@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "warden-harness"
+version = "0.1.0"
+description = "Warden — a governance-and-eval harness for long-running agents on the Meta Model API. Durable task graphs, weighted-rubric grading, fail-closed instruments, human escalation at real authority gates."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary — hackathon build, see Official Rules (Oct 26) for IP terms" }
+authors = [{ name = "Israel Lee Armstead" }]
+# Deliberately zero runtime dependencies: stdlib only, so the demo runs anywhere.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+warden = "warden.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

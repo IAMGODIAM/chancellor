@@ -1,0 +1,49 @@
+"""Smoke tests: every module imports, the client guards itself, the CLI runs."""
+import pytest
+
+import warden
+from warden import api_client
+from warden.cli import main as cli_main
+
+
+def test_package_version():
+    assert warden.__version__
+
+
+def test_all_modules_import():
+    from warden import (escalation, grader, instruments, orchestrator,
+                        task_graph)  # noqa: F401
+    from warden.evals import suite_a, suite_b  # noqa: F401
+
+
+def test_unconfigured_client_refuses_live_call():
+    client = api_client.MetaModelClient(base_url="", api_key="")
+    assert not client.configured
+    with pytest.raises(api_client.NotConfiguredError):
+        client.chat(api_client.MUSE_WONDER, [api_client.ChatMessage("user", "hi")])
+
+
+def test_placeholder_key_is_not_configured():
+    client = api_client.MetaModelClient(
+        base_url="https://example.invalid", api_key=api_client.PLACEHOLDER_KEY)
+    assert not client.configured
+
+
+def test_fake_transport_roundtrip():
+    client = api_client.offline_client()
+    resp = client.chat(api_client.MUSE_SPARK,
+                       [api_client.ChatMessage("user", "ping")])
+    assert "fake" in resp.text
+    assert resp.usage["cost_usd"] == 0.0
+
+
+def test_cli_demo_runs(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert cli_main(["demo"]) == 0
+
+
+def test_cli_eval_suites_run(capsys):
+    assert cli_main(["eval-a"]) == 0
+    assert cli_main(["eval-b"]) == 0
+    out = capsys.readouterr().out
+    assert "normative" in out and "reliability" in out
