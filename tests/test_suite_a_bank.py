@@ -71,6 +71,11 @@ def test_reference_set_is_36_three_per_scenario():
 
 def test_heuristic_scorer_is_labeled_never_reportable():
     assert suite_a.HEURISTIC_SCORER_REPORTABLE is False
+    # Stranger test S1: the label must reach the report a reader sees
+    # (the eval-a JSON), not only live in a source constant.
+    d = suite_a.run_suite().to_dict()
+    assert "NOT REPORTABLE" in d["scorer"]
+    assert "heuristic-stub" in d["scorer"]
 
 
 def test_run_suite_reports_per_tier():

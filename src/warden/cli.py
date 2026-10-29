@@ -148,7 +148,8 @@ def run_demo(state_dir: str = ".warden") -> int:
     print(f"run: {report.graph_name}  halted={report.halted} "
           f"reason={report.halt_reason}")
     print(f"completed: {report.completed}")
-    print(f"grades: {report.grades} (by judge, pin {judge.pin[:12]}…)")
+    print(f"grades: {report.grades} (scripted offline judge — rehearsal "
+          f"grades, pin {judge.pin[:12]}…)")
     print(f"audit receipts: {len(audit.read_all())} "
           f"(see {state_dir}/audit-log.jsonl)")
     print(f"audit checkpoint: signed over {sealed} receipts "

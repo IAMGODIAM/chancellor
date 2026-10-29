@@ -60,7 +60,9 @@ def test_demo_run_grades_come_from_the_judge(tmp_path, capsys):
     state_dir = tmp_path / ".warden"
     assert cli.run_demo(str(state_dir)) == 0
     out = capsys.readouterr().out
-    assert "by judge, pin" in out
+    # Stranger test S6: the demo's grades are scripted rehearsal grades,
+    # and the printed line must say so (was: "by judge, pin").
+    assert "scripted offline judge — rehearsal grades, pin" in out
 
     state = json.loads((state_dir / "demo.state.json").read_text())
     nodes = {n["id"]: n for n in state["nodes"]}

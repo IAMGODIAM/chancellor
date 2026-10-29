@@ -134,6 +134,10 @@ class SuiteAReport:
     results: list[ScenarioResult]
     mean_total: float
     pass_rate: float
+    # Which scorer produced these numbers, labeled for the reader of the
+    # report itself (stranger test S1): the heuristic-stub label must
+    # travel with the output, not only live in a source constant.
+    scorer_label: str = ""
 
     def tier_means(self) -> dict[str, float]:
         """Mean total per tier. Report per tier, never only one mean
@@ -147,6 +151,7 @@ class SuiteAReport:
     def to_dict(self) -> dict:
         return {
             "suite": "A-normative-judgment",
+            "scorer": self.scorer_label,
             "scenarios": len(self.results),
             "mean_total": self.mean_total,
             "pass_rate": self.pass_rate,
@@ -231,6 +236,13 @@ def judge_scorer(judge: Judge, with_gold_context: bool = True):
 def run_suite(responder=None, scorer=None, scenarios=None) -> SuiteAReport:
     responder = responder or stub_responder
     scorer = scorer or heuristic_scorer
+    if scorer is heuristic_scorer:
+        scorer_label = ("heuristic-stub — NOT REPORTABLE (grades style, "
+                        "not judgment; reported Suite A scores come from "
+                        "the calibrated model judge)")
+    else:
+        scorer_label = ("provided scorer — reportable only via the "
+                        "calibrated model judge (see calibration.py)")
     scenarios = scenarios or SCENARIOS
     results: list[ScenarioResult] = []
     for sc in scenarios:
@@ -242,4 +254,5 @@ def run_suite(responder=None, scorer=None, scenarios=None) -> SuiteAReport:
     pass_rate = (sum(1 for r in results if r.verdict == "pass") / len(results)
                  if results else 0.0)
     return SuiteAReport(results=results, mean_total=mean_total,
-                        pass_rate=round(pass_rate, 3))
+                        pass_rate=round(pass_rate, 3),
+                        scorer_label=scorer_label)

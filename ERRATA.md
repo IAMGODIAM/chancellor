@@ -5,8 +5,9 @@ text is never edited in place; the correction lives here and governs.
 
 ## E-1 — "Muse Wonder Full" is not an API model (2026-10-29)
 
-**Where the error stands:** the frozen SPEC (`../SPEC.md`, architecture
-diagram) lists the client tier as "Muse Spark · Muse Wonder / Wonder
+**Where the error stands:** the frozen SPEC (architecture diagram; the
+SPEC is available in the submission packet and is not part of this
+repo) lists the client tier as "Muse Spark · Muse Wonder / Wonder
 Full · …", and early pitch copy echoed it.
 
 **The correction:** `muse-wonder-full` does not exist as a model on the
