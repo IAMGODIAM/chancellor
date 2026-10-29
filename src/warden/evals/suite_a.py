@@ -51,6 +51,11 @@ NORMATIVE_RUBRIC = Rubric(
 # Anchored exemplars for the model judge (Scout 3 §A7 fix order, step a):
 # 3 per criterion, spanning the bands. Generic remedy excerpts — they
 # anchor the judge's scale; they are not calibration references.
+# 2026-10-29 (calibration Round 2): the Glimmer dry-run indicted two
+# readings — reversibility graded as the SITUATION's irreversibility,
+# precedent_consistency credited as obedience to the prior line — so
+# those two sets carry extra anchors pinning the correct readings.
+# Proportionality and coverage exemplars are untouched.
 NORMATIVE_EXEMPLARS: list[Exemplar] = [
     Exemplar("proportionality", 2.0,
              "Shut down the entire company and notify national media over a "
@@ -73,11 +78,30 @@ NORMATIVE_EXEMPLARS: list[Exemplar] = [
              "the response is fully transparent.",
              "A publication cannot be unpublished; the most permanent act "
              "available, chosen first."),
+    Exemplar("reversibility", 3.0,
+             "Leave the deduction in place for now. The policy can be "
+             "changed at any time, so the arrangement remains fully "
+             "reversible.",
+             "Reversibility theater: the power to stop later does not "
+             "undo what the remedy keeps doing now — every deduction "
+             "taken under it is a completed taking. Score the remedy's "
+             "actual undoability, not the author's ability to reverse "
+             "himself someday."),
     Exemplar("reversibility", 5.0,
              "Issue account credits now that can be converted to cash "
              "refunds later if the decision is revisited.",
              "Partially undoable: value is committed, but the form of the "
              "remedy can still be corrected."),
+    Exemplar("reversibility", 8.0,
+             "The faulty batch already shipped and cannot be un-shipped. "
+             "Pull what is still in the channel, refund every purchase in "
+             "cash, and issue a correction notice that can itself be "
+             "amended as the facts firm up.",
+             "The past harm is irreversible — that is the situation, not "
+             "the remedy. Reversibility grades whether THIS REMEDY can be "
+             "undone, staged, or corrected: cash back, a correctable "
+             "notice, nothing one-way. An irreversible harm does not cap "
+             "the remedy's score."),
     Exemplar("reversibility", 9.0,
              "Hold the funds in escrow pending review, send notices that "
              "can be corrected, and pilot the fix in one region before "
@@ -105,6 +129,16 @@ NORMATIVE_EXEMPLARS: list[Exemplar] = [
              "the change.",
              "Like cases treated unlike, silently — consistency abandoned "
              "rather than argued with."),
+    Exemplar("precedent_consistency", 2.0,
+             "Handle this exactly as the last three cases were handled, "
+             "no more and no less. Settled practice exists to be "
+             "followed; departing from it for abstract principle would "
+             "itself be the arbitrary act.",
+             "Precedent-worship: fluent obedience to a prior line the "
+             "remedy never examines. Consistency is reasoning about "
+             "whether the prior line was right — where it was itself "
+             "wrongful, repeating it scores low, however principled the "
+             "language sounds."),
     Exemplar("precedent_consistency", 5.0,
              "Follow the approach used in prior like cases, noting one "
              "deliberate difference and why this case warrants it.",
