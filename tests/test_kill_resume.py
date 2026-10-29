@@ -141,9 +141,20 @@ def test_kill_resume_trials(tmp_path):
 
         graph = TaskGraph.load(state)
         assert graph.is_complete(), f"trial {trial}: graph incomplete"
-        effects = (markers / "effects.log").read_text().split()
-        assert sorted(effects) == ["n0", "n1", "n2", "n3", "n4", "n5"], (
-            f"trial {trial}: effects {sorted(effects)} — each node must "
+        # Exactly-once is asserted from the *.effect files — the durable
+        # record of an effect having landed. The worker's append to
+        # effects.log is a second, separate step after the effect file
+        # is written, and the idempotent-return path on resume does not
+        # re-log; a SIGKILL landing between the two steps therefore
+        # leaves a landed effect unlogged, and the append-log undercounts
+        # (the second T3 race, diagnosed 2026-10-29 — DEMO-SCRIPT §4 #13).
+        # Counting the log asserted from a racy witness; counting the
+        # effect files asserts from the state of record. One file exists
+        # per node id by construction, so set equality here is exactly
+        # "each node took effect exactly once, none missing, none extra."
+        effects = sorted(p.stem for p in markers.glob("*.effect"))
+        assert effects == ["n0", "n1", "n2", "n3", "n4", "n5"], (
+            f"trial {trial}: effects {effects} — each node must "
             "take effect exactly once across all lifetimes")
 
     assert corrupted == 0, f"{corrupted} corrupted state files across trials"
