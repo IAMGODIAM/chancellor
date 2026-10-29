@@ -21,3 +21,7 @@ The development record for this repository during the Meta Global AI Developer H
 **State at end of day:** 154 tests passing, 0 failing. Golden-run check: the demo's report output is byte-identical across clean runs. The repository was created today (private during the build; it goes public before the submission, as the rules require).
 
 **Next:** live transport wiring when the team's API access lands (everything above runs offline today); calibration of the judge against the hand-scored key; the golden freeze and submission package ahead of Nov 4, 12:00 PM ET.
+
+## 2026-10-29 (later) — Calibration key approved
+
+The 36-reference calibration key was draft-scored by the team's lead, reviewed by the project owner, and approved with one amendment: the A07 mediocre reference (full customer refunds and prospective disclosure, but no report to the regulator) is scored **revise**, not pass — full restitution without regulator notification does not pass. The amended key validates clean and its verdict bands separate exactly: 12 pass / 12 revise / 12 fail across the strong / mediocre / fluent-but-wrong tiers. A zero-cost dry-run of the calibration statistics against a stand-in judge was recomputed against the approved key: the judge ranks remedies well (Spearman ρ 0.910) but reads two criteria — reversibility and precedent consistency — materially lower than the key (κ 0.200 / 0.061), so the dry-run gate fails and names its own fix: strengthen those two criteria's anchored exemplars before the calibration run of record against the production judge.
