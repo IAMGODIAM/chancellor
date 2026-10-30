@@ -10,7 +10,7 @@ import random
 
 import pytest
 
-from warden.grader import Criterion, Rubric, grade
+from chancellor.grader import Criterion, Rubric, grade
 
 CASES = 200
 

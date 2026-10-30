@@ -2,11 +2,11 @@
 style-blind scorer (must pass), a verbosity-biased scorer (must be
 caught), and the heuristic plumbing scorer (must be indicted where it
 is in fact measuring prose — that indictment is the probe working)."""
-from warden.evals import suite_a
-from warden.evals.suite_a_bank import scenario_by_id
-from warden.evals.suite_a_probes import (
+from chancellor.evals import suite_a
+from chancellor.evals.suite_a_bank import scenario_by_id
+from chancellor.evals.suite_a_probes import (
     FILLER, hedge_probe, padding_probe, permutation_probe, style_twin_probe)
-from warden.evals.suite_a_references import references_for
+from chancellor.evals.suite_a_references import references_for
 
 FLAT = {"proportionality": 6.0, "reversibility": 6.0,
         "stakeholder_coverage": 6.0, "precedent_consistency": 6.0}

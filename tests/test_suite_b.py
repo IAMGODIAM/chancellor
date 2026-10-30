@@ -3,14 +3,14 @@ fault manifest. These tests pin the accounting rules the council ruled:
 triggered-only denominators, drift/divergence/displacement as three
 separate measures (AM-4), timing in its own denominator (AM-3), and
 the zero-denominator guards (red-team K5)."""
-from warden.evals import suite_b
-from warden.evals.suite_b_tasks import TASKS, TASKS_BY_ID
-from warden.evals.suite_b_world import (FAULT_CRASH, FAULT_OMISSION,
+from chancellor.evals import suite_b
+from chancellor.evals.suite_b_tasks import TASKS, TASKS_BY_ID
+from chancellor.evals.suite_b_world import (FAULT_CRASH, FAULT_OMISSION,
                                          FAULT_VALUE, SUB_TIMING,
                                          FaultEntry, FaultInjector,
                                          ScriptedAgent, ToolBelt, World,
                                          suite_transport)
-from warden.api_client import CostMeter, MetaModelClient
+from chancellor.api_client import CostMeter, MetaModelClient
 
 SEED = 20261029
 

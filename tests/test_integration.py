@@ -20,17 +20,17 @@ from pathlib import Path
 
 import pytest
 
-import warden
-from warden import cli
-from warden.api_client import ChatResponse, MetaModelClient
-from warden.escalation import (ActionClass, AuditLog, AuditWriteError,
+import chancellor
+from chancellor import cli
+from chancellor.api_client import ChatResponse, MetaModelClient
+from chancellor.escalation import (ActionClass, AuditLog, AuditWriteError,
                                EscalationRequest, Gatekeeper)
-from warden.grader import OUTPUT_RUBRIC
-from warden.instruments import default_panel
-from warden.judge import Judge
-from warden.orchestrator import CrewRunner
-from warden.task_graph import TaskGraph
-from warden.verify_log import verify_log
+from chancellor.grader import OUTPUT_RUBRIC
+from chancellor.instruments import default_panel
+from chancellor.judge import Judge
+from chancellor.orchestrator import CrewRunner
+from chancellor.task_graph import TaskGraph
+from chancellor.verify_log import verify_log
 
 
 # ---------------------------------------------------------------- demo run
@@ -57,7 +57,7 @@ def test_demo_run_grades_come_from_the_judge(tmp_path, capsys):
     """Behavioral half: a full demo run completes with judge-produced
     grades while every persisted artifact is grade-free, and the audit
     log it ships verifies — checkpoint included."""
-    state_dir = tmp_path / ".warden"
+    state_dir = tmp_path / ".chancellor"
     assert cli.run_demo(str(state_dir)) == 0
     out = capsys.readouterr().out
     # Stranger test S6: the demo's grades are scripted rehearsal grades,
@@ -81,15 +81,15 @@ def test_demo_run_grades_come_from_the_judge(tmp_path, capsys):
 
 
 def test_demo_audit_log_verifies_via_module_cli(tmp_path):
-    """The shipped demo log passes `python -m warden.verify_log` with
+    """The shipped demo log passes `python -m chancellor.verify_log` with
     exit 0, exactly as the submission's stranger would run it."""
-    state_dir = tmp_path / ".warden"
+    state_dir = tmp_path / ".chancellor"
     assert cli.run_demo(str(state_dir)) == 0
     env = dict(os.environ)
-    src = str(Path(warden.__file__).resolve().parent.parent)
+    src = str(Path(chancellor.__file__).resolve().parent.parent)
     env["PYTHONPATH"] = src + os.pathsep + env.get("PYTHONPATH", "")
     proc = subprocess.run(
-        [sys.executable, "-m", "warden.verify_log",
+        [sys.executable, "-m", "chancellor.verify_log",
          str(state_dir / "audit-log.jsonl")],
         capture_output=True, text=True, env=env, timeout=60)
     assert proc.returncode == 0, proc.stdout + proc.stderr
@@ -209,6 +209,6 @@ def test_package_level_exports():
     for name in ("AttemptCapError", "IllegalTransitionError",
                  "SCHEMA_VERSION", "Judge", "JudgeError", "CostMeter",
                  "AuditLog", "AuditWriteError"):
-        assert name in warden.__all__
-        assert getattr(warden, name) is not None
-    assert warden.SCHEMA_VERSION == 1
+        assert name in chancellor.__all__
+        assert getattr(chancellor, name) is not None
+    assert chancellor.SCHEMA_VERSION == 1

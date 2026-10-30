@@ -1,6 +1,6 @@
 import pytest
 
-from warden.grader import Criterion, Rubric, grade
+from chancellor.grader import Criterion, Rubric, grade
 
 RUBRIC = Rubric("r", [Criterion("a", 0.6), Criterion("b", 0.4)],
                 pass_mark=70, revise_mark=50)

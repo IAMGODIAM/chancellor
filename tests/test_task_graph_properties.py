@@ -6,7 +6,7 @@ import random
 
 import pytest
 
-from warden.task_graph import (SCHEMA_VERSION, IllegalTransitionError,
+from chancellor.task_graph import (SCHEMA_VERSION, IllegalTransitionError,
                                NodeStatus, TaskGraph)
 
 CASES = 100

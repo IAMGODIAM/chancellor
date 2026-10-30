@@ -1,4 +1,4 @@
-# Warden
+# Chancellor
 
 **The governance-and-eval harness for long-running agents.**
 
@@ -14,19 +14,19 @@ Built for the Meta Model API (Muse Spark · Muse Wonder · Muse Image · SAM 3.1
 > consumer subscription tier name, unreachable through the API. The frozen SPEC's
 > tier list named it in error; the correction is recorded in [ERRATA.md](ERRATA.md)
 > (the SPEC itself is frozen and is not edited). The authoritative model column —
-> exact, versioned IDs only — lives in `src/warden/api_client.py` (`MODEL_IDS`).
+> exact, versioned IDs only — lives in `src/chancellor/api_client.py` (`MODEL_IDS`).
 
 ## The pitch
 
 Long-running agents fail quietly: they drift, mis-grade their own work, trust broken
 tools, and sail past decisions that were never theirs to make. Frameworks optimize for
-capability. Warden is the other half — **governance**:
+capability. Chancellor is the other half — **governance**:
 
 - **Work is a graph, not a vibe.** Every run is an explicit, durable task graph that
   persists to disk and resumes after a crash.
 - **Output is graded, not trusted.** Every consequential output is scored against a
   weighted rubric before acceptance.
-- **Instruments fail closed.** If Warden's own checks error, the run halts. A broken
+- **Instruments fail closed.** If Chancellor's own checks error, the run halts. A broken
   gauge is a stop signal, never a pass — and there is no flag to turn this off.
 - **Authority escalates; capability doesn't.** Spend, external sends, publishing,
   irreversible acts, and credential use stop at a human gate. Every gate decision —
@@ -51,7 +51,7 @@ completes fewer tasks at a higher cost per success — and never once claims a
 success that did not happen. Drift 0 is an observation across these 360 runs,
 stated with its denominator, not a bound on future runs.
 
-**Tests:** 154 passing, 0 failing — including the kill-resume gate (SIGKILL
+**Tests:** 155 passing, 0 failing — including the kill-resume gate (SIGKILL
 trials; each node's effect lands exactly once, asserted from the effect files
 themselves): the kill-resume test passes 30/30 consecutive runs, and the full
 suite is green on 3 consecutive runs.
@@ -73,16 +73,16 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
 pytest                 # smoke + unit tests (all offline)
-warden demo            # the scripted governed run, offline
-warden eval-a          # Suite A with stub agents
-warden eval-b          # Suite B reliability metrics
+chancellor demo            # the scripted governed run, offline
+chancellor eval-a          # Suite A with stub agents
+chancellor eval-b          # Suite B reliability metrics
 ```
 
 Zero runtime dependencies — stdlib only, Python ≥ 3.11.
 
-The demo writes its state to `./.warden` in the current directory
+The demo writes its state to `./.chancellor` in the current directory
 (task-graph state, the audit log, and its checkpoints), and re-runs
-append to it. Delete `./.warden` for a clean run — the demo's printed
+append to it. Delete `./.chancellor` for a clean run — the demo's printed
 output is byte-identical across clean runs.
 
 ## Demo
@@ -91,7 +91,7 @@ output is byte-identical across clean runs.
 
 **Demo video:** _link lands here on submission day._
 
-Until then, the demo is the offline run itself — `warden demo` (Quickstart
+Until then, the demo is the offline run itself — `chancellor demo` (Quickstart
 above). Its printed output is byte-identical across clean runs, so the video
 is a capture of a fixed target, not a lucky take.
 
@@ -101,7 +101,7 @@ Every governed run writes a hash-chained audit log with signed
 checkpoints. Verify one offline — no credentials, no network:
 
 ```bash
-python -m warden.verify_log .warden/audit-log.jsonl
+python -m chancellor.verify_log .chancellor/audit-log.jsonl
 ```
 
 Exit 0 means the chain is intact and the newest signed checkpoint
@@ -119,7 +119,7 @@ export META_MODEL_API_KEY=...        # never commit this
 ```
 
 Until credentials exist, `MetaModelClient.chat()` raises `NotConfiguredError`
-unless given a transport — use `warden.api_client.offline_client()` for
+unless given a transport — use `chancellor.api_client.offline_client()` for
 development. The live transport lands when the team's API access does,
 behind the same client seam; the build plan lives in the frozen SPEC.md
 (available in the submission packet — it is not part of this repo).
@@ -127,7 +127,7 @@ behind the same client seam; the build plan lives in the frozen SPEC.md
 ## Layout
 
 ```
-src/warden/
+src/chancellor/
   task_graph.py    explicit DAG, validation, persistence, resume
   orchestrator.py  CrewRunner: governed execution of the graph
   grader.py        weighted rubrics, verdict bands, fail-closed grading
@@ -136,8 +136,8 @@ src/warden/
   api_client.py    Meta Model API client interface (env-configured)
   judge.py         the Judge: a separate caller that produces the scores
   receipts.py      hash-chained receipts + signed Merkle checkpoints
-  verify_log.py    offline audit-log verifier (python -m warden.verify_log)
-  cli.py           warden demo | eval-a | eval-b
+  verify_log.py    offline audit-log verifier (python -m chancellor.verify_log)
+  cli.py           chancellor demo | eval-a | eval-b
   evals/
     suite_a.py           normative-judgment eval (remedy design)
     suite_a_bank.py      the 12 scenarios, 3 tiers, one-fact-flip twins
@@ -164,7 +164,7 @@ tests/             smoke + unit tests, all offline
   SAM 3.1 — exact, versioned IDs only; see [ERRATA.md](ERRATA.md) E-1):
   fail-closed instruments and receipt-bearing gates are the idea, not a
   feature list.
-- **Demo (25%)** — `warden demo` runs end-to-end offline today; the same run
+- **Demo (25%)** — `chancellor demo` runs end-to-end offline today; the same run
   goes live on Meta models once API access lands, behind a one-function
   transport swap. (Video: see the Demo section above.)
 - **Technical Depth (20%)** — durable resumable task graphs proven under

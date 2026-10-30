@@ -18,20 +18,20 @@ import sys
 import time
 from pathlib import Path
 
-import warden
-from warden.task_graph import TaskGraph
+import chancellor
+from chancellor.task_graph import TaskGraph
 
-SRC = str(Path(warden.__file__).resolve().parent.parent)
+SRC = str(Path(chancellor.__file__).resolve().parent.parent)
 TRIALS = 20
 
 CHILD = r"""
 import json, os, random, sys, time
 from pathlib import Path
 
-from warden.grader import OUTPUT_RUBRIC
-from warden.instruments import default_panel
-from warden.orchestrator import CrewRunner
-from warden.task_graph import TaskGraph
+from chancellor.grader import OUTPUT_RUBRIC
+from chancellor.instruments import default_panel
+from chancellor.orchestrator import CrewRunner
+from chancellor.task_graph import TaskGraph
 
 state = Path(sys.argv[1]); markers = Path(sys.argv[2])
 seed = int(sys.argv[3])

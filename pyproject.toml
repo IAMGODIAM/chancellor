@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "warden-harness"
+name = "chancellor-harness"
 version = "0.1.0"
-description = "Warden — a governance-and-eval harness for long-running agents on the Meta Model API. Durable task graphs, weighted-rubric grading, fail-closed instruments, human escalation at real authority gates."
+description = "Chancellor — a governance-and-eval harness for long-running agents on the Meta Model API. Durable task graphs, weighted-rubric grading, fail-closed instruments, human escalation at real authority gates."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary — hackathon build, see Official Rules (Oct 26) for IP terms" }
@@ -17,7 +17,7 @@ dependencies = []
 dev = ["pytest>=8"]
 
 [project.scripts]
-warden = "warden.cli:main"
+chancellor = "chancellor.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

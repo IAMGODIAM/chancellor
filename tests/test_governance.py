@@ -6,11 +6,11 @@ re-evaluates only when a decider is actually attached.
 """
 import pytest
 
-from warden.escalation import ActionClass, Gatekeeper
-from warden.grader import OUTPUT_RUBRIC
-from warden.instruments import InstrumentPanel, default_panel
-from warden.orchestrator import CrewRunner
-from warden.task_graph import NodeStatus, TaskGraph
+from chancellor.escalation import ActionClass, Gatekeeper
+from chancellor.grader import OUTPUT_RUBRIC
+from chancellor.instruments import InstrumentPanel, default_panel
+from chancellor.orchestrator import CrewRunner
+from chancellor.task_graph import NodeStatus, TaskGraph
 
 GOOD = {"correctness": 9, "completeness": 9, "clarity": 9, "safety": 10}
 # 6/10 across the board -> 60.0, squarely in the revise band (50..70).

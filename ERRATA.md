@@ -18,7 +18,7 @@ it as an API-called tier is wrong.
 
 **What governs instead:** the model column admits only exact, versioned
 model IDs (Council AM-5), enforced in code in
-`src/warden/api_client.py` (`MODEL_IDS`, with a test asserting the
+`src/chancellor/api_client.py` (`MODEL_IDS`, with a test asserting the
 nonexistent constant is absent):
 
 - `muse-spark-1.3` (+ `muse-spark-1.3-contributor`)

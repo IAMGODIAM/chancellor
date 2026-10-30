@@ -1,4 +1,4 @@
-from warden.evals import suite_a, suite_b
+from chancellor.evals import suite_a, suite_b
 
 
 def test_suite_a_structure():
@@ -27,7 +27,7 @@ def test_suite_b_no_failures_reports_na_not_vacuous_perfection():
     # Red-team K5 / Lane 1 handoff: with zero triggered faults the old
     # suite reported recovery_rate == 1.0 — vacuous perfection. The
     # rebuilt suite reports "n/a (no triggered faults)" instead.
-    from warden.evals.suite_b_tasks import TASKS
+    from chancellor.evals.suite_b_tasks import TASKS
     task = TASKS[0]
     clean_run = suite_b.run_configuration(task, "governed", [], "clean")
     arm = suite_b.ArmReport(arm="governed", outcomes=[clean_run])

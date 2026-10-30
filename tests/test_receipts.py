@@ -8,9 +8,9 @@ import json
 
 import pytest
 
-from warden import receipts
-from warden.escalation import ActionClass, AuditLog, EscalationRequest, Gatekeeper
-from warden.verify_log import main as verify_main, verify_log
+from chancellor import receipts
+from chancellor.escalation import ActionClass, AuditLog, EscalationRequest, Gatekeeper
+from chancellor.verify_log import main as verify_main, verify_log
 
 
 def _spend(i=0):

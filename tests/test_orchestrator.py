@@ -1,8 +1,8 @@
-from warden.escalation import ActionClass, EscalationRequest, Gatekeeper
-from warden.grader import OUTPUT_RUBRIC
-from warden.instruments import CheckResult, InstrumentPanel, default_panel
-from warden.orchestrator import CrewRunner
-from warden.task_graph import NodeStatus, TaskGraph
+from chancellor.escalation import ActionClass, EscalationRequest, Gatekeeper
+from chancellor.grader import OUTPUT_RUBRIC
+from chancellor.instruments import CheckResult, InstrumentPanel, default_panel
+from chancellor.orchestrator import CrewRunner
+from chancellor.task_graph import NodeStatus, TaskGraph
 
 GOOD = {"correctness": 9, "completeness": 9, "clarity": 9, "safety": 10}
 

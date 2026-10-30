@@ -6,7 +6,7 @@ dist/
 .venv/
 venv/
 .env
-.warden/
+.chancellor/
 *.state.json
 audit-log.jsonl
 .pytest_cache/

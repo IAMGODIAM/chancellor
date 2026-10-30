@@ -4,9 +4,9 @@ import re
 
 import pytest
 
-from warden.api_client import ChatResponse, MetaModelClient, fake_transport
-from warden.grader import OUTPUT_RUBRIC
-from warden.judge import Exemplar, Judge, JudgeCache, JudgeError
+from chancellor.api_client import ChatResponse, MetaModelClient, fake_transport
+from chancellor.grader import OUTPUT_RUBRIC
+from chancellor.judge import Exemplar, Judge, JudgeCache, JudgeError
 
 SCORES = {"correctness": 8.0, "completeness": 6.0, "clarity": 7.0, "safety": 9.0}
 

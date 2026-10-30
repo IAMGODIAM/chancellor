@@ -1,6 +1,6 @@
 import pytest
 
-from warden.task_graph import CycleError, NodeStatus, TaskGraph
+from chancellor.task_graph import CycleError, NodeStatus, TaskGraph
 
 
 def _graph():

@@ -5,8 +5,8 @@ never from a worker's self-reported cost_usd (advisory only) — and
 splits spend by lane so the burn audit can read canonical spend
 against the canonical ceiling (AM-9vi $40 target; EA-5 $60 hard stop).
 """
-from warden import api_client
-from warden.api_client import ChatMessage, ChatResponse, MetaModelClient
+from chancellor import api_client
+from chancellor.api_client import ChatMessage, ChatResponse, MetaModelClient
 
 
 def _fixed_transport(prompt_tokens, completion_tokens, reported_cost=None):

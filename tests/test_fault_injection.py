@@ -6,11 +6,11 @@ and nothing raises out of the runner.
 """
 import time
 
-from warden.escalation import ActionClass, AuditLog, Gatekeeper
-from warden.grader import OUTPUT_RUBRIC
-from warden.instruments import InstrumentPanel, default_panel
-from warden.orchestrator import CrewRunner
-from warden.task_graph import NodeStatus, TaskGraph
+from chancellor.escalation import ActionClass, AuditLog, Gatekeeper
+from chancellor.grader import OUTPUT_RUBRIC
+from chancellor.instruments import InstrumentPanel, default_panel
+from chancellor.orchestrator import CrewRunner
+from chancellor.task_graph import NodeStatus, TaskGraph
 
 GOOD = {"correctness": 9, "completeness": 9, "clarity": 9, "safety": 10}
 
@@ -207,7 +207,7 @@ def test_approver_that_raises_is_a_denial_not_a_crash(tmp_path):
 def test_audit_log_is_append_only_by_prefix(tmp_path):
     """Snapshot bytes after each decision: every earlier snapshot is a
     strict prefix of the later file — the log is never rewritten."""
-    from warden.escalation import EscalationRequest
+    from chancellor.escalation import EscalationRequest
 
     path = tmp_path / "audit.jsonl"
     log = AuditLog(path)

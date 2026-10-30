@@ -7,11 +7,11 @@ import re
 
 import pytest
 
-from warden.api_client import ChatResponse, MetaModelClient
-from warden.evals import calibration as cal
-from warden.evals.suite_a import NORMATIVE_RUBRIC
-from warden.evals.suite_a_references import REFERENCES
-from warden.judge import Judge
+from chancellor.api_client import ChatResponse, MetaModelClient
+from chancellor.evals import calibration as cal
+from chancellor.evals.suite_a import NORMATIVE_RUBRIC
+from chancellor.evals.suite_a_references import REFERENCES
+from chancellor.judge import Judge
 
 
 # ---- statistics on known-agreement data -------------------------------

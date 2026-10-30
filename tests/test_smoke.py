@@ -1,19 +1,19 @@
 """Smoke tests: every module imports, the client guards itself, the CLI runs."""
 import pytest
 
-import warden
-from warden import api_client
-from warden.cli import main as cli_main
+import chancellor
+from chancellor import api_client
+from chancellor.cli import main as cli_main
 
 
 def test_package_version():
-    assert warden.__version__
+    assert chancellor.__version__
 
 
 def test_all_modules_import():
-    from warden import (escalation, grader, instruments, orchestrator,
+    from chancellor import (escalation, grader, instruments, orchestrator,
                         task_graph)  # noqa: F401
-    from warden.evals import suite_a, suite_b  # noqa: F401
+    from chancellor.evals import suite_a, suite_b  # noqa: F401
 
 
 def test_unconfigured_client_refuses_live_call():

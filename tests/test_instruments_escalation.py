@@ -1,6 +1,6 @@
-from warden.escalation import (ActionClass, AuditLog, EscalationRequest,
+from chancellor.escalation import (ActionClass, AuditLog, EscalationRequest,
                                Gatekeeper)
-from warden.instruments import (CheckResult, InstrumentPanel, default_panel)
+from chancellor.instruments import (CheckResult, InstrumentPanel, default_panel)
 
 
 def test_panel_pass_and_fail():

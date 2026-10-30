@@ -5,13 +5,13 @@ from collections import Counter
 
 import pytest
 
-from warden.api_client import ChatResponse, MetaModelClient
-from warden.evals import suite_a
-from warden.evals.suite_a_bank import (
+from chancellor.api_client import ChatResponse, MetaModelClient
+from chancellor.evals import suite_a
+from chancellor.evals.suite_a_bank import (
     BANNED_RUBRIC_TERMS, SCENARIOS, TWINS, scenario_by_id, scenario_text)
-from warden.evals.suite_a_gold import HELD_BACK, gold_stakeholders
-from warden.evals.suite_a_references import QUALITIES, REFERENCES, references_for
-from warden.judge import Judge
+from chancellor.evals.suite_a_gold import HELD_BACK, gold_stakeholders
+from chancellor.evals.suite_a_references import QUALITIES, REFERENCES, references_for
+from chancellor.judge import Judge
 
 
 def test_bank_is_twelve_in_three_tiers():
