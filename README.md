@@ -35,6 +35,37 @@ capability. Warden is the other half — **governance**:
 Plus two eval suites: **Suite A**, normative judgment on synthetic remedy-design
 problems, and **Suite B**, long-horizon agent reliability under failure injection.
 
+## Results (measured, Oct 29, 2026)
+
+**Suite B reliability frontier** — 360 runs, identical fault manifests (the
+manifest hash `5c75a88c…` prints in every report):
+
+| | Governed | Ungoverned |
+|---|---|---|
+| Drift (claimed success, final state failed) | **0** | **30** |
+| Completion | 0.333 | 0.667 |
+| Cost per success | $0.002147 | $0.001826 |
+
+Governance is not free, and the price is printed, not hidden: the governed arm
+completes fewer tasks at a higher cost per success — and never once claims a
+success that did not happen. Drift 0 is an observation across these 360 runs,
+stated with its denominator, not a bound on future runs.
+
+**Tests:** 154 passing, 0 failing — including the kill-resume gate (SIGKILL
+trials; each node's effect lands exactly once, asserted from the effect files
+themselves): the kill-resume test passes 30/30 consecutive runs, and the full
+suite is green on 3 consecutive runs.
+
+**Suite A:** the calibration key of record is approved; the calibration run of
+record has not yet run, and the zero-cost stand-in dry-runs failed the
+calibration gate (κ 0.200 / 0.061, round 2 κ 0.314 / 0.132) — so no Suite A
+score is reported yet. The gate catching an uncalibrated judge at $0 is the
+method working as designed.
+
+The full record — measurements, honest negative results, and corrections filed
+as new entries rather than silent edits — is the development log:
+[BUILD-LOG.md](BUILD-LOG.md) and [ERRATA.md](ERRATA.md).
+
 ## Quickstart
 
 ```bash
@@ -53,6 +84,16 @@ The demo writes its state to `./.warden` in the current directory
 (task-graph state, the audit log, and its checkpoints), and re-runs
 append to it. Delete `./.warden` for a clean run — the demo's printed
 output is byte-identical across clean runs.
+
+## Demo
+
+<!-- FREEZE-DAY INSERT: replace the placeholder line below with the demo video URL. One line; nothing else in this section changes. -->
+
+**Demo video:** _link lands here on submission day._
+
+Until then, the demo is the offline run itself — `warden demo` (Quickstart
+above). Its printed output is byte-identical across clean runs, so the video
+is a capture of a fixed target, not a lucky take.
 
 ## Verify the audit log
 
@@ -113,10 +154,20 @@ tests/             smoke + unit tests, all offline
 
 ## How it maps to the judging criteria
 
-- **Creativity** — governance as the product: fail-closed instruments and
-  receipt-bearing gates are the idea, not a feature list.
-- **Technical ambition** — durable resumable graphs, rubric-graded outputs,
-  failure-injected reliability measurement, cost as a first-class instrument.
-- **Whether it works** — `warden demo` runs end-to-end offline today; the same
-  run goes live on Meta models once API access lands, behind a one-function
-  transport swap.
+- **Impact (30%)** — for anyone who runs long-running agents with real
+  authority: every consequential act is gated before it happens, graded after
+  it lands, and receipted either way — so an operator can hand an agent real
+  work (spend, sends, publishing, irreversible acts) and prove afterward
+  exactly what it did, what it cost, and who approved it.
+- **Tooling — creative use of Meta's tools (25%)** — governance as the
+  product, built for the Meta Model API's model column (Spark, Wonder, Image,
+  SAM 3.1 — exact, versioned IDs only; see [ERRATA.md](ERRATA.md) E-1):
+  fail-closed instruments and receipt-bearing gates are the idea, not a
+  feature list.
+- **Demo (25%)** — `warden demo` runs end-to-end offline today; the same run
+  goes live on Meta models once API access lands, behind a one-function
+  transport swap. (Video: see the Demo section above.)
+- **Technical Depth (20%)** — durable resumable task graphs proven under
+  SIGKILL trials, rubric-graded outputs from an independent judge,
+  failure-injected reliability measurement with the cost printed beside the
+  frontier, and a hash-chained audit log verifiable offline.
