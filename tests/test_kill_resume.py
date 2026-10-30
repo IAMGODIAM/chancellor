@@ -51,10 +51,23 @@ def worker(node):
     if eff.exists():
         # Idempotency key = node id: a re-invocation after a crash
         # returns the recorded effect instead of taking effect twice.
-        return json.loads(eff.read_text())
+        # A TORN record (kill landed inside a previous lifetime's write)
+        # is an effect that never committed -- treat it as absent and
+        # recompute, never as a corrupt committed effect. (Diagnosis
+        # 2026-10-30: this read crashed with JSONDecodeError on empty
+        # effect files, ~10 of 300 gates at x300, two runs running.)
+        try:
+            return json.loads(eff.read_text())
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass
     time.sleep(rng.uniform(0.03, 0.06))
     artifact = {"text": "output " + nid, "cost_usd": 0.01, "scores": GOOD}
-    eff.write_text(json.dumps(artifact))
+    # The effect record is a commit record: write it with the same
+    # crash-atomic discipline as TaskGraph.save (tmp + os.replace), so
+    # a kill at any point leaves either no file or the whole file.
+    tmp = markers / (nid + ".effect.tmp-" + str(os.getpid()))
+    tmp.write_text(json.dumps(artifact))
+    os.replace(tmp, eff)
     with open(markers / "effects.log", "a") as fh:
         fh.write(nid + "\n")
     return artifact
@@ -159,3 +172,25 @@ def test_kill_resume_trials(tmp_path):
 
     assert corrupted == 0, f"{corrupted} corrupted state files across trials"
     assert killed >= 8, f"harness only landed {killed} kills — not proven"
+
+
+def test_resume_tolerates_torn_effect_file(tmp_path):
+    """Regression (2026-10-30 diagnosis): a SIGKILL inside a lifetime's
+    effect-file write leaves a torn (empty) .effect record. The next
+    lifetime must read it as 'never committed', recompute the effect, and
+    complete — the pre-fix child crashed here with JSONDecodeError and
+    the final lifetime exited 3 (~10 of 300 gates at x300, two runs)."""
+    work = tmp_path / "torn"
+    work.mkdir()
+    state = work / "state.json"
+    markers = work / "markers"
+    markers.mkdir()
+    (markers / "n0.effect").write_text("")  # torn record, as a kill leaves it
+    rc = _run_to_completion(state, markers, seed=777)
+    assert rc == 0, "resumed run must complete despite a torn effect record"
+    graph = TaskGraph.load(state)
+    assert graph.is_complete()
+    effects = sorted(p.stem for p in markers.glob("*.effect"))
+    assert effects == ["n0", "n1", "n2", "n3", "n4", "n5"]
+    # the torn record was recomputed into a valid committed effect
+    json.loads((markers / "n0.effect").read_text())
