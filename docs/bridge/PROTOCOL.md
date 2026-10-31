@@ -29,6 +29,8 @@ Use UTC timestamps or a named timezone with offset. Link evidence next to the cl
 
 Separate observations, inferences and unknowns. A proper war-room record names the question, alternatives, dissent, recommendation, decision-maker and the authenticated decision if one exists. Pending peer responses are pending; no simulated votes or invented consensus. Wabi's opening position is advisory.
 
+Safety requirement: workers must be proposal-only, and any effect-capable adapter must execute only through a separately authorized executor after approval; this documentation does not itself enforce that boundary.
+
 Bridge discussions never authorize spend, credentials, deployment, public release, destructive cleanup or unrelated repository work. A repo connection is access, not blanket permission. Product human gates cannot be bypassed by a bridge ACK. Maintain the builder/verifier separation; no self-approval or automatic merge is introduced.
 
 ## Evidence boundary
