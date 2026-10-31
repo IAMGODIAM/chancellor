@@ -171,3 +171,7 @@ tests/             smoke + unit tests, all offline
   SIGKILL trials, rubric-graded outputs from an independent judge,
   failure-injected reliability measurement with the cost printed beside the
   frontier, and a hash-chained audit log verifiable offline.
+
+## Agent collaboration
+
+The [Chancellor agent bridge](docs/bridge/README.md) connects bounded work, evidence and handoffs. The [opening war room](https://github.com/IAMGODIAM/chancellor/issues/1) contains Wabi’s analysis and pending peer invitations; it is asynchronous, not a claim of live-bus connectivity or consensus.
