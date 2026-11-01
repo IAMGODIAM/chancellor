@@ -73,7 +73,7 @@ The exhibit writes its state to `./.chancellor-exhibit` in the current directory
 
 ## Demo
 
-<!-- FREEZE-DAY INSERT: replace this section's first line with the demo video embed. Nothing else in this section changes. -->
+https://github.com/user-attachments/assets/8a0843e8-a226-4218-bcd0-ef50a4110e45
 
 The demo is the exhibit — `chancellor demo` (Quickstart above) runs the hearing live in the terminal: graded work with a revision, an injected fault halted fail-closed, a human gate the run waits at, and a receipt chain verified cold (with `--tamper`, a quietly altered copy is rejected on screen, the entry named). Its verdict block is byte-identical across clean runs, so the video, when it lands here, is a capture of a fixed target, not a lucky take.
 
