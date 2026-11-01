@@ -1,70 +1,83 @@
+<div align="center">
+
+<img src="docs/media/banner.png" alt="Chancellor — the governance-and-eval harness for long-running agents" width="880">
+
+[![gates](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml/badge.svg)](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml)
+<a href="docs/evidence/run-5/"><img src="docs/media/badge-drift.svg" alt="Suite B: drift 0 / 1,800 — bounds printed"></a>
+<a href="https://github.com/IAMGODIAM/chancellor/actions"><img src="docs/media/badge-tests.svg" alt="Tests: 188 passing — gates green"></a>
+<a href="#results-measured-oct-2931-2026"><img src="docs/media/badge-calibration.svg" alt="Calibration: gate not passed — verdicts labeled"></a>
+<a href="https://github.com/IAMGODIAM/chancellor/releases/tag/v1.0.0"><img src="docs/media/badge-release.svg" alt="Release: v1.0.0"></a>
+
+</div>
+
 # Chancellor
 
 **The governance-and-eval harness for long-running agents.**
 
-Built for the Meta Global AI Developer Hackathon (Cerebral Valley), Indie Dev track.
-Built for the Meta Model API (Muse Spark · Muse Wonder · Muse Image · SAM 3.1).
+Built for the Meta Global AI Developer Hackathon (Cerebral Valley), Indie Dev track, on the Meta Model API: `muse-spark-1.3` does the work, `muse-wonder-1.0` grades it — a worker never scores its own output.
 
-> **Status — Oct 29, 2026:** fully offline today. The live transport is
-> wired behind the client seam but not yet connected — live wiring is
-> pending the team's API access. Everything below runs against offline
-> stubs. See [BUILD-LOG.md](BUILD-LOG.md) for the current state.
+## For judges — the 60-second path
 
-> **Model-column errata:** `muse-wonder-full` is **not an API model** — it is a
-> consumer subscription tier name, unreachable through the API. The frozen SPEC's
-> tier list named it in error; the correction is recorded in [ERRATA.md](ERRATA.md)
-> (the SPEC itself is frozen and is not edited). The authoritative model column —
-> exact, versioned IDs only — lives in `src/chancellor/api_client.py` (`MODEL_IDS`).
+```bash
+pip install chancellor
+# (until the listing posts, the same package straight from this repo:
+#  pip install git+https://github.com/IAMGODIAM/chancellor)
+
+chancellor demo                # the exhibit, offline — graded work, a halted
+                               # fault, a human gate, a verified receipt
+python -m chancellor.verify_log .chancellor-exhibit/audit-log.jsonl
+                               # the demo's own receipt book, verified cold
+```
+
+- **The evidence:** [docs/evidence/run-5/](docs/evidence/run-5/) — the RUN-5 record with its bounds printed; a two-file sample you can verify in isolation lives in [docs/evidence/sample/](docs/evidence/sample/).
+- **The film:** the [Demo](#demo) section below — three minutes, a capture of this exact run.
+
+One term, defined once: **drift**, here, means a run claiming success for work whose final state failed its check — not model drift. Every drift figure in this README uses that sense.
+
+The demo runs offline by design. A `--live` mode exists — the same run against the live Meta models, through the same client — and it refuses to run without credentials rather than falling back silently.
 
 ## The pitch
 
-Long-running agents fail quietly: they drift, mis-grade their own work, trust broken
-tools, and sail past decisions that were never theirs to make. Frameworks optimize for
-capability. Chancellor is the other half — **governance**:
+Long-running agents fail quietly: they drift, mis-grade their own work, trust broken tools, and sail past decisions that were never theirs to make. Frameworks optimize for capability. Chancellor is the other half — **governance**:
 
-- **Work is a graph, not a vibe.** Every run is an explicit, durable task graph that
-  persists to disk and resumes after a crash.
-- **Output is graded, not trusted.** Every consequential output is scored against a
-  weighted rubric before acceptance.
-- **Instruments fail closed.** If Chancellor's own checks error, the run halts. A broken
-  gauge is a stop signal, never a pass — and there is no flag to turn this off.
-- **Authority escalates; capability doesn't.** Spend, external sends, publishing,
-  irreversible acts, and credential use stop at a human gate. Every gate decision —
-  human or policy — leaves an append-only receipt.
+- **Work is a graph, not a vibe.** Every run is an explicit, durable task graph that persists to disk and resumes after a crash.
+- **Output is graded, not trusted.** Every consequential output is scored against a weighted rubric before acceptance.
+- **Instruments fail closed.** If Chancellor's own checks error, the run halts. A broken gauge is a stop signal, never a pass — and there is no flag to turn this off.
+- **Authority escalates; capability doesn't.** Spend, external sends, publishing, irreversible acts, and credential use stop at a human gate. Every gate decision — human or policy — leaves an append-only receipt.
 
-Plus two eval suites: **Suite A**, normative judgment on synthetic remedy-design
-problems, and **Suite B**, long-horizon agent reliability under failure injection.
+Two eval suites test the claims. **Suite A** asks whether the judge grades remedies for invented harms the way the approved key grades them — consistently, and for the stated reasons. **Suite B** breaks long runs on purpose — crashes, dropped steps, corrupted values — and counts how often an agent claims success for work that did not happen.
 
-## Results (measured, Oct 29, 2026)
+Model names in this repo are exact API model IDs only; one naming correction is recorded in [ERRATA.md](ERRATA.md).
 
-**Suite B reliability frontier** — 360 runs, identical fault manifests (the
-manifest hash `5c75a88c…` prints in every report):
+**Status — Oct 31, 2026:** the offline demo is the guaranteed path and needs no key. The live connection to the Meta Model API was established Oct 30 and the transport is validated — the model list returns and both working models answer. Graded live runs are metered and reported in [BUILD-LOG.md](BUILD-LOG.md).
 
-| | Governed | Ungoverned |
-|---|---|---|
+## Results (measured, Oct 29–31, 2026)
+
+> **The regeneration rule.** This README is a derivative of the measured record — BUILD-LOG.md + docs/evidence/ — re-rendered at every release; a README that trails the record is a stale claim and is corrected as one.
+
+**Suite B reliability frontier, at 10x scale** (RUN-5, Oct 31, on the finalized tree — 5,600 Suite B runs in all): governed drift **0 / 1,800 runs** against ungoverned drift **300 / 1,800** on identical fault manifests. The zero travels with its bounds wherever it is quoted: a 95% upper bound of 0.166% at the cell level (n = 1,800), and the weaker manifest-level bound of 25.9% (0 of 10 manifests). A value-cell extension added governed drift **0 / 2,000**. Drift is a bound with its denominator, never a bare zero.
+
+The original frontier (Oct 29) had the same shape at one-tenth the scale. Each arm ran the same 10 tasks under the same 180 fault manifests. A run *completes* when it finishes; it *succeeds* when its final state passes the task's check. Drift is the gap that matters — claiming success when the check failed:
+
+| (180 runs per arm) | Governed | Ungoverned |
+|---|---:|---:|
 | Drift (claimed success, final state failed) | **0** | **30** |
-| Completion | 0.333 | 0.667 |
-| Cost per success | $0.002147 | $0.001826 |
+| Completion | 60 of 180 (0.333) | 120 of 180 (0.667) |
+| Cost per success | $0.0021 | $0.0018 |
 
-Governance is not free, and the price is printed, not hidden: the governed arm
-completes fewer tasks at a higher cost per success — and never once claims a
-success that did not happen. Drift 0 is an observation across these 360 runs,
-stated with its denominator, not a bound on future runs.
+Governance is not free, and the price is printed, not hidden: the governed arm completes fewer tasks at a higher cost per success — and never once claims a success that did not happen.
 
-**Tests:** 155 passing, 0 failing — including the kill-resume gate (SIGKILL
-trials; each node's effect lands exactly once, asserted from the effect files
-themselves): the kill-resume test passes 30/30 consecutive runs, and the full
-suite is green on 3 consecutive runs.
+**Endurance:** four parallel 8-hour soaks (RUN-5, Oct 31) each completed 480 / 480 segments and 5,760 steps per soak — 48 injected faults per soak, each met by a fail-closed halt rather than a corrupted claim — with drift 0, zero corrupted state files, and every final hash chain verifying. An independent red team then re-derived all four chains from the raw files: 1,846 entries, 0 breaks.
 
-**Suite A:** the calibration key of record is approved; the calibration run of
-record has not yet run, and the zero-cost stand-in dry-runs failed the
-calibration gate (κ 0.200 / 0.061, round 2 κ 0.314 / 0.132) — so no Suite A
-score is reported yet. The gate catching an uncalibrated judge at $0 is the
-method working as designed.
+**Kill-resume gate (T3):** the fixed harness passes **300 / 300** gates (6,000 trials in RUN-5's S2 stage, on the Lambda box). The original harness's 290 / 300 stands in [BUILD-LOG.md](BUILD-LOG.md) as the measurement of the harness as first written — the defect was in the test harness, not the product, and the diagnosis is recorded there in full.
 
-The full record — measurements, honest negative results, and corrections filed
-as new entries rather than silent edits — is the development log:
-[BUILD-LOG.md](BUILD-LOG.md) and [ERRATA.md](ERRATA.md).
+**Tests:** 188 passing, 0 failing on the frozen tree — which also passes its own presentation gates: Ruff format and lint at zero findings, mypy clean, identical commands in pre-commit and CI (see the badge above).
+
+**Suite A:** the calibration gate has been run twice under pre-registration and has not passed — and no Suite A score is claimed anywhere in this submission. The calibration of record measured band κ 0.667 and Spearman ρ 0.881, with precedent-consistency (κ 0.294) and reversibility (κ 0.575) below the 0.6 criterion floor. The pre-registered remedy run then failed its own completeness gate — 35 of 36 references scored, one lost to two transport failures — and an incomplete run earns no gate statistics; its diagnostics (not gate statistics) put every criterion above threshold, and the judge's blind self-agreement, measured for the first time, satisfied its gate on all four criteria. What ships is the labeled fallback: live judge verdicts carry the label *uncalibrated* until a pre-registered run passes in full. The gate catching our own judge — twice — is the method working as designed.
+
+Don't take the tables' word for any of this — the audit log of a governed run verifies offline, with no credentials and no network (see [Verify the audit log](#verify-the-audit-log)).
+
+The full record — measurements, honest negative results, and corrections filed as new entries rather than silent edits — is the development log: [BUILD-LOG.md](BUILD-LOG.md) and [ERRATA.md](ERRATA.md).
 
 ## Quickstart
 
@@ -73,56 +86,46 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 
 pytest                 # smoke + unit tests (all offline)
-chancellor demo            # the scripted governed run, offline
+chancellor demo            # the exhibit — the hearing, live in the terminal (offline)
 chancellor eval-a          # Suite A with stub agents
 chancellor eval-b          # Suite B reliability metrics
 ```
 
-Zero runtime dependencies — stdlib only, Python ≥ 3.11.
+Zero runtime dependencies — stdlib only, Python ≥ 3.11. Allow about two minutes for the demo at stage pace (the gate is meant to be waited at); `--fast` compresses the same run for a quick pass. Judging from a distance: `pip install git+https://github.com/IAMGODIAM/chancellor` installs the package straight from this repo, and `chancellor demo` runs offline.
 
-The demo writes its state to `./.chancellor` in the current directory
-(task-graph state, the audit log, and its checkpoints), and re-runs
-append to it. Delete `./.chancellor` for a clean run — the demo's printed
-output is byte-identical across clean runs.
+The exhibit writes its state to `./.chancellor-exhibit` in the current directory (task-graph state, the audit log, and its checkpoints). Its verdict block is byte-identical across clean runs. `chancellor demo --classic` runs the original scripted governed run, which keeps its state in `./.chancellor`.
 
 ## Demo
 
-<!-- FREEZE-DAY INSERT: replace the placeholder line below with the demo video URL. One line; nothing else in this section changes. -->
+<img src="docs/media/exhibit.gif" alt="The exhibit, animated: the four beats of a governed run — graded work, a halted fault, a human gate, and a receipt chain verified cold" width="880">
 
-**Demo video:** _link lands here on submission day._
+*The exhibit in half a minute — real output of `chancellor demo`, typeset from the verified capture. The full hearing, narrated, is the film:*
 
-Until then, the demo is the offline run itself — `chancellor demo` (Quickstart
-above). Its printed output is byte-identical across clean runs, so the video
-is a capture of a fixed target, not a lucky take.
+https://github.com/user-attachments/assets/8a0843e8-a226-4218-bcd0-ef50a4110e45
+
+The demo is the exhibit — `chancellor demo` (Quickstart above) runs the hearing live in the terminal: graded work with a revision, an injected fault halted fail-closed, a human gate the run waits at, and a receipt chain verified cold (with `--tamper`, a quietly altered copy is rejected on screen, the entry named). Its verdict block is byte-identical across clean runs, so the video above is a capture of a fixed target, not a lucky take.
 
 ## Verify the audit log
 
-Every governed run writes a hash-chained audit log with signed
-checkpoints. Verify one offline — no credentials, no network:
+Every governed run writes a hash-chained audit log with signed checkpoints. Verify one offline — no credentials, no network:
 
 ```bash
 python -m chancellor.verify_log .chancellor/audit-log.jsonl
 ```
 
-Exit 0 means the chain is intact and the newest signed checkpoint
-checks out. Exit 1 names the failure — a mid-log edit, a reordering, a
-truncated tail, a forged checkpoint. A log with no checkpoint is never
-reported as verified: tail truncation is undetectable without one, and
-the verifier says so rather than guessing.
+Exit 0 means the chain is intact and the newest signed checkpoint checks out. Exit 1 names the failure — a mid-log edit, a reordering, a truncated tail, a forged checkpoint. A log with no checkpoint is never reported as verified: tail truncation is undetectable without one, and the verifier says so rather than guessing. The checkpoints are signed with the development signer whose key ships in the source — deliberately public, and labeled in the code where it sits: those signatures prove the chain is internally consistent and unaltered since signing (tamper-evidence), not who signed it (non-repudiation). Separating the signer — a production key held apart from the code — is the named hardening step before any deployment that needs attribution.
 
-## Going live (when API access lands)
+A ready-made pair to try it on — one exhibit run's log and its signed checkpoint, with the exact commands — lives in [docs/evidence/sample/](docs/evidence/sample/).
+
+## Going live
+
+The live client talks to the Meta Model API through one transport function; the offline demo uses the same client with a stub transport, which is why the demo's behavior does not change when the live path is used.
 
 ```bash
-cp .env.example .env   # then fill in the values claimed at kickoff
-export META_MODEL_API_BASE_URL=...   # from the Meta Model API console
-export META_MODEL_API_KEY=...        # never commit this
+cp .env.example .env   # set META_MODEL_API_BASE_URL and META_MODEL_API_KEY
 ```
 
-Until credentials exist, `MetaModelClient.chat()` raises `NotConfiguredError`
-unless given a transport — use `chancellor.api_client.offline_client()` for
-development. The live transport lands when the team's API access does,
-behind the same client seam; the build plan lives in the frozen SPEC.md
-(available in the submission packet — it is not part of this repo).
+With no key configured, `MetaModelClient.chat()` raises `NotConfiguredError` — use `chancellor.api_client.offline_client()` for keyless development. The connection was established and validated on Oct 30, 2026; see [BUILD-LOG.md](BUILD-LOG.md).
 
 ## Layout
 
@@ -150,28 +153,22 @@ src/chancellor/
     suite_b_tasks.py     the 10 world-state tasks Suite B executes
     suite_b_world.py     the assertable world state the tasks run over
 tests/             smoke + unit tests, all offline
+docs/              GLOSSARY.md (the amendment key) + media/ (banner, social preview) + evidence/ (the RUN-5 record)
 ```
+
+The code cites its governing amendments inline (AM-2, EA-5, …) — the key is [docs/GLOSSARY.md](docs/GLOSSARY.md).
 
 ## How it maps to the judging criteria
 
-- **Impact (30%)** — for anyone who runs long-running agents with real
-  authority: every consequential act is gated before it happens, graded after
-  it lands, and receipted either way — so an operator can hand an agent real
-  work (spend, sends, publishing, irreversible acts) and prove afterward
-  exactly what it did, what it cost, and who approved it.
-- **Tooling — creative use of Meta's tools (25%)** — governance as the
-  product, built for the Meta Model API's model column (Spark, Wonder, Image,
-  SAM 3.1 — exact, versioned IDs only; see [ERRATA.md](ERRATA.md) E-1):
-  fail-closed instruments and receipt-bearing gates are the idea, not a
-  feature list.
-- **Demo (25%)** — `chancellor demo` runs end-to-end offline today; the same run
-  goes live on Meta models once API access lands, behind a one-function
-  transport swap. (Video: see the Demo section above.)
-- **Technical Depth (20%)** — durable resumable task graphs proven under
-  SIGKILL trials, rubric-graded outputs from an independent judge,
-  failure-injected reliability measurement with the cost printed beside the
-  frontier, and a hash-chained audit log verifiable offline.
+- **Impact (30%)** — for anyone who runs long-running agents with real authority: every consequential act is gated before it happens, graded after it lands, and receipted either way — so an operator can hand an agent real work (spend, sends, publishing, irreversible acts) and prove afterward exactly what it did, what it cost, and who approved it.
+- **Tooling — creative use of Meta's tools (25%)** — the Meta Model API supplies both halves of the separation of powers: `muse-spark-1.3` does the work and `muse-wonder-1.0` grades it, so no run is scored by the model that produced it. Exact, versioned IDs only — see [ERRATA.md](ERRATA.md) E-1.
+- **Demo (25%)** — `chancellor demo` runs end-to-end offline today; the identical run executes on the live Meta models through the same client (connection validated Oct 30), so the demo cannot drift from the product. (Video: see the Demo section above.)
+- **Technical Depth (20%)** — durable, crash-atomic task graphs proven under kill-resume gates (300 / 300), rubric-graded outputs from an independent judge, failure-injected reliability measurement with the cost printed beside the frontier, and a hash-chained audit log verifiable offline.
 
 ## Agent collaboration
 
 The [Chancellor agent bridge](docs/bridge/README.md) connects bounded work, evidence and handoffs. The [opening war room](https://github.com/IAMGODIAM/chancellor/issues/1) contains Wabi’s analysis and pending peer invitations; it is asynchronous, not a claim of live-bus connectivity or consensus.
+
+## License
+
+Proprietary — see [LICENSE](LICENSE). This repository is public so the work can be read and verified; publication is not a license to reuse it.

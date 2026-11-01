@@ -1,5 +1,6 @@
 """Judge module: separate caller, one criterion per call, reason before
 score, pin + cache, fail-closed parsing, self-grading refused."""
+
 import re
 
 import pytest
@@ -18,7 +19,10 @@ def scripted_transport(scores, calls):
         crit = re.search(r"Criterion: (\w+)", user).group(1)
         return ChatResponse(
             text=f"Adequate on {crit}, with gaps noted.\nSCORE: {scores[crit]}",
-            model=model, usage={"prompt_tokens": 10, "completion_tokens": 5})
+            model=model,
+            usage={"prompt_tokens": 10, "completion_tokens": 5},
+        )
+
     return _t
 
 
@@ -73,7 +77,8 @@ def test_cache_hits_and_file_persistence(tmp_path):
 
 def test_unparseable_reply_fails_closed():
     client = MetaModelClient(
-        transport=lambda m, msgs, **k: ChatResponse(text="no score here", model=m))
+        transport=lambda m, msgs, **k: ChatResponse(text="no score here", model=m)
+    )
     judge = Judge(client, model="muse-wonder-1.0", rubric=OUTPUT_RUBRIC)
     with pytest.raises(JudgeError):
         judge.score_criterion("n", "text", "clarity")
@@ -81,7 +86,8 @@ def test_unparseable_reply_fails_closed():
 
 def test_out_of_range_score_fails_closed():
     client = MetaModelClient(
-        transport=lambda m, msgs, **k: ChatResponse(text="Great.\nSCORE: 42", model=m))
+        transport=lambda m, msgs, **k: ChatResponse(text="Great.\nSCORE: 42", model=m)
+    )
     judge = Judge(client, model="muse-wonder-1.0", rubric=OUTPUT_RUBRIC)
     with pytest.raises(JudgeError):
         judge.score_criterion("n", "text", "clarity")
@@ -99,13 +105,19 @@ def test_fake_transport_cannot_grade():
 def test_self_grading_refused():
     client = MetaModelClient(transport=scripted_transport(SCORES, []))
     with pytest.raises(ValueError):
-        Judge(client, model="muse-spark-1.3", rubric=OUTPUT_RUBRIC,
-              worker_model="muse-spark-1.3")
+        Judge(
+            client,
+            model="muse-spark-1.3",
+            rubric=OUTPUT_RUBRIC,
+            worker_model="muse-spark-1.3",
+        )
 
 
 def test_exemplars_land_in_prompt():
     calls = []
-    ex = [Exemplar("clarity", 3.0, "an unverifiable muddle", "a reviewer cannot check it")]
+    ex = [
+        Exemplar("clarity", 3.0, "an unverifiable muddle", "a reviewer cannot check it")
+    ]
     judge = make_judge(calls, exemplars=ex)
     judge.score_criterion("n", "text", "clarity")
     assert "an unverifiable muddle" in calls[0][-1].content

@@ -2,8 +2,9 @@ import pytest
 
 from chancellor.grader import Criterion, Rubric, grade
 
-RUBRIC = Rubric("r", [Criterion("a", 0.6), Criterion("b", 0.4)],
-                pass_mark=70, revise_mark=50)
+RUBRIC = Rubric(
+    "r", [Criterion("a", 0.6), Criterion("b", 0.4)], pass_mark=70, revise_mark=50
+)
 
 
 def test_weight_sum_enforced():

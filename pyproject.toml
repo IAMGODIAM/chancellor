@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "chancellor-harness"
-version = "0.1.0"
-description = "Chancellor — a governance-and-eval harness for long-running agents on the Meta Model API. Durable task graphs, weighted-rubric grading, fail-closed instruments, human escalation at real authority gates."
+name = "chancellor"
+version = "1.0.0"
+description = "Chancellor — governance for long-running agents on the Meta Model API. Work runs as a durable task graph that survives crashes; a separate judge model grades every consequential output; and spending, sending, publishing, or using credentials stops at a human gate that leaves a signed receipt."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary — hackathon build, see Official Rules (Oct 26) for IP terms" }
@@ -24,3 +24,37 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
+
+# --- Code-beauty canon (Wisdom Council on Code Beauty, 2026-10-31) --------
+# The surface is surrendered to the formatter; the gates below are the law,
+# run identically by pre-commit and CI (.github/workflows/gates.yml).
+# Prose data files (the Suite A key, bank, and references) carry compact
+# prose literals whose shape IS the readability; by stated policy they sit
+# outside the automated gates entirely — their review is the calibration
+# process, not the linter. Every other file answers to the full canon.
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+extend-exclude = [
+    "src/chancellor/evals/suite_a_key.py",
+    "src/chancellor/evals/suite_a_bank.py",
+    "src/chancellor/evals/suite_a_references.py",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "RET", "ARG", "ERA"]
+
+[tool.ruff.lint.per-file-ignores]
+# Test doubles conform to the interfaces they fake — a stub worker takes
+# the node, a fake transport takes the full call, an approver takes the
+# request — whether or not the double uses them. Unused parameters in
+# tests are the protocol's shape, stated here rather than noqa'd 40 times.
+"tests/**" = ["ARG001", "ARG002", "ARG005"]
+
+[tool.mypy]
+python_version = "3.11"
+files = "src/chancellor"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true

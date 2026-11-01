@@ -5,6 +5,7 @@ stdlib-only, so the properties are exercised with seeded randomized
 generation (200 cases per property): the claim under test is the same —
 the invariants hold for all inputs, not just the examples.
 """
+
 import math
 import random
 
@@ -39,8 +40,9 @@ def test_grade_monotonic():
         if scores[crit.name] >= crit.max_score:
             continue
         bumped = dict(scores)
-        bumped[crit.name] = min(crit.max_score,
-                                scores[crit.name] + rng.uniform(0.01, 1.0))
+        bumped[crit.name] = min(
+            crit.max_score, scores[crit.name] + rng.uniform(0.01, 1.0)
+        )
         assert grade(rubric, bumped).total >= base
 
 
@@ -61,16 +63,28 @@ def test_grade_bounds_and_verdict_consistency():
 def test_verdict_boundaries_exact():
     # Single-criterion rubric: total == score * 10, so boundaries are exact.
     rubric = Rubric("b", [Criterion("a", 1.0)], pass_mark=70.0, revise_mark=50.0)
-    assert grade(rubric, {"a": 7.0}).verdict == "pass"      # exactly 70.00
+    assert grade(rubric, {"a": 7.0}).verdict == "pass"  # exactly 70.00
     assert grade(rubric, {"a": 6.999}).verdict == "revise"  # 69.99
-    assert grade(rubric, {"a": 5.0}).verdict == "revise"    # exactly 50.00
-    assert grade(rubric, {"a": 4.999}).verdict == "fail"    # 49.99
+    assert grade(rubric, {"a": 5.0}).verdict == "revise"  # exactly 50.00
+    assert grade(rubric, {"a": 4.999}).verdict == "fail"  # 49.99
     assert grade(rubric, {"a": 0.0}).total == 0.0
     assert grade(rubric, {"a": 10.0}).total == 100.0
 
 
-POISONS = [float("nan"), float("inf"), float("-inf"), -0.5, 10.5,
-           "9", "high", None, True, False, [9], {"s": 9}]
+POISONS = [
+    float("nan"),
+    float("inf"),
+    float("-inf"),
+    -0.5,
+    10.5,
+    "9",
+    "high",
+    None,
+    True,
+    False,
+    [9],
+    {"s": 9},
+]
 
 
 def test_grade_fails_closed_on_invalid_scores():

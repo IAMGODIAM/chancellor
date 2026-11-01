@@ -4,11 +4,12 @@ Every injected failure must produce the same shape: the run halts, zero
 outputs are accepted from the failed node, downstream never executes,
 and nothing raises out of the runner.
 """
+
 import time
 
 from chancellor.escalation import ActionClass, AuditLog, Gatekeeper
 from chancellor.grader import OUTPUT_RUBRIC
-from chancellor.instruments import InstrumentPanel, default_panel
+from chancellor.instruments import InstrumentPanel
 from chancellor.orchestrator import CrewRunner
 from chancellor.task_graph import NodeStatus, TaskGraph
 
@@ -27,6 +28,7 @@ def _ok(node):
 
 
 # -- instruments under attack --------------------------------------------------
+
 
 def test_instrument_error_halts_with_zero_accepted():
     def boom(_artifact):
@@ -75,6 +77,7 @@ def test_empty_panel_never_reports_ok():
 
 # -- grader under attack ---------------------------------------------------------
 
+
 def _run_with_scores(scores):
     def worker(node):
         return {"text": "x", "cost_usd": 0.0, "scores": scores}
@@ -83,12 +86,14 @@ def _run_with_scores(scores):
 
 
 def test_grader_error_mid_run_halts_with_zero_accepted():
-    poisoned = [dict(GOOD, correctness=float("nan")),
-                dict(GOOD, safety=float("inf")),
-                {k: v for k, v in GOOD.items() if k != "clarity"},
-                "not-a-dict",
-                dict(GOOD, clarity="high"),
-                dict(GOOD, safety=None)]
+    poisoned = [
+        dict(GOOD, correctness=float("nan")),
+        dict(GOOD, safety=float("inf")),
+        {k: v for k, v in GOOD.items() if k != "clarity"},
+        "not-a-dict",
+        dict(GOOD, clarity="high"),
+        dict(GOOD, safety=None),
+    ]
     for scores in poisoned:
         report = _run_with_scores(scores)
         assert report.halted and report.completed == []
@@ -118,6 +123,7 @@ def test_declared_ungraded_node_completes_without_scores():
 
 # -- gates under attack ------------------------------------------------------------
 
+
 def _gated_worker(action):
     def worker(node):
         artifact = _ok(node)
@@ -130,17 +136,25 @@ def _gated_worker(action):
 def test_gate_actions_never_auto(tmp_path):
     """Fuzz every action class: human-gate classes block with exactly
     one receipt and zero executions; policy classes complete."""
-    human = {ActionClass.SPEND, ActionClass.EXTERNAL_SEND,
-             ActionClass.PUBLISH, ActionClass.IRREVERSIBLE,
-             ActionClass.CREDENTIAL}
+    human = {
+        ActionClass.SPEND,
+        ActionClass.EXTERNAL_SEND,
+        ActionClass.PUBLISH,
+        ActionClass.IRREVERSIBLE,
+        ActionClass.CREDENTIAL,
+    }
     for cls in ActionClass:
         log = AuditLog(tmp_path / f"audit-{cls.value}.jsonl")
         g = TaskGraph("t")
         g.task("one", "One", worker="w")
-        action = {"action": f"do {cls.value}", "action_class": cls.value,
-                  "cost_usd": 1.0}
-        runner = CrewRunner(g, {"w": _gated_worker(action)},
-                            gatekeeper=Gatekeeper(audit_log=log))
+        action = {
+            "action": f"do {cls.value}",
+            "action_class": cls.value,
+            "cost_usd": 1.0,
+        }
+        runner = CrewRunner(
+            g, {"w": _gated_worker(action)}, gatekeeper=Gatekeeper(audit_log=log)
+        )
         report = runner.run()
         entries = log.read_all()
         assert len(entries) == 1, cls
@@ -158,33 +172,32 @@ def test_gate_class_string_coerced_and_validated():
         g = TaskGraph("t")
         g.task("one", "One", worker="w")
         action = {"action": "buy", "action_class": drifted, "cost_usd": 5.0}
-        report = CrewRunner(g, {"w": _gated_worker(action)},
-                            gatekeeper=Gatekeeper()).run()
+        report = CrewRunner(
+            g, {"w": _gated_worker(action)}, gatekeeper=Gatekeeper()
+        ).run()
         assert report.blocked == ["one"], drifted
         assert g.nodes["one"].status is NodeStatus.BLOCKED
     # An auto class as a raw string coerces and passes by policy.
     g = TaskGraph("t")
     g.task("one", "One", worker="w")
     action = {"action": "compute", "action_class": "compute"}
-    report = CrewRunner(g, {"w": _gated_worker(action)},
-                        gatekeeper=Gatekeeper()).run()
+    report = CrewRunner(g, {"w": _gated_worker(action)}, gatekeeper=Gatekeeper()).run()
     assert report.completed == ["one"]
 
 
 def test_malformed_gate_requests_halt_never_crash():
     bad_actions = [
         {"action": "x", "action_class": "bogus-class"},
-        {"action": "x"},                                # missing class
-        {"surprise": True},                             # wrong keys entirely
-        42,                                             # not a mapping
-        "spend please",                                 # not a mapping
-        {"action": "x", "action_class": 7},             # wrong type
+        {"action": "x"},  # missing class
+        {"surprise": True},  # wrong keys entirely
+        42,  # not a mapping
+        "spend please",  # not a mapping
+        {"action": "x", "action_class": 7},  # wrong type
     ]
     for bad in bad_actions:
         g = TaskGraph("t")
         g.task("one", "One", worker="w")
-        report = CrewRunner(g, {"w": _gated_worker(bad)},
-                            gatekeeper=Gatekeeper()).run()
+        report = CrewRunner(g, {"w": _gated_worker(bad)}, gatekeeper=Gatekeeper()).run()
         assert report.halted and report.completed == [], bad
         assert report.failed == ["one"], bad
 
@@ -214,9 +227,10 @@ def test_audit_log_is_append_only_by_prefix(tmp_path):
     gk = Gatekeeper(audit_log=log)
     snapshots = []
     for i in range(5):
-        gk.authorize(EscalationRequest(
-            action=f"decision {i}", action_class=ActionClass.SPEND))
+        gk.authorize(
+            EscalationRequest(action=f"decision {i}", action_class=ActionClass.SPEND)
+        )
         snapshots.append(path.read_bytes())
-    for earlier, later in zip(snapshots, snapshots[1:]):
+    for earlier, later in zip(snapshots, snapshots[1:], strict=False):
         assert later.startswith(earlier) and len(later) > len(earlier)
     assert len(log.read_all()) == 5

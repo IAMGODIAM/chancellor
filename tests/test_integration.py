@@ -11,6 +11,7 @@ Covers:
     and record-or-halt on audit-write failure (AM-10v) — not only via
     the runner-side wrap.
 """
+
 import json
 import os
 import re
@@ -23,8 +24,13 @@ import pytest
 import chancellor
 from chancellor import cli
 from chancellor.api_client import ChatResponse, MetaModelClient
-from chancellor.escalation import (ActionClass, AuditLog, AuditWriteError,
-                               EscalationRequest, Gatekeeper)
+from chancellor.escalation import (
+    ActionClass,
+    AuditLog,
+    AuditWriteError,
+    EscalationRequest,
+    Gatekeeper,
+)
 from chancellor.grader import OUTPUT_RUBRIC
 from chancellor.instruments import default_panel
 from chancellor.judge import Judge
@@ -32,8 +38,8 @@ from chancellor.orchestrator import CrewRunner
 from chancellor.task_graph import TaskGraph
 from chancellor.verify_log import verify_log
 
-
 # ---------------------------------------------------------------- demo run
+
 
 def _assert_no_grade_key(obj, where="state"):
     if isinstance(obj, dict):
@@ -89,24 +95,33 @@ def test_demo_audit_log_verifies_via_module_cli(tmp_path):
     src = str(Path(chancellor.__file__).resolve().parent.parent)
     env["PYTHONPATH"] = src + os.pathsep + env.get("PYTHONPATH", "")
     proc = subprocess.run(
-        [sys.executable, "-m", "chancellor.verify_log",
-         str(state_dir / "audit-log.jsonl")],
-        capture_output=True, text=True, env=env, timeout=60)
+        [
+            sys.executable,
+            "-m",
+            "chancellor.verify_log",
+            str(state_dir / "audit-log.jsonl"),
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=60,
+    )
     assert proc.returncode == 0, proc.stdout + proc.stderr
     assert "VERIFIED" in proc.stdout
 
 
 # ------------------------------------------------- provenance, unit level
 
-_JUDGE_TABLE = {"correctness": 8.0, "completeness": 6.0,
-                "clarity": 7.0, "safety": 9.0}
+_JUDGE_TABLE = {"correctness": 8.0, "completeness": 6.0, "clarity": 7.0, "safety": 9.0}
 
 
 def _scripted_judge_transport(model, messages, **kwargs):
     crit = re.search(r"Criterion: (\w+)", messages[-1].content).group(1)
     return ChatResponse(
         text=f"Sound on {crit}.\nSCORE: {_JUDGE_TABLE[crit]}",
-        model=model, usage={"prompt_tokens": 0, "completion_tokens": 0})
+        model=model,
+        usage={"prompt_tokens": 0, "completion_tokens": 0},
+    )
 
 
 def test_governed_runner_grades_via_score_provider():
@@ -116,14 +131,22 @@ def test_governed_runner_grades_via_score_provider():
     graph = TaskGraph(name="provider-run")
     graph.task("only", "Do the thing", worker="w")
     client = MetaModelClient(transport=_scripted_judge_transport)
-    judge = Judge(client, model="muse-wonder-1.0", rubric=OUTPUT_RUBRIC,
-                  worker_model="muse-spark-1.3")
+    judge = Judge(
+        client,
+        model="muse-wonder-1.0",
+        rubric=OUTPUT_RUBRIC,
+        worker_model="muse-spark-1.3",
+    )
     runner = CrewRunner.governed(
-        graph, workers={"w": lambda node: {"text": "the work product"}},
-        panel=default_panel(), rubric=OUTPUT_RUBRIC,
+        graph,
+        workers={"w": lambda node: {"text": "the work product"}},
+        panel=default_panel(),
+        rubric=OUTPUT_RUBRIC,
         gatekeeper=Gatekeeper(),
         score_provider=lambda node, artifact: judge.score_proposal(
-            node.id, artifact["text"]))
+            node.id, artifact["text"]
+        ),
+    )
     report = runner.run()
     assert report.ok and report.completed == ["only"]
     # (8*.35 + 6*.25 + 7*.20 + 9*.20) / 10 * 100 = 75.0 — the judge's
@@ -135,9 +158,11 @@ def test_governed_runner_grades_via_score_provider():
 
 # ------------------------------------------------ Gatekeeper source wraps
 
+
 def _send_request():
-    return EscalationRequest(action="Send the draft",
-                             action_class=ActionClass.EXTERNAL_SEND)
+    return EscalationRequest(
+        action="Send the draft", action_class=ActionClass.EXTERNAL_SEND
+    )
 
 
 def test_gatekeeper_approver_exception_denies_with_receipt(tmp_path):
@@ -148,8 +173,7 @@ def test_gatekeeper_approver_exception_denies_with_receipt(tmp_path):
     def exploding_approver(req):
         raise RuntimeError("approver process died")
 
-    gk = Gatekeeper(audit_log=audit, approver=exploding_approver,
-                    human_id="human-1")
+    gk = Gatekeeper(audit_log=audit, approver=exploding_approver, human_id="human-1")
     decision = gk.authorize(_send_request())
     assert decision.approved is False
     assert decision.decider == "policy"
@@ -176,9 +200,9 @@ def test_gatekeeper_audit_write_failure_is_record_or_halt():
     approval does not take effect — authorize raises AuditWriteError
     instead of returning an unrecorded approval."""
     log = _BrokenLog()
-    gk = Gatekeeper(audit_log=log,
-                    approver=lambda req: (True, "looks fine"),
-                    human_id="human-1")
+    gk = Gatekeeper(
+        audit_log=log, approver=lambda req: (True, "looks fine"), human_id="human-1"
+    )
     with pytest.raises(AuditWriteError):
         gk.authorize(_send_request())
     assert log.attempts == 1
@@ -194,21 +218,35 @@ def test_gatekeeper_audit_write_failure_halts_even_a_denial():
 
 def test_gatekeeper_normal_paths_still_receipted(tmp_path):
     audit = AuditLog(tmp_path / "audit.jsonl")
-    gk = Gatekeeper(audit_log=audit,
-                    approver=lambda req: (True, "approved in test"),
-                    human_id="human-1")
+    gk = Gatekeeper(
+        audit_log=audit,
+        approver=lambda req: (True, "approved in test"),
+        human_id="human-1",
+    )
     assert gk.authorize(_send_request()).approved is True
-    assert gk.authorize(EscalationRequest(
-        action="Read a file", action_class=ActionClass.READ)).approved is True
+    assert (
+        gk.authorize(
+            EscalationRequest(action="Read a file", action_class=ActionClass.READ)
+        ).approved
+        is True
+    )
     assert len(audit.read_all()) == 2
 
 
 # ------------------------------------------------------------------ exports
 
+
 def test_package_level_exports():
-    for name in ("AttemptCapError", "IllegalTransitionError",
-                 "SCHEMA_VERSION", "Judge", "JudgeError", "CostMeter",
-                 "AuditLog", "AuditWriteError"):
+    for name in (
+        "AttemptCapError",
+        "IllegalTransitionError",
+        "SCHEMA_VERSION",
+        "Judge",
+        "JudgeError",
+        "CostMeter",
+        "AuditLog",
+        "AuditWriteError",
+    ):
         assert name in chancellor.__all__
         assert getattr(chancellor, name) is not None
     assert chancellor.SCHEMA_VERSION == 1

@@ -31,11 +31,13 @@ the artifact's text; the artifact itself never carries scores. Without
 a provider, the legacy artifact-carried scores remain the input (the
 test-only paths use them), and a scores-less artifact still halts.
 """
+
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable
+from typing import cast
 
 from .escalation import ActionClass, EscalationRequest, Gatekeeper
 from .grader import Rubric, grade
@@ -67,12 +69,16 @@ class RunReport:
 
 
 class CrewRunner:
-    def __init__(self, graph: TaskGraph, workers: dict[str, Worker],
-                 panel: InstrumentPanel | None = None,
-                 rubric: Rubric | None = None,
-                 gatekeeper: Gatekeeper | None = None,
-                 state_path: str | Path | None = None,
-                 score_provider: Callable | None = None):
+    def __init__(
+        self,
+        graph: TaskGraph,
+        workers: dict[str, Worker],
+        panel: InstrumentPanel | None = None,
+        rubric: Rubric | None = None,
+        gatekeeper: Gatekeeper | None = None,
+        state_path: str | Path | None = None,
+        score_provider: Callable | None = None,
+    ):
         """The low-level constructor. Every governance layer is optional
         here, which makes this the TEST-ONLY path — production code must
         use CrewRunner.governed().
@@ -87,14 +93,20 @@ class CrewRunner:
         self.gatekeeper = gatekeeper
         self.state_path = Path(state_path) if state_path else None
         self.score_provider = score_provider
-        self.governed = False
+        self.is_governed = False
 
     @classmethod
-    def governed(cls, graph: TaskGraph, workers: dict[str, Worker],
-                 *, panel: InstrumentPanel, rubric: Rubric,
-                 gatekeeper: Gatekeeper,
-                 state_path: str | Path | None = None,
-                 score_provider: Callable | None = None) -> "CrewRunner":
+    def governed(
+        cls,
+        graph: TaskGraph,
+        workers: dict[str, Worker],
+        *,
+        panel: InstrumentPanel,
+        rubric: Rubric,
+        gatekeeper: Gatekeeper,
+        state_path: str | Path | None = None,
+        score_provider: Callable | None = None,
+    ) -> CrewRunner:
         """The production constructor. All three governance layers are
         required, and the panel must be non-empty — a governed runner
         that cannot check, grade, or gate is a contradiction, and it is
@@ -104,20 +116,32 @@ class CrewRunner:
         if len(panel) == 0:
             raise ValueError(
                 "governed runner requires a NON-EMPTY instrument panel — "
-                "an empty panel certifies nothing (fail-closed)")
+                "an empty panel certifies nothing (fail-closed)"
+            )
         if rubric is None:
             raise ValueError("governed runner requires a rubric")
         if gatekeeper is None:
             raise ValueError("governed runner requires a gatekeeper")
-        runner = cls(graph, workers, panel=panel, rubric=rubric,
-                     gatekeeper=gatekeeper, state_path=state_path,
-                     score_provider=score_provider)
-        runner.governed = True
+        runner = cls(
+            graph,
+            workers,
+            panel=panel,
+            rubric=rubric,
+            gatekeeper=gatekeeper,
+            state_path=state_path,
+            score_provider=score_provider,
+        )
+        runner.is_governed = True
         return runner
 
     @classmethod
-    def ungoverned(cls, graph: TaskGraph, workers: dict[str, Worker],
-                   *, state_path: str | Path | None = None) -> "CrewRunner":
+    def ungoverned(
+        cls,
+        graph: TaskGraph,
+        workers: dict[str, Worker],
+        *,
+        state_path: str | Path | None = None,
+    ) -> CrewRunner:
         """The named test-only path: a runner with no governance layers.
         Exists so Suite B's ungoverned arm is a deliberate construction,
         never an accident of omitted arguments."""
@@ -145,13 +169,15 @@ class CrewRunner:
         for node in self.graph.nodes.values():
             if node.status is NodeStatus.BLOCKED:
                 self.graph.requeue(
-                    node.id, "requeued at resume: gate re-evaluation "
-                             "(approver attached)")
-                report.dispositions[node.id] = self.graph.nodes[node.id].disposition
+                    node.id,
+                    "requeued at resume: gate re-evaluation (approver attached)",
+                )
+                # requeue() sets the disposition on the line above.
+                report.dispositions[node.id] = cast(str, node.disposition)
 
     def run(self) -> RunReport:
         self.graph.validate()
-        report = RunReport(graph_name=self.graph.name, governed=self.governed)
+        report = RunReport(graph_name=self.graph.name, governed=self.is_governed)
         report.dispositions.update(self.graph.resume_report)
         self._reevaluate_blocked(report)
         self._persist()
@@ -164,8 +190,11 @@ class CrewRunner:
                 break
             for node in ready:
                 if not self._run_node(node, report):
-                    return report   # halted — fail-closed
-            self._persist()
+                    return report  # halted — fail-closed
+            # No per-wave persist: every _run_node exit path persists
+            # after its last mutation (mutation-path verification,
+            # council R9) — a wave-end write would rewrite identical
+            # bytes.
         return report
 
     # -- gate boundary ------------------------------------------------------
@@ -195,7 +224,8 @@ class CrewRunner:
                 raise ValueError(f"malformed gate request: {exc}") from exc
         raise ValueError(
             f"malformed gate request: action must be a mapping or "
-            f"EscalationRequest, got {type(raw).__name__}")
+            f"EscalationRequest, got {type(raw).__name__}"
+        )
 
     @staticmethod
     def _coerce_class(value: object) -> ActionClass:
@@ -207,11 +237,14 @@ class CrewRunner:
             except ValueError:
                 raise ValueError(f"unknown action_class: {value!r}") from None
         raise ValueError(
-            f"action_class must be an ActionClass or string, "
-            f"got {type(value).__name__}")
+            f"action_class must be an ActionClass or string, got {type(value).__name__}"
+        )
 
     # -- one node -------------------------------------------------------------
 
+    # CC 25 (radon) — the governed path in one visible flow: check,
+    # grade, gate, escalate, persist. Deliberately not scattered
+    # across handlers; each branch is a governance outcome.
     def _run_node(self, node: TaskNode, report: RunReport) -> bool:
         """Returns False when the run must halt."""
         try:
@@ -220,24 +253,28 @@ class CrewRunner:
             return self._fail_node(node, report, str(exc))
         worker = self.workers.get(node.worker)
         if worker is None:
-            return self._fail_node(
-                node, report, f"unknown worker '{node.worker}'")
+            return self._fail_node(node, report, f"unknown worker '{node.worker}'")
         try:
             artifact = worker(node)
         except Exception as exc:
             return self._fail_node(
-                node, report, f"worker error: {type(exc).__name__}: {exc}")
+                node, report, f"worker error: {type(exc).__name__}: {exc}"
+            )
 
         # Instruments — fail-closed.
         if self.panel is not None:
             panel_result = self.panel.run_all(artifact)
             if not panel_result.ok:
                 return self._fail_node(
-                    node, report,
-                    f"instrument failure: {panel_result.halt_reason}")
+                    node, report, f"instrument failure: {panel_result.halt_reason}"
+                )
 
         # Escalation gate — a denied gate blocks the node and halts the run.
-        if self.gatekeeper is not None and isinstance(artifact, dict) and "action" in artifact:
+        if (
+            self.gatekeeper is not None
+            and isinstance(artifact, dict)
+            and "action" in artifact
+        ):
             try:
                 req = self._coerce_request(node, artifact["action"])
             except ValueError as exc:
@@ -250,20 +287,24 @@ class CrewRunner:
                 # (The Gatekeeper's own audit write is Lane 2's surface;
                 # the denial is receipted here in the persisted state.)
                 self.graph.block(
-                    node.id, f"gatekeeper error — denied (fail-closed): "
-                             f"{type(exc).__name__}: {exc}")
+                    node.id,
+                    f"gatekeeper error — denied (fail-closed): "
+                    f"{type(exc).__name__}: {exc}",
+                )
                 report.blocked.append(node.id)
                 report.halted = True
                 report.halt_reason = (
-                    f"node {node.id}: gatekeeper error — denied "
-                    f"(fail-closed): {exc}")
+                    f"node {node.id}: gatekeeper error — denied (fail-closed): {exc}"
+                )
                 self._persist()
                 return False
             if not decision.approved:
                 self.graph.block(node.id, f"gate denied: {decision.rationale}")
                 report.blocked.append(node.id)
                 report.halted = True
-                report.halt_reason = f"node {node.id}: gate denied ({decision.rationale})"
+                report.halt_reason = (
+                    f"node {node.id}: gate denied ({decision.rationale})"
+                )
                 self._persist()
                 return False
 
@@ -280,25 +321,28 @@ class CrewRunner:
                     scores = self.score_provider(node, artifact)
                 except Exception as exc:  # a scorer that cannot score halts
                     return self._fail_node(
-                        node, report,
-                        f"scoring error: {type(exc).__name__}: {exc}")
+                        node, report, f"scoring error: {type(exc).__name__}: {exc}"
+                    )
             elif isinstance(artifact, dict) and "scores" in artifact:
                 scores = artifact["scores"]
             else:
                 return self._fail_node(
-                    node, report,
+                    node,
+                    report,
                     "graded node produced no scores — refusing to accept "
-                    "ungraded output (fail-closed)")
+                    "ungraded output (fail-closed)",
+                )
             try:
                 result = grade(self.rubric, scores)
             except Exception as exc:  # any grading error halts — AM-10(iv)
                 return self._fail_node(
-                    node, report,
-                    f"grading error: {type(exc).__name__}: {exc}")
+                    node, report, f"grading error: {type(exc).__name__}: {exc}"
+                )
             total = result.total
             if result.verdict == "fail":
                 return self._fail_node(
-                    node, report, f"graded {total} (fail) — below revise floor")
+                    node, report, f"graded {total} (fail) — below revise floor"
+                )
             if result.verdict == "revise":
                 # Revise means revise: the node goes back for another
                 # attempt instead of completing on a band that asked
@@ -306,26 +350,34 @@ class CrewRunner:
                 report.grades[node.id] = total
                 if node.attempts >= node.max_attempts:
                     return self._fail_node(
-                        node, report,
+                        node,
+                        report,
                         f"graded {total} (revise) — attempt cap exhausted "
                         f"({node.attempts}/{node.max_attempts}); "
-                        "revision could not clear the bar")
+                        "revision could not clear the bar",
+                    )
                 report.revised.append(node.id)
                 self.graph.requeue(
-                    node.id, f"grade {total} in revise band — requeued "
-                             f"(attempt {node.attempts} of "
-                             f"{node.max_attempts} spent)")
+                    node.id,
+                    f"grade {total} in revise band — requeued "
+                    f"(attempt {node.attempts} of "
+                    f"{node.max_attempts} spent)",
+                )
                 self.graph.nodes[node.id].grade = total
                 self._persist()
                 return True
 
         stored = artifact
-        if isinstance(artifact, dict) and isinstance(artifact.get("action"), EscalationRequest):
+        if isinstance(artifact, dict) and isinstance(
+            artifact.get("action"), EscalationRequest
+        ):
             a = artifact["action"]
             stored = dict(artifact)
             stored["action"] = {
-                "action": a.action, "action_class": a.action_class.value,
-                "detail": a.detail, "cost_usd": a.cost_usd,
+                "action": a.action,
+                "action_class": a.action_class.value,
+                "detail": a.detail,
+                "cost_usd": a.cost_usd,
                 "gate": "decided — see audit log",
             }
         self.graph.complete(node.id, output=stored, grade=total)

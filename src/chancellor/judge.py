@@ -36,13 +36,15 @@ Contexts are per-criterion scoring-key material (e.g. the hidden gold
 stakeholder list for coverage). They go to the judge only, never to any
 responder prompt.
 """
+
 from __future__ import annotations
 
 import hashlib
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from .api_client import ChatMessage, MetaModelClient
 from .grader import GradeResult, Rubric, grade
@@ -61,6 +63,7 @@ class JudgeError(RuntimeError):
 class Exemplar:
     """One anchored exemplar for a criterion: a proposal excerpt, the
     score it earns, and why."""
+
     criterion: str
     score: float
     excerpt: str
@@ -76,7 +79,7 @@ class CriterionJudgment:
     pin: str = ""
 
 
-def _canonical(obj) -> str:
+def _canonical(obj: object) -> str:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
 
@@ -99,11 +102,19 @@ class JudgeCache:
             self._data = json.loads(self.path.read_text(encoding="utf-8"))
 
     @staticmethod
-    def make_key(subject_id: str, proposal: str, criterion: str,
-                 prompt_hash: str) -> str:
-        return _sha(_canonical({
-            "subject": subject_id, "proposal": _sha(proposal),
-            "criterion": criterion, "prompt": prompt_hash}))
+    def make_key(
+        subject_id: str, proposal: str, criterion: str, prompt_hash: str
+    ) -> str:
+        return _sha(
+            _canonical(
+                {
+                    "subject": subject_id,
+                    "proposal": _sha(proposal),
+                    "criterion": criterion,
+                    "prompt": prompt_hash,
+                }
+            )
+        )
 
     def get(self, key: str) -> dict | None:
         return self._data.get(key)
@@ -118,15 +129,23 @@ class JudgeCache:
 
 
 class Judge:
-    def __init__(self, client: MetaModelClient, model: str, rubric: Rubric,
-                 exemplars: list[Exemplar] | None = None,
-                 worker_model: str | None = None,
-                 cache: JudgeCache | None = None,
-                 max_tokens: int = 400):
+    # CC 11 (radon) — construction refusals plus pin assembly; the
+    # branches are the fail-closed checks themselves.
+    def __init__(
+        self,
+        client: MetaModelClient,
+        model: str,
+        rubric: Rubric,
+        exemplars: list[Exemplar] | None = None,
+        worker_model: str | None = None,
+        cache: JudgeCache | None = None,
+        max_tokens: int = 400,
+    ):
         if worker_model is not None and worker_model == model:
             raise ValueError(
                 f"judge model {model!r} equals the worker model — self-grading "
-                "is refused (declare a different judge variant)")
+                "is refused (declare a different judge variant)"
+            )
         self.client = client
         self.model = model
         self.rubric = rubric
@@ -140,22 +159,41 @@ class Judge:
         if stray:
             raise ValueError(f"exemplars for unknown criteria: {sorted(stray)}")
         self.stats = {"calls": 0, "cache_hits": 0}
-        self._pin = _sha(_canonical({
-            "prompt_version": JUDGE_PROMPT_VERSION,
-            "model": model,
-            "rubric": {
-                "name": rubric.name, "pass_mark": rubric.pass_mark,
-                "revise_mark": rubric.revise_mark,
-                "criteria": [
-                    {"name": c.name, "weight": c.weight, "max": c.max_score,
-                     "description": c.description} for c in rubric.criteria],
-            },
-            "exemplars": sorted(
-                ({"criterion": e.criterion, "score": e.score,
-                  "excerpt": e.excerpt, "rationale": e.rationale}
-                 for e in exemplars or []),
-                key=lambda d: (d["criterion"], d["score"])),
-        }))
+        exemplar_rows: list[dict[str, Any]] = sorted(
+            [
+                {
+                    "criterion": e.criterion,
+                    "score": e.score,
+                    "excerpt": e.excerpt,
+                    "rationale": e.rationale,
+                }
+                for e in exemplars or []
+            ],
+            key=lambda d: (d["criterion"], d["score"]),
+        )
+        self._pin = _sha(
+            _canonical(
+                {
+                    "prompt_version": JUDGE_PROMPT_VERSION,
+                    "model": model,
+                    "rubric": {
+                        "name": rubric.name,
+                        "pass_mark": rubric.pass_mark,
+                        "revise_mark": rubric.revise_mark,
+                        "criteria": [
+                            {
+                                "name": c.name,
+                                "weight": c.weight,
+                                "max": c.max_score,
+                                "description": c.description,
+                            }
+                            for c in rubric.criteria
+                        ],
+                    },
+                    "exemplars": exemplar_rows,
+                }
+            )
+        )
 
     @property
     def pin(self) -> str:
@@ -171,7 +209,8 @@ class Judge:
             "the proposal and you gain nothing from its success. Judge the "
             "substance of the remedy, never its prose style, length, or "
             "confidence. Reply with exactly one sentence of justification, "
-            "then a final line of the form SCORE: <number>.")
+            "then a final line of the form SCORE: <number>."
+        )
         lines = [
             f"Criterion: {crit.name} (0 to {crit.max_score:g})",
             f"What it measures: {crit.description}",
@@ -182,16 +221,23 @@ class Judge:
             for ex in anchors:
                 lines.append(f'  [{ex.score:g}] "{ex.excerpt}" — {ex.rationale}')
         if context:
-            lines.append(f"Scoring-key context (not shown to the proposal's author):\n{context}")
+            lines.append(
+                f"Scoring-key context (not shown to the proposal's author):\n{context}"
+            )
         lines.append(f"Proposal to score:\n{proposal}")
         lines.append("Give your one-sentence justification, then the SCORE line.")
         return system, "\n".join(lines)
 
     # -- scoring ---------------------------------------------------------
-    def score_criterion(self, subject_id: str, proposal: str, criterion: str,
-                        context: str = "") -> CriterionJudgment:
+    # CC 14 (radon) — the fail-closed parse ladder: every branch is
+    # a refusal mode that must be passed before a score is accepted.
+    def score_criterion(
+        self, subject_id: str, proposal: str, criterion: str, context: str = ""
+    ) -> CriterionJudgment:
         if criterion not in {c.name for c in self.rubric.criteria}:
-            raise JudgeError(f"unknown criterion {criterion!r} for rubric {self.rubric.name!r}")
+            raise JudgeError(
+                f"unknown criterion {criterion!r} for rubric {self.rubric.name!r}"
+            )
         crit = next(c for c in self.rubric.criteria if c.name == criterion)
         system, user = self._prompt(criterion, proposal, context)
         prompt_hash = _sha(system + "\n" + user)
@@ -199,41 +245,54 @@ class Judge:
         hit = self.cache.get(key)
         if hit is not None:
             self.stats["cache_hits"] += 1
-            return CriterionJudgment(criterion, float(hit["score"]), hit["reason"],
-                                     cached=True, pin=self._pin)
+            return CriterionJudgment(
+                criterion,
+                float(hit["score"]),
+                hit["reason"],
+                cached=True,
+                pin=self._pin,
+            )
         resp = self.client.chat(
             self.model,
             [ChatMessage("system", system), ChatMessage("user", user)],
-            max_tokens=self.max_tokens)
+            max_tokens=self.max_tokens,
+        )
         self.stats["calls"] += 1
         matches = _SCORE_RE.findall(resp.text or "")
         if not matches:
             raise JudgeError(
                 f"judge returned no SCORE line for criterion {criterion!r} "
-                f"(subject {subject_id!r}); refusing to invent one")
+                f"(subject {subject_id!r}); refusing to invent one"
+            )
         score = float(matches[-1])
         if score < 0 or score > crit.max_score:
             raise JudgeError(
                 f"judge score {score} outside 0..{crit.max_score} for criterion "
-                f"{criterion!r} (subject {subject_id!r}) — refusing to grade")
+                f"{criterion!r} (subject {subject_id!r}) — refusing to grade"
+            )
         reason = " ".join(
-            ln.strip() for ln in (resp.text or "").splitlines()
-            if ln.strip() and not ln.strip().upper().startswith("SCORE:")).strip()
+            ln.strip()
+            for ln in (resp.text or "").splitlines()
+            if ln.strip() and not ln.strip().upper().startswith("SCORE:")
+        ).strip()
         self.cache.put(key, {"score": score, "reason": reason, "model": self.model})
         return CriterionJudgment(criterion, score, reason, pin=self._pin)
 
-    def score_proposal(self, subject_id: str, proposal: str,
-                       contexts: dict[str, str] | None = None) -> dict[str, float]:
+    def score_proposal(
+        self, subject_id: str, proposal: str, contexts: dict[str, str] | None = None
+    ) -> dict[str, float]:
         """One judge call per criterion. Returns a scores dict in exactly
         the shape `grader.grade(rubric, scores)` consumes."""
         contexts = contexts or {}
         return {
             c.name: self.score_criterion(
-                subject_id, proposal, c.name, contexts.get(c.name, "")).score
+                subject_id, proposal, c.name, contexts.get(c.name, "")
+            ).score
             for c in self.rubric.criteria
         }
 
-    def grade_proposal(self, subject_id: str, proposal: str,
-                       contexts: dict[str, str] | None = None) -> GradeResult:
+    def grade_proposal(
+        self, subject_id: str, proposal: str, contexts: dict[str, str] | None = None
+    ) -> GradeResult:
         """score_proposal + the existing grader, in one step."""
         return grade(self.rubric, self.score_proposal(subject_id, proposal, contexts))

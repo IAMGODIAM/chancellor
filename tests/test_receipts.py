@@ -4,33 +4,36 @@ Covers: chain round-trip, checkpoint consistency, and tamper detection
 for a mid-log edit, tail truncation, reordering, a forged checkpoint
 signature, and a doctored checkpoint root.
 """
+
 import json
 
 import pytest
 
 from chancellor import receipts
 from chancellor.escalation import ActionClass, AuditLog, EscalationRequest, Gatekeeper
-from chancellor.verify_log import main as verify_main, verify_log
+from chancellor.verify_log import main as verify_main
+from chancellor.verify_log import verify_log
 
 
 def _spend(i=0):
-    return EscalationRequest(action=f"spend #{i}",
-                             action_class=ActionClass.SPEND,
-                             cost_usd=1.0, node_id=f"n{i}")
+    return EscalationRequest(
+        action=f"spend #{i}",
+        action_class=ActionClass.SPEND,
+        cost_usd=1.0,
+        node_id=f"n{i}",
+    )
 
 
 def _seed_log(path, n=5):
     log = AuditLog(path)
-    gk = Gatekeeper(audit_log=log, approver=lambda req: (True, "ok"),
-                    human_id="tester")
+    gk = Gatekeeper(audit_log=log, approver=lambda req: (True, "ok"), human_id="tester")
     for i in range(n):
         gk.authorize(_spend(i))
     return log
 
 
 def _rewrite(path, rows):
-    path.write_text("".join(json.dumps(r) + "\n" for r in rows),
-                    encoding="utf-8")
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
 
 
 def test_entries_are_chained_with_axes(tmp_path):
@@ -49,7 +52,9 @@ def test_entries_are_chained_with_axes(tmp_path):
 
 def test_axes_for_each_class():
     assert receipts.effect_axes_for("publish") == [
-        "external_visibility", "irreversibility"]
+        "external_visibility",
+        "irreversibility",
+    ]
     assert receipts.effect_axes_for("credential") == ["credential_exposure"]
     assert receipts.effect_axes_for("external_send") == ["external_visibility"]
     assert receipts.effect_axes_for("read") == []
@@ -59,8 +64,7 @@ def test_reopen_continues_chain(tmp_path):
     path = tmp_path / "audit.jsonl"
     _seed_log(path, n=2)
     log2 = AuditLog(path)  # re-opens, re-verifies, continues
-    Gatekeeper(audit_log=log2, approver=lambda req: (True, "ok")).authorize(
-        _spend(2))
+    Gatekeeper(audit_log=log2, approver=lambda req: (True, "ok")).authorize(_spend(2))
     entries = log2.read_all()
     assert len(entries) == 3
     assert entries[2]["seq"] == 2
@@ -113,8 +117,9 @@ def test_verify_detects_reordering(tmp_path):
     _rewrite(path, rows)
     result = verify_log(path)
     assert not result.ok
-    assert any("seq_mismatch" in f or "prev_hash_link_broken" in f
-               for f in result.failures)
+    assert any(
+        "seq_mismatch" in f or "prev_hash_link_broken" in f for f in result.failures
+    )
 
 
 def test_verify_detects_forged_checkpoint_signature(tmp_path):
@@ -144,8 +149,10 @@ def test_verify_detects_doctored_checkpoint_root(tmp_path):
     cp_path.write_text(json.dumps(env) + "\n")
     result = verify_log(path)
     assert not result.ok
-    assert any("checkpoint_root_mismatch" in f or
-               "checkpoint_signature_invalid" in f for f in result.failures)
+    assert any(
+        "checkpoint_root_mismatch" in f or "checkpoint_signature_invalid" in f
+        for f in result.failures
+    )
 
 
 def test_uncheckpointed_log_is_not_called_verified(tmp_path):
@@ -170,21 +177,27 @@ def test_tampered_log_refuses_new_receipts(tmp_path):
 
 def test_legacy_prefix_anchors_and_is_reported(tmp_path):
     path = tmp_path / "audit.jsonl"
-    legacy = {"ts": 1.0, "action": "old", "action_class": "spend",
-              "detail": "", "cost_usd": None, "node_id": None,
-              "approved": True, "decider": "policy", "rationale": "pre-chain"}
+    legacy = {
+        "ts": 1.0,
+        "action": "old",
+        "action_class": "spend",
+        "detail": "",
+        "cost_usd": None,
+        "node_id": None,
+        "approved": True,
+        "decider": "policy",
+        "rationale": "pre-chain",
+    }
     path.write_text(json.dumps(legacy) + "\n")
     log = AuditLog(path)  # tolerated as a prefix
-    Gatekeeper(audit_log=log, approver=lambda req: (True, "ok")).authorize(
-        _spend(0))
+    Gatekeeper(audit_log=log, approver=lambda req: (True, "ok")).authorize(_spend(0))
     entries = log.read_all()
     assert entries[1]["seq"] == 1
     assert entries[1]["prev_hash"] == receipts.legacy_anchor(legacy)
     log.checkpoint()
     strict = verify_log(path)
     assert not strict.ok
-    assert any(f.startswith("unchained_legacy_entries")
-               for f in strict.failures)
+    assert any(f.startswith("unchained_legacy_entries") for f in strict.failures)
     assert verify_log(path, allow_legacy_prefix=True).ok
 
 

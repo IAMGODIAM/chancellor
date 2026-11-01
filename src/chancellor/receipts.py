@@ -29,6 +29,7 @@ the demo; they are NOT third-party non-repudiation. Production signs
 through the E5 issuer's separated Ed25519 signer service
 (``did:e5key``) behind this same :class:`Signer` interface.
 """
+
 from __future__ import annotations
 
 import base64
@@ -45,8 +46,6 @@ SCHEMA = "e5.decision_receipt.v1"
 CHECKPOINT_SCHEMA = "e5.receipt_checkpoint.v1"
 PAYLOAD_TYPE = "application/vnd.e5.decision-receipt.v1+json"
 CHECKPOINT_PAYLOAD_TYPE = "application/vnd.e5.receipt-checkpoint.v1+json"
-
-GENESIS_PREV: str | None = None  # prev_hash of the first chained entry in a fresh log
 
 # --------------------------------------------------------------------- AM-2
 # Effect axes (Council AM-2): an action carries every axis it truly has;
@@ -75,15 +74,17 @@ def effect_axes_for(action_class_value: str) -> list[str]:
     return list(EFFECT_AXES.get(action_class_value, ()))
 
 
-# ------------------------------------------------------------------ algebra
+# --------------------------------------------------------------------- algebra
 def canonical(obj) -> bytes:
     """Sorted keys, compact separators, raw UTF-8 — byte-identical to
     the issuer's canonical form for the value shapes this schema carries."""
-    return json.dumps(obj, sort_keys=True, separators=(",", ":"),
-                      ensure_ascii=False).encode("utf-8")
+    return json.dumps(
+        obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
 
 
 def sha256_hex(data: bytes) -> str:
+    """SHA-256 of data, hex-encoded — the chain's one hash, named once."""
     return hashlib.sha256(data).hexdigest()
 
 
@@ -122,8 +123,16 @@ def pae(payload_type: str, payload: bytes) -> bytes:
     """DSSE pre-authentication encoding (in-toto/DSSE standard),
     mirroring the issuer."""
     pt = payload_type.encode("utf-8")
-    return (b"DSSEv1 " + str(len(pt)).encode() + b" " + pt + b" " +
-            str(len(payload)).encode() + b" " + payload)
+    return (
+        b"DSSEv1 "
+        + str(len(pt)).encode()
+        + b" "
+        + pt
+        + b" "
+        + str(len(payload)).encode()
+        + b" "
+        + payload
+    )
 
 
 def _b64(data: bytes) -> str:
@@ -134,7 +143,7 @@ def _unb64(text: str) -> bytes:
     return base64.b64decode(text.encode("ascii"))
 
 
-# ------------------------------------------------------------------- signer
+# --------------------------------------------------------------------- signer
 class Signer(Protocol):
     """Anything that can sign checkpoint payloads. The production
     implementation is the E5 issuer's signer service (Ed25519,
@@ -176,13 +185,20 @@ class DevHmacSigner:
 
 
 def default_signer() -> Signer:
+    """The development signer. A demo credential by design; production
+    custody replaces it, not extends it."""
     return DevHmacSigner()
 
 
-# --------------------------------------------------------------- checkpoint
-def build_checkpoint(*, signer: Signer, log_size: int,
-                     leaves: list[str], head_hash: str | None,
-                     created_at: int | None = None) -> dict:
+# --------------------------------------------------------------------- checkpoint
+def build_checkpoint(
+    *,
+    signer: Signer,
+    log_size: int,
+    leaves: list[str],
+    head_hash: str | None,
+    created_at: int | None = None,
+) -> dict:
     """A signed Merkle checkpoint as a DSSE envelope, payload shaped
     exactly like the issuer's ``e5.receipt_checkpoint.v1``:
     {schema, issuer, created_at, log_size, merkle_root,
@@ -204,22 +220,26 @@ def build_checkpoint(*, signer: Signer, log_size: int,
 
 
 def checkpoint_payload(envelope: dict) -> dict:
+    """Decode a checkpoint envelope's payload back to its dict."""
     return json.loads(_unb64(envelope["payload"]).decode("utf-8"))
 
 
 def checkpoint_signature_valid(envelope: dict, signer: Signer) -> bool:
+    """True iff a checkpoint envelope carries a valid signature under
+    signer. Fail-closed: any malformation reads False."""
     try:
         payload_bytes = _unb64(envelope["payload"])
         sigs = envelope["signatures"]
         if len(sigs) != 1 or sigs[0]["keyid"] != signer.key_id:
             return False
-        return signer.verify(pae(envelope["payloadType"], payload_bytes),
-                             _unb64(sigs[0]["sig"]))
+        return signer.verify(
+            pae(envelope["payloadType"], payload_bytes), _unb64(sigs[0]["sig"])
+        )
     except Exception:
         return False
 
 
-# ------------------------------------------------------------- chain errors
+# --------------------------------------------------------------------- chain errors
 class ChainIntegrityError(RuntimeError):
     """Raised when an existing log's chained entries fail verification
     at open time — a tampered log accepts no new receipts."""
@@ -228,13 +248,16 @@ class ChainIntegrityError(RuntimeError):
 @dataclass
 class ChainState:
     """Rebuilt-by-reading state of a chained log file."""
-    total_entries: int = 0          # every line, legacy + chained
-    chained: int = 0                # entries carrying entry_hash
-    legacy_prefix: int = 0          # unchained lines before the chain starts
-    prev_hash: str | None = None    # link the next entry must carry
+
+    total_entries: int = 0  # every line, legacy + chained
+    chained: int = 0  # entries carrying entry_hash
+    legacy_prefix: int = 0  # unchained lines before the chain starts
+    prev_hash: str | None = None  # link the next entry must carry
     leaves: list[str] = field(default_factory=list)  # chained entry hashes
 
 
+# CC 11 (radon) — a linear walk over the chain; one branch per
+# defect class the scan must classify.
 def scan_chain(lines: list[dict]) -> ChainState:
     """Walk parsed log lines and rebuild chain state, VERIFYING as we
     go. Raises ChainIntegrityError naming the first break."""
@@ -246,23 +269,26 @@ def scan_chain(lines: list[dict]) -> ChainState:
             if state.chained:
                 raise ChainIntegrityError(
                     f"unchained entry at position {pos} after the chain "
-                    f"has started — log is not append-only")
+                    f"has started — log is not append-only"
+                )
             state.legacy_prefix += 1
             prev_entry = entry
             continue
-        expected_prev = (legacy_anchor(prev_entry)
-                         if state.chained == 0 and prev_entry is not None
-                         else state.prev_hash)
+        expected_prev = (
+            legacy_anchor(prev_entry)
+            if state.chained == 0 and prev_entry is not None
+            else state.prev_hash
+        )
         if entry.get("seq") != pos:
             raise ChainIntegrityError(
-                f"seq mismatch at position {pos}: entry claims "
-                f"seq={entry.get('seq')!r}")
+                f"seq mismatch at position {pos}: entry claims seq={entry.get('seq')!r}"
+            )
         if entry.get("prev_hash") != expected_prev:
-            raise ChainIntegrityError(
-                f"prev_hash link broken at seq {pos}")
+            raise ChainIntegrityError(f"prev_hash link broken at seq {pos}")
         if entry_hash(entry) != entry["entry_hash"]:
             raise ChainIntegrityError(
-                f"entry_hash mismatch at seq {pos} — entry was edited")
+                f"entry_hash mismatch at seq {pos} — entry was edited"
+            )
         state.chained += 1
         state.leaves.append(entry["entry_hash"])
         state.prev_hash = entry["entry_hash"]
@@ -274,4 +300,5 @@ def scan_chain(lines: list[dict]) -> ChainState:
 
 
 def default_checkpoint_path(log_path: str | Path) -> Path:
+    """A log's checkpoint sidecar lives beside it, at '<log>.checkpoints.jsonl'."""
     return Path(str(log_path) + ".checkpoints.jsonl")
