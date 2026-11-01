@@ -31,7 +31,7 @@ Model names in this repo are exact API model IDs only; one naming correction is 
 
 ## Results (measured, Oct 29–31, 2026)
 
-**Suite B reliability frontier, at 10x scale** (Lambda run, Oct 30): governed drift **0 / 1,800 runs** against ungoverned drift **300 / 1,800** on identical fault manifests. The zero travels with its bounds wherever it is quoted: a 95% upper bound of 0.166% at the cell level (n = 1,800), and the weaker manifest-level bound of 25.9% (0 of 10 manifests). A value-cell extension added governed drift **0 / 2,000**. Drift is a bound with its denominator, never a bare zero.
+**Suite B reliability frontier, at 10x scale** (RUN-5, Oct 31, on the finalized tree — 5,600 Suite B runs in all): governed drift **0 / 1,800 runs** against ungoverned drift **300 / 1,800** on identical fault manifests. The zero travels with its bounds wherever it is quoted: a 95% upper bound of 0.166% at the cell level (n = 1,800), and the weaker manifest-level bound of 25.9% (0 of 10 manifests). A value-cell extension added governed drift **0 / 2,000**. Drift is a bound with its denominator, never a bare zero.
 
 The original frontier (Oct 29) had the same shape at one-tenth the scale. Each arm ran the same 10 tasks under the same 180 fault manifests. A run *completes* when it finishes; it *succeeds* when its final state passes the task's check. Drift is the gap that matters — claiming success when the check failed:
 
@@ -43,13 +43,13 @@ The original frontier (Oct 29) had the same shape at one-tenth the scale. Each a
 
 Governance is not free, and the price is printed, not hidden: the governed arm completes fewer tasks at a higher cost per success — and never once claims a success that did not happen.
 
-**Endurance:** four parallel 8-hour soaks (Oct 30–31, Lambda) each completed 480 / 480 segments — 5,760 steps in all, 48 injected faults per soak, one forced SIGKILL per soak, resumed every time — with drift 0 and every final hash chain verifying.
+**Endurance:** four parallel 8-hour soaks (RUN-5, Oct 31) each completed 480 / 480 segments and 5,760 steps per soak — 48 injected faults per soak, each met by a fail-closed halt rather than a corrupted claim — with drift 0, zero corrupted state files, and every final hash chain verifying. An independent red team then re-derived all four chains from the raw files: 1,846 entries, 0 breaks.
 
-**Kill-resume gate (T3):** the fixed harness passes **300 / 300** gates, locally and on the Lambda box. The original harness's 290 / 300 stands in [BUILD-LOG.md](BUILD-LOG.md) as the measurement of the harness as first written — the defect was in the test harness, not the product, and the diagnosis is recorded there in full.
+**Kill-resume gate (T3):** the fixed harness passes **300 / 300** gates (6,000 trials in RUN-5's S2 stage, on the Lambda box). The original harness's 290 / 300 stands in [BUILD-LOG.md](BUILD-LOG.md) as the measurement of the harness as first written — the defect was in the test harness, not the product, and the diagnosis is recorded there in full.
 
-**Tests:** 155 passing, 0 failing — and since Oct 31 the tree also passes its own presentation gates: Ruff format and lint at zero findings, mypy configured, identical commands in pre-commit and CI (see the badge above).
+**Tests:** 188 passing, 0 failing on the frozen tree — which also passes its own presentation gates: Ruff format and lint at zero findings, mypy clean, identical commands in pre-commit and CI (see the badge above).
 
-**Suite A:** the calibration key of record is approved; the live calibration run has not yet reported, and the zero-cost stand-in dry-runs failed the calibration gate (κ 0.200 / 0.061, round 2 κ 0.314 / 0.132) — so no Suite A score is reported yet. The gate catching an uncalibrated judge at $0 is the method working as designed.
+**Suite A:** the calibration gate has been run twice under pre-registration and has not passed — and no Suite A score is claimed anywhere in this submission. The calibration of record measured band κ 0.667 and Spearman ρ 0.881, with precedent-consistency (κ 0.294) and reversibility (κ 0.575) below the 0.6 criterion floor. The pre-registered remedy run then failed its own completeness gate — 35 of 36 references scored, one lost to two transport failures — and an incomplete run earns no gate statistics; its diagnostics (not gate statistics) put every criterion above threshold, and the judge's blind self-agreement, measured for the first time, satisfied its gate on all four criteria. What ships is the labeled fallback: live judge verdicts carry the label *uncalibrated* until a pre-registered run passes in full. The gate catching our own judge — twice — is the method working as designed.
 
 Don't take the tables' word for any of this — the audit log of a governed run verifies offline, with no credentials and no network (see [Verify the audit log](#verify-the-audit-log)).
 
@@ -75,7 +75,7 @@ The exhibit writes its state to `./.chancellor-exhibit` in the current directory
 
 https://github.com/user-attachments/assets/8a0843e8-a226-4218-bcd0-ef50a4110e45
 
-The demo is the exhibit — `chancellor demo` (Quickstart above) runs the hearing live in the terminal: graded work with a revision, an injected fault halted fail-closed, a human gate the run waits at, and a receipt chain verified cold (with `--tamper`, a quietly altered copy is rejected on screen, the entry named). Its verdict block is byte-identical across clean runs, so the video, when it lands here, is a capture of a fixed target, not a lucky take.
+The demo is the exhibit — `chancellor demo` (Quickstart above) runs the hearing live in the terminal: graded work with a revision, an injected fault halted fail-closed, a human gate the run waits at, and a receipt chain verified cold (with `--tamper`, a quietly altered copy is rejected on screen, the entry named). Its verdict block is byte-identical across clean runs, so the video above is a capture of a fixed target, not a lucky take.
 
 ## Verify the audit log
 
@@ -133,7 +133,7 @@ The code cites its governing amendments inline (AM-2, EA-5, …) — the key is 
 - **Impact (30%)** — for anyone who runs long-running agents with real authority: every consequential act is gated before it happens, graded after it lands, and receipted either way — so an operator can hand an agent real work (spend, sends, publishing, irreversible acts) and prove afterward exactly what it did, what it cost, and who approved it.
 - **Tooling — creative use of Meta's tools (25%)** — the Meta Model API supplies both halves of the separation of powers: `muse-spark-1.3` does the work and `muse-wonder-1.0` grades it, so no run is scored by the model that produced it. Exact, versioned IDs only — see [ERRATA.md](ERRATA.md) E-1.
 - **Demo (25%)** — `chancellor demo` runs end-to-end offline today; the identical run executes on the live Meta models through the same client (connection validated Oct 30), so the demo cannot drift from the product. (Video: see the Demo section above.)
-- **Technical Depth (20%)** — durable resumable task graphs proven under SIGKILL trials, rubric-graded outputs from an independent judge, failure-injected reliability measurement with the cost printed beside the frontier, and a hash-chained audit log verifiable offline.
+- **Technical Depth (20%)** — durable, crash-atomic task graphs proven under kill-resume gates (300 / 300), rubric-graded outputs from an independent judge, failure-injected reliability measurement with the cost printed beside the frontier, and a hash-chained audit log verifiable offline.
 
 ## License
 
