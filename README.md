@@ -67,7 +67,7 @@ chancellor eval-a          # Suite A with stub agents
 chancellor eval-b          # Suite B reliability metrics
 ```
 
-Zero runtime dependencies — stdlib only, Python ≥ 3.11.
+Zero runtime dependencies — stdlib only, Python ≥ 3.11. Allow about two minutes for the demo at stage pace (the gate is meant to be waited at); `--fast` compresses the same run for a quick pass. Judging from a distance: `pip install git+https://github.com/IAMGODIAM/chancellor` installs the package straight from this repo, and `chancellor demo` runs offline.
 
 The exhibit writes its state to `./.chancellor-exhibit` in the current directory (task-graph state, the audit log, and its checkpoints). Its verdict block is byte-identical across clean runs. `chancellor demo --classic` runs the original scripted governed run, which keeps its state in `./.chancellor`.
 
@@ -85,7 +85,7 @@ Every governed run writes a hash-chained audit log with signed checkpoints. Veri
 python -m chancellor.verify_log .chancellor/audit-log.jsonl
 ```
 
-Exit 0 means the chain is intact and the newest signed checkpoint checks out. Exit 1 names the failure — a mid-log edit, a reordering, a truncated tail, a forged checkpoint. A log with no checkpoint is never reported as verified: tail truncation is undetectable without one, and the verifier says so rather than guessing.
+Exit 0 means the chain is intact and the newest signed checkpoint checks out. Exit 1 names the failure — a mid-log edit, a reordering, a truncated tail, a forged checkpoint. A log with no checkpoint is never reported as verified: tail truncation is undetectable without one, and the verifier says so rather than guessing. The checkpoints are signed with the development signer whose key ships in the source — deliberately public, and labeled in the code where it sits: those signatures prove the chain is internally consistent and unaltered since signing (tamper-evidence), not who signed it (non-repudiation). Separating the signer — a production key held apart from the code — is the named hardening step before any deployment that needs attribution.
 
 ## Going live
 
@@ -123,7 +123,7 @@ src/chancellor/
     suite_b_tasks.py     the 10 world-state tasks Suite B executes
     suite_b_world.py     the assertable world state the tasks run over
 tests/             smoke + unit tests, all offline
-docs/              GLOSSARY.md (the amendment key) + media/ (banner, social preview)
+docs/              GLOSSARY.md (the amendment key) + media/ (banner, social preview) + evidence/ (the RUN-5 record)
 ```
 
 The code cites its governing amendments inline (AM-2, EA-5, …) — the key is [docs/GLOSSARY.md](docs/GLOSSARY.md).
