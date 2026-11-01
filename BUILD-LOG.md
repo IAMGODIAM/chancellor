@@ -119,3 +119,7 @@ The W5/AM-16 lanes' ruff debt (11 findings + 4 unformatted files in gate_report.
 - docs/open-register.md: the undecided, registered — remedy-2, signer separation, the hindcast scorer, the film upgrade, the PR sequence, the RT-4 disposition.
 - CITATION.cff added (author Israel Lee Armstead; version 1.0.0; the license field omitted — proprietary, no SPDX fit — with a comment saying so).
 - Live transport proof (filed earlier today, docs/evidence/live-transport/): one governed Spark/Wonder exchange through the connector custody lane, under its three-line label law.
+
+## 2026-11-01 — PyPI listing live via trusted publishing
+
+`pip install chancellor` is live: https://pypi.org/project/chancellor/ (version 1.0.0, the frozen tree). The upload ran headless from CI by Trusted Publishing (OIDC) — a pending publisher registered on the maintainer account (iamgodiam) for this repository's publish.yml workflow, environment pypi; no API token exists or was used. Verified cold in a fresh virtual environment on the day: install from PyPI, `chancellor demo --fast --auto` exit 0. Run: https://github.com/IAMGODIAM/chancellor/actions/runs/41340810549
