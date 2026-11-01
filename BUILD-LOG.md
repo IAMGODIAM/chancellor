@@ -123,3 +123,14 @@ The W5/AM-16 lanes' ruff debt (11 findings + 4 unformatted files in gate_report.
 ## 2026-11-01 — PyPI listing live via trusted publishing
 
 `pip install chancellor` is live: https://pypi.org/project/chancellor/ (version 1.0.0, the frozen tree). The upload ran headless from CI by Trusted Publishing (OIDC) — a pending publisher registered on the maintainer account (iamgodiam) for this repository's publish.yml workflow, environment pypi; no API token exists or was used. Verified cold in a fresh virtual environment on the day: install from PyPI, `chancellor demo --fast --auto` exit 0. Run: https://github.com/IAMGODIAM/chancellor/actions/runs/41340810549
+
+## 2026-11-01 — PR #2 merged: Chancellor agent bridge and opening war room (Wabi)
+
+- PR #2, "Add Chancellor agent bridge and opening war room" (branch `wabi/chancellor-agent-bridge-20261031`), merged after the Chairman lifted the freeze. Merge commit `f5c4b9cf6c4e92e6ecfcf93fb3283b2fbf793d99`. Seven files, +136/−0: six additions under `docs/bridge/` and `docs/warroom/` (byte-identical to the PR's versions) and a 4-line README addition. No `src/` touched.
+- Conflict resolution (one file, README.md): the PR's lines were written against the pre-refinement README and appended at its end; they were integrated into the current README verbatim as an `## Agent collaboration` section at the end of "How it maps to the judging criteria" — the position the PR's own base ended at — with the current README otherwise byte-for-byte intact (removing the section restores it exactly). The branch was updated with a merge of current main carrying this resolution, then merged through the API.
+- CI on the merge commit: gates workflow **success**. Full local gate suite on merged main (after PR #3, below): pytest **188 passed**; ruff check — all checks passed; ruff format — clean; mypy — success, 25 source files.
+
+## 2026-11-01 — PR #3 merged: Manus light-bridge feasibility, red-team and market dossier
+
+- PR #3, "docs(research): Manus light-bridge feasibility, red-team and market dossier" (branch `manus/chancellor-light-bridge-study-20261031`), merged clean, second in the held sequence. Merge commit `5451ba308b95ae8855a20ea170405a5fe2f054f1`. One added file: `docs/warroom/2026-10-31-manus-light-bridge-study.md` (+294/−0). No `src/` touched.
+- CI on the merge commit: gates workflow **success**. Gates measured on the resulting main HEAD (`5451ba30…`): pytest **188 passed**; ruff check — all checks passed; ruff format — clean (59 files); mypy — success, 25 source files. Measured-tree seam: none — both merges are documentation-only; RUN-7 measures the frozen tarball and PyPI 1.0.0 is that tree.
