@@ -1,6 +1,6 @@
 from chancellor.escalation import ActionClass, EscalationRequest, Gatekeeper
 from chancellor.grader import OUTPUT_RUBRIC
-from chancellor.instruments import CheckResult, InstrumentPanel, default_panel
+from chancellor.instruments import InstrumentPanel, default_panel
 from chancellor.orchestrator import CrewRunner
 from chancellor.task_graph import NodeStatus, TaskGraph
 
@@ -19,9 +19,13 @@ def _ok_worker(node):
 
 
 def test_full_run_completes(tmp_path):
-    runner = CrewRunner(_two_node_graph(), {"w": _ok_worker},
-                        panel=default_panel(), rubric=OUTPUT_RUBRIC,
-                        state_path=tmp_path / "s.json")
+    runner = CrewRunner(
+        _two_node_graph(),
+        {"w": _ok_worker},
+        panel=default_panel(),
+        rubric=OUTPUT_RUBRIC,
+        state_path=tmp_path / "s.json",
+    )
     report = runner.run()
     assert report.ok and report.completed == ["one", "two"]
     assert (tmp_path / "s.json").exists()
@@ -54,9 +58,11 @@ def test_broken_instrument_halts_run():
 
 def test_failing_grade_rejects_output():
     def weak(node):
-        return {"text": "thin", "cost_usd": 0.0,
-                "scores": {"correctness": 1, "completeness": 1,
-                           "clarity": 1, "safety": 1}}
+        return {
+            "text": "thin",
+            "cost_usd": 0.0,
+            "scores": {"correctness": 1, "completeness": 1, "clarity": 1, "safety": 1},
+        }
 
     runner = CrewRunner(_two_node_graph(), {"w": weak}, rubric=OUTPUT_RUBRIC)
     report = runner.run()
@@ -67,8 +73,11 @@ def test_gate_denial_blocks_node():
     def spender(node):
         artifact = _ok_worker(node)
         artifact["action"] = EscalationRequest(
-            action="Buy inference credits", action_class=ActionClass.SPEND,
-            cost_usd=25.0, node_id=node.id)
+            action="Buy inference credits",
+            action_class=ActionClass.SPEND,
+            cost_usd=25.0,
+            node_id=node.id,
+        )
         return artifact
 
     g = TaskGraph("t")

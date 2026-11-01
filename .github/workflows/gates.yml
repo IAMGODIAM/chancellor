@@ -1,0 +1,28 @@
+name: gates
+
+# The CI half of the gates. Pre-commit (.pre-commit-config.yaml) runs the
+# identical commands locally; a gate that exists in only one place is not
+# a gate. (Wisdom Council on Code Beauty, 2026-10-31.)
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install gate tools
+        run: pip install "ruff==0.17.3" "mypy>=1.10" "pytest>=8"
+      - name: Format check
+        run: ruff format --check .
+      - name: Lint
+        run: ruff check .
+      - name: Type check
+        run: mypy
+      - name: Tests
+        run: python -m pytest -q

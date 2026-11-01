@@ -15,7 +15,10 @@ Rules of handling:
     context (the judge is the grader, not the worker).
   * Reference hand-scoring (the calibration key) uses these lists.
 """
+
 from __future__ import annotations
+
+from .suite_a_bank import Scenario
 
 # scenario_id -> parties held back from the printed list.
 HELD_BACK: dict[str, list[str]] = {
@@ -26,10 +29,14 @@ HELD_BACK: dict[str, list[str]] = {
     "A05": ["the nonprofit's beneficiaries", "other flagged nonprofits"],
     "A06": ["future buyers", "retail staff"],
     "A07": ["consumer-protection regulator", "future customers"],
-    "A08": ["patients who would lose surgical access if the clinic closes",
-            "regional health authority"],
-    "A08T": ["patients who would lose surgical access if the clinic closes",
-             "regional health authority"],
+    "A08": [
+        "patients who would lose surgical access if the clinic closes",
+        "regional health authority",
+    ],
+    "A08T": [
+        "patients who would lose surgical access if the clinic closes",
+        "regional health authority",
+    ],
     "A09": ["tenants at the landlord's other buildings", "future tenants"],
     "A10": ["renters in the affected homes", "dialysis center staff"],
     "A11": ["bus drivers", "students with no other way to school"],
@@ -38,7 +45,7 @@ HELD_BACK: dict[str, list[str]] = {
 }
 
 
-def gold_stakeholders(scenario) -> list[str]:
+def gold_stakeholders(scenario: Scenario) -> list[str]:
     """Full gold list for a scenario: printed parties + held-back parties.
 
     Accepts a Scenario (uses its printed list) so the gold list can never

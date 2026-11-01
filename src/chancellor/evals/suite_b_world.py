@@ -26,12 +26,14 @@ omission, and timing faults abort runs or cost score — they never make
 a worker claim success on corrupted state. (Thoth's expander, checked
 in every Suite B report.)
 """
+
 from __future__ import annotations
 
 import copy
 import hashlib
 import json
 from dataclasses import dataclass
+from typing import Literal, cast
 
 from ..api_client import ChatMessage, ChatResponse, MetaModelClient
 from .suite_b_tasks import StepSpec, TaskSpec
@@ -39,11 +41,11 @@ from .suite_b_tasks import StepSpec, TaskSpec
 # Fault classes (Council AM-3): crash / omission / value. Timing is an
 # omission SUBSPECIES with its own denominator. "Cost" is not a fault
 # class — it is tested by the instrument tests, not injected here.
-FAULT_CRASH = "crash"
-FAULT_OMISSION = "omission"
-FAULT_VALUE = "value"
-SUB_PLAIN = "plain"
-SUB_TIMING = "timing"
+FAULT_CRASH: Literal["crash"] = "crash"
+FAULT_OMISSION: Literal["omission"] = "omission"
+FAULT_VALUE: Literal["value"] = "value"
+SUB_PLAIN: Literal["plain"] = "plain"
+SUB_TIMING: Literal["timing"] = "timing"
 
 
 class ToolCrash(Exception):
@@ -64,24 +66,31 @@ def checksum_of(value: object) -> str:
 class FaultEntry:
     """One manifest line: inject `fault` at the `call`-th invocation of
     step `step` in task `task_id`, under manifest `manifest_id`."""
+
     id: str
     task_id: str
     manifest_id: str
     step: str
     call: int
-    fault: str                          # crash | omission | value
-    subspecies: str | None = None       # omission only: plain | timing
-    transform: str | None = None        # value only: scale10 | replace
-    replacement: object = None          # value/replace payload
-    direct_keys: tuple[str, ...] = ()   # world keys the fault itself writes
+    fault: Literal["crash", "omission", "value"]
+    subspecies: Literal["plain", "timing"] | None = None  # omission only
+    transform: str | None = None  # value only: scale10 | replace
+    replacement: object = None  # value/replace payload
+    direct_keys: tuple[str, ...] = ()  # world keys the fault itself writes
 
     def to_dict(self) -> dict:
-        return {"id": self.id, "task_id": self.task_id,
-                "manifest_id": self.manifest_id, "step": self.step,
-                "call": self.call, "fault": self.fault,
-                "subspecies": self.subspecies, "transform": self.transform,
-                "replacement": self.replacement,
-                "direct_keys": list(self.direct_keys)}
+        return {
+            "id": self.id,
+            "task_id": self.task_id,
+            "manifest_id": self.manifest_id,
+            "step": self.step,
+            "call": self.call,
+            "fault": self.fault,
+            "subspecies": self.subspecies,
+            "transform": self.transform,
+            "replacement": self.replacement,
+            "direct_keys": list(self.direct_keys),
+        }
 
 
 class FaultInjector:
@@ -92,7 +101,8 @@ class FaultInjector:
     def __init__(self, entries: list[FaultEntry]):
         self.entries = list(entries)
         self._by_point: dict[tuple[str, int], FaultEntry] = {
-            (e.step, e.call): e for e in self.entries}
+            (e.step, e.call): e for e in self.entries
+        }
         self.triggered: list[FaultEntry] = []
 
     def fire(self, step: str, call: int) -> FaultEntry | None:
@@ -118,7 +128,7 @@ class World:
 
 @dataclass
 class FetchResult:
-    status: str                         # ok | empty | late
+    status: Literal["ok", "empty", "late"]
     value: object = None
     checksum: str | None = None
 
@@ -129,8 +139,14 @@ class ToolBelt:
     with the injector consulted at the boundary — AgentChaos-style:
     faults live at the shared tool layer, not inside the agent."""
 
-    def __init__(self, world: World, injector: FaultInjector,
-                 client: MetaModelClient, model: str, task_id: str):
+    def __init__(
+        self,
+        world: World,
+        injector: FaultInjector,
+        client: MetaModelClient,
+        model: str,
+        task_id: str,
+    ):
         self.world = world
         self.injector = injector
         self.client = client
@@ -139,9 +155,15 @@ class ToolBelt:
         self._calls: dict[str, int] = {}
 
     def _meter(self, step: str, note: str) -> None:
-        self.client.chat(self.model, [ChatMessage(
-            role="user",
-            content=f"suite-b task {self.task_id} step {step}: {note}")])
+        self.client.chat(
+            self.model,
+            [
+                ChatMessage(
+                    role="user",
+                    content=f"suite-b task {self.task_id} step {step}: {note}",
+                )
+            ],
+        )
 
     def fetch(self, step: str, source_key: str) -> FetchResult:
         call = self._calls.get(step, 0)
@@ -152,10 +174,12 @@ class ToolBelt:
             if entry.fault == FAULT_CRASH:
                 raise ToolCrash(
                     f"tool crash injected at {step} call {call} "
-                    f"(manifest entry {entry.id})")
+                    f"(manifest entry {entry.id})"
+                )
             if entry.fault == FAULT_OMISSION:
                 return FetchResult(
-                    "late" if entry.subspecies == SUB_TIMING else "empty")
+                    "late" if entry.subspecies == SUB_TIMING else "empty"
+                )
             if entry.fault == FAULT_VALUE:
                 true_value = self.world.state[source_key]
                 corrupted = self._corrupt(true_value, entry)
@@ -168,15 +192,18 @@ class ToolBelt:
 
     @staticmethod
     def _corrupt(value: object, entry: FaultEntry) -> object:
-        if entry.transform == "scale10" and isinstance(value, (int, float)) \
-                and not isinstance(value, bool):
+        if (
+            entry.transform == "scale10"
+            and isinstance(value, (int, float))
+            and not isinstance(value, bool)
+        ):
             return value * 10
         if entry.transform == "replace":
             return entry.replacement
         return value
 
 
-_MISSING = object()   # scratch sentinel: an optional step produced nothing
+_MISSING = object()  # scratch sentinel: an optional step produced nothing
 
 
 class ScriptedAgent:
@@ -198,71 +225,100 @@ class ScriptedAgent:
 
     def _fetch_required(self, step: StepSpec) -> FetchResult:
         """Required-fetch policy: one retry on empty/late, then abort."""
-        result = self.belt.fetch(step.name, step.source)
+        # The task builder only emits fetch steps carrying a source;
+        # the casts in these handlers state that construction guarantee.
+        source = cast(str, step.source)
+        result = self.belt.fetch(step.name, source)
         if result.status == "ok":
             return result
-        result = self.belt.fetch(step.name, step.source)
+        result = self.belt.fetch(step.name, source)
         if result.status == "ok":
             return result
         raise StepAborted(
             f"required data for step {step.name} never arrived "
-            f"(last status: {result.status}) — aborting honestly")
+            f"(last status: {result.status}) — aborting honestly"
+        )
 
     def _step_fetch(self, step: StepSpec) -> dict:
+        slot = cast(str, step.scratch)
         if step.required:
             result = self._fetch_required(step)
         else:
-            result = self.belt.fetch(step.name, step.source)
+            result = self.belt.fetch(step.name, cast(str, step.source))
             if result.status != "ok":
                 self.degraded.append(step.name)
-                self.scratch[step.scratch] = _MISSING
-                return {"text": f"{step.name}: no data ({result.status}) "
-                                "— optional step skipped",
-                        "data": {"skipped": True}}
-        self.scratch[step.scratch] = result.value
-        return {"text": f"{step.name}: fetched {step.source} = {result.value!r}",
-                "data": {"value": result.value, "checksum": result.checksum}}
+                self.scratch[slot] = _MISSING
+                return {
+                    "text": f"{step.name}: no data ({result.status}) "
+                    "— optional step skipped",
+                    "data": {"skipped": True},
+                }
+        self.scratch[slot] = result.value
+        return {
+            "text": f"{step.name}: fetched {step.source} = {result.value!r}",
+            "data": {"value": result.value, "checksum": result.checksum},
+        }
 
     def _step_compute(self, step: StepSpec) -> dict:
         self.belt._meter(step.name, f"compute {step.op}")
-        vals = [self.scratch[name] for name in step.inputs]
-        result = {"add": vals[0] + vals[1], "sub": vals[0] - vals[1],
-                  "mul": vals[0] * vals[1]}[step.op]
-        self.scratch[step.scratch] = result
+        vals = [cast(float, self.scratch[name]) for name in step.inputs]
+        result = {
+            "add": vals[0] + vals[1],
+            "sub": vals[0] - vals[1],
+            "mul": vals[0] * vals[1],
+        }[cast(str, step.op)]
+        self.scratch[cast(str, step.scratch)] = result
         return {"text": f"{step.name}: {step.op}{tuple(vals)} = {result}"}
 
     def _step_store(self, step: StepSpec) -> dict:
         self.belt._meter(step.name, f"store {step.target}")
-        value = self.scratch[step.scratch]
+        value = self.scratch[cast(str, step.scratch)]
         self.world.state[step.target] = value
-        return {"text": f"{step.name}: stored {step.target} = {value!r}",
-                "data": {"key": step.target, "value": value}}
+        return {
+            "text": f"{step.name}: stored {step.target} = {value!r}",
+            "data": {"key": step.target, "value": value},
+        }
 
     def _step_enrich(self, step: StepSpec) -> dict:
-        result = self.belt.fetch(step.name, step.source)
+        result = self.belt.fetch(step.name, cast(str, step.source))
         if result.status != "ok":
             self.degraded.append(step.name)
-            return {"text": f"{step.name}: no data ({result.status}) "
-                            "— optional enrich skipped",
-                    "data": {"skipped": True}}
-        stored = result.value if step.mode == "copy" \
-            else self.scratch["result"] * result.value
+            return {
+                "text": f"{step.name}: no data ({result.status}) "
+                "— optional enrich skipped",
+                "data": {"skipped": True},
+            }
+        stored = (
+            result.value
+            if step.mode == "copy"
+            else cast(float, self.scratch["result"]) * cast(float, result.value)
+        )
         self.world.state[step.target] = stored
-        return {"text": f"{step.name}: enriched {step.target} = {stored!r}",
-                "data": {"value": result.value, "checksum": result.checksum,
-                         "stored": stored}}
+        return {
+            "text": f"{step.name}: enriched {step.target} = {stored!r}",
+            "data": {
+                "value": result.value,
+                "checksum": result.checksum,
+                "stored": stored,
+            },
+        }
 
     def _step_summarize(self, step: StepSpec) -> dict:
         self.belt._meter(step.name, "summarize")
-        summary = {"claimed": "complete", "task": self.task.id,
-                   "headline": self.scratch.get("result")}
+        summary = {
+            "claimed": "complete",
+            "task": self.task.id,
+            "headline": self.scratch.get("result"),
+        }
         self.world.state[step.target] = summary
-        return {"text": f"{self.task.id} complete: headline "
-                        f"{summary['headline']!r}",
-                "data": {"key": step.target, "value": summary}}
+        return {
+            "text": f"{self.task.id} complete: headline {summary['headline']!r}",
+            "data": {"key": step.target, "value": summary},
+        }
 
 
-def suite_transport(model: str, messages: list[ChatMessage], **kwargs) -> ChatResponse:
+def suite_transport(model: str, messages: list[ChatMessage], **kwargs) -> ChatResponse:  # noqa: ARG001
+    # Transport protocol: call options are accepted for conformance and ignored.
     """Deterministic offline transport for Suite B. Token usage is a
     fixed function of the prompt, and Lane 2's CostMeter prices it at
     list rates — Suite B's costs are metered, never self-reported
@@ -272,4 +328,5 @@ def suite_transport(model: str, messages: list[ChatMessage], **kwargs) -> ChatRe
     return ChatResponse(
         text=f"[suite-b:{model}] deterministic offline step response",
         model=model,
-        usage={"prompt_tokens": prompt_tokens, "completion_tokens": 32})
+        usage={"prompt_tokens": prompt_tokens, "completion_tokens": 32},
+    )

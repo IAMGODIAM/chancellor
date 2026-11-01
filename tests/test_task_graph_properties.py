@@ -1,13 +1,18 @@
 """T1 property tests — task-graph invariants: lifecycle legality,
 persistence round-trip, resume reconciliation (seeded randomized,
 stdlib-only; see test_grader_properties for why)."""
+
 import json
 import random
 
 import pytest
 
-from chancellor.task_graph import (SCHEMA_VERSION, IllegalTransitionError,
-                               NodeStatus, TaskGraph)
+from chancellor.task_graph import (
+    SCHEMA_VERSION,
+    IllegalTransitionError,
+    NodeStatus,
+    TaskGraph,
+)
 
 CASES = 100
 
@@ -23,23 +28,28 @@ def _random_dag(rng: random.Random, n: int | None = None) -> TaskGraph:
 
 # -- lifecycle ---------------------------------------------------------------
 
+
 def test_terminal_states_are_terminal():
     g = TaskGraph("t")
     g.task("a", "A")
     g.task("b", "B")
     g.complete("a", output="done")
-    for op in (lambda: g.complete("a"),
-               lambda: g.fail("a", "again"),
-               lambda: g.block("a", "again"),
-               lambda: g.requeue("a", "again"),
-               lambda: g.start("a")):
+    for op in (
+        lambda g=g: g.complete("a"),
+        lambda g=g: g.fail("a", "again"),
+        lambda g=g: g.block("a", "again"),
+        lambda g=g: g.requeue("a", "again"),
+        lambda g=g: g.start("a"),
+    ):
         with pytest.raises(IllegalTransitionError):
             op()
     g.fail("b", "boom")
-    for op in (lambda: g.complete("b"),
-               lambda: g.fail("b", "again"),
-               lambda: g.requeue("b", "again"),
-               lambda: g.start("b")):
+    for op in (
+        lambda g=g: g.complete("b"),
+        lambda g=g: g.fail("b", "again"),
+        lambda g=g: g.requeue("b", "again"),
+        lambda g=g: g.start("b"),
+    ):
         with pytest.raises(IllegalTransitionError):
             op()
 
@@ -75,23 +85,30 @@ def test_status_lifecycle_random_walks():
     for _ in range(CASES):
         g = _random_dag(rng, n=1)
         node = g.nodes["n0"]
-        ops = [lambda: g.start("n0"),
-               lambda: g.complete("n0"),
-               lambda: g.fail("n0", "x"),
-               lambda: g.block("n0", "x"),
-               lambda: g.requeue("n0", "x")]
+        ops = [
+            lambda g=g: g.start("n0"),
+            lambda g=g: g.complete("n0"),
+            lambda g=g: g.fail("n0", "x"),
+            lambda g=g: g.block("n0", "x"),
+            lambda g=g: g.requeue("n0", "x"),
+        ]
         for _ in range(rng.randint(1, 12)):
             was_terminal = node.status in (
-                NodeStatus.DONE, NodeStatus.FAILED, NodeStatus.SKIPPED)
+                NodeStatus.DONE,
+                NodeStatus.FAILED,
+                NodeStatus.SKIPPED,
+            )
             try:
                 rng.choice(ops)()
             except ValueError:
                 continue  # illegal transition or attempt cap: refused
             assert not was_terminal, (
-                f"an operation escaped terminal state {node.status}")
+                f"an operation escaped terminal state {node.status}"
+            )
 
 
 # -- persistence ---------------------------------------------------------------
+
 
 def test_persistence_roundtrip_random_graphs(tmp_path):
     rng = random.Random(13)
@@ -99,10 +116,15 @@ def test_persistence_roundtrip_random_graphs(tmp_path):
         g = _random_dag(rng)
         # Complete a dependency-closed prefix so statuses vary legally.
         for node in list(g.nodes.values()):
-            if all(g.nodes[d].status is NodeStatus.DONE
-                   for d in node.depends_on) and rng.random() < 0.6:
-                g.complete(node.id, output={"text": f"out-{node.id}"},
-                           grade=float(rng.randint(0, 100)))
+            if (
+                all(g.nodes[d].status is NodeStatus.DONE for d in node.depends_on)
+                and rng.random() < 0.6
+            ):
+                g.complete(
+                    node.id,
+                    output={"text": f"out-{node.id}"},
+                    grade=float(rng.randint(0, 100)),
+                )
         path = tmp_path / f"s{i}.json"
         g.save(path)
         g2 = TaskGraph.load(path)
@@ -133,22 +155,32 @@ def test_save_is_atomic_and_versioned(tmp_path):
 
 def test_load_refuses_future_schema(tmp_path):
     path = tmp_path / "future.json"
-    path.write_text(json.dumps(
-        {"schema_version": SCHEMA_VERSION + 99, "name": "x", "nodes": []}))
+    path.write_text(
+        json.dumps({"schema_version": SCHEMA_VERSION + 99, "name": "x", "nodes": []})
+    )
     with pytest.raises(ValueError):
         TaskGraph.load(path)
 
 
 def test_load_accepts_legacy_unversioned_state(tmp_path):
     path = tmp_path / "legacy.json"
-    path.write_text(json.dumps({"name": "old", "nodes": [
-        {"id": "a", "title": "A", "status": "done", "output": "kept"}]}))
+    path.write_text(
+        json.dumps(
+            {
+                "name": "old",
+                "nodes": [
+                    {"id": "a", "title": "A", "status": "done", "output": "kept"}
+                ],
+            }
+        )
+    )
     g = TaskGraph.load(path)
     assert g.nodes["a"].status is NodeStatus.DONE
     assert g.nodes["a"].attempts == 0
 
 
 # -- resume reconciliation -------------------------------------------------------
+
 
 def test_resume_requeues_interrupted_node(tmp_path):
     g = TaskGraph("t")
@@ -214,11 +246,9 @@ def test_resume_invariants_random_graphs(tmp_path):
                 pass
         path = tmp_path / f"r{i}.json"
         g.save(path)
-        before_done = {n.id for n in g.nodes.values()
-                       if n.status is NodeStatus.DONE}
+        before_done = {n.id for n in g.nodes.values() if n.status is NodeStatus.DONE}
         g2 = TaskGraph.load(path)
-        assert all(n.status is not NodeStatus.RUNNING
-                   for n in g2.nodes.values())
+        assert all(n.status is not NodeStatus.RUNNING for n in g2.nodes.values())
         assert set(g2.resume_report) == set(g2.nodes)
         for nid in before_done:
             assert g2.nodes[nid].status is NodeStatus.DONE

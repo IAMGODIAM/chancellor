@@ -9,6 +9,7 @@ duplicate effects, and zero corrupted state files.
 Gate: 20 trials, 20/20 resume and complete, 0 duplicate effects,
 0 corrupted state files.
 """
+
 import json
 import os
 import random
@@ -91,14 +92,20 @@ def _spawn(state: Path, markers: Path, seed: int) -> subprocess.Popen:
     env = dict(os.environ, PYTHONPATH=SRC)
     return subprocess.Popen(
         [sys.executable, "-c", CHILD, str(state), str(markers), str(seed)],
-        env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
 
 
 def _run_to_completion(state: Path, markers: Path, seed: int) -> int:
     env = dict(os.environ, PYTHONPATH=SRC)
     done = subprocess.run(
         [sys.executable, "-c", CHILD, str(state), str(markers), str(seed)],
-        env=env, capture_output=True, timeout=120)
+        env=env,
+        capture_output=True,
+        timeout=120,
+    )
     return done.returncode
 
 
@@ -168,7 +175,8 @@ def test_kill_resume_trials(tmp_path):
         effects = sorted(p.stem for p in markers.glob("*.effect"))
         assert effects == ["n0", "n1", "n2", "n3", "n4", "n5"], (
             f"trial {trial}: effects {effects} — each node must "
-            "take effect exactly once across all lifetimes")
+            "take effect exactly once across all lifetimes"
+        )
 
     assert corrupted == 0, f"{corrupted} corrupted state files across trials"
     assert killed >= 8, f"harness only landed {killed} kills — not proven"

@@ -17,7 +17,8 @@ def test_ready_flow():
     assert [n.id for n in g.ready()] == ["a"]
     g.complete("a", output="done")
     assert {n.id for n in g.ready()} == {"b", "c"}
-    g.complete("b"); g.complete("c")
+    g.complete("b")
+    g.complete("c")
     assert [n.id for n in g.ready()] == ["d"]
     g.complete("d")
     assert g.is_complete()
@@ -46,4 +47,7 @@ def test_persistence_roundtrip(tmp_path):
     g2 = TaskGraph.load(path)
     assert g2.nodes["a"].status is NodeStatus.DONE
     assert g2.nodes["a"].grade == 88.5
-    assert [n.id for n in g2.ready()] == ["b"] or {n.id for n in g2.ready()} == {"b", "c"}
+    assert [n.id for n in g2.ready()] == ["b"] or {n.id for n in g2.ready()} == {
+        "b",
+        "c",
+    }

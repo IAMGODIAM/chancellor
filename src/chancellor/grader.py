@@ -13,11 +13,13 @@ poison the total, and a NaN weight used to slip past the weight-sum
 check. Non-numeric values (strings, bools, None, containers) are refused
 too. An invalid number is never graded; it raises.
 """
+
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Mapping
+from typing import Literal
 
 
 def _require_finite(value: object, what: str) -> float:
@@ -34,25 +36,33 @@ def _require_finite(value: object, what: str) -> float:
 @dataclass
 class Criterion:
     name: str
-    weight: float                # 0..1, all weights in a rubric sum to 1.0
+    weight: float  # 0..1, all weights in a rubric sum to 1.0
     max_score: float = 10.0
     description: str = ""
 
     def __post_init__(self):
-        self.weight = _require_finite(self.weight, f"weight of criterion '{self.name}'")
-        if self.weight < 0:
-            raise ValueError(f"weight of criterion '{self.name}' is negative")
-        self.max_score = _require_finite(
-            self.max_score, f"max_score of criterion '{self.name}'")
-        if self.max_score <= 0:
-            raise ValueError(f"max_score of criterion '{self.name}' must be positive")
+        _validate_criterion(self)
+
+
+def _validate_criterion(crit: Criterion) -> None:
+    """One criterion's boundary checks: finite, non-negative weight;
+    finite, positive max_score. Called at construction AND at grade
+    time — dataclass fields are mutable, so the boundary re-checks."""
+    crit.weight = _require_finite(crit.weight, f"weight of criterion '{crit.name}'")
+    if crit.weight < 0:
+        raise ValueError(f"weight of criterion '{crit.name}' is negative")
+    crit.max_score = _require_finite(
+        crit.max_score, f"max_score of criterion '{crit.name}'"
+    )
+    if crit.max_score <= 0:
+        raise ValueError(f"max_score of criterion '{crit.name}' must be positive")
 
 
 @dataclass
 class GradeResult:
     rubric: str
-    total: float                 # normalized 0..100
-    verdict: str                 # "pass" | "revise" | "fail"
+    total: float  # normalized 0..100
+    verdict: Literal["pass", "revise", "fail"]
     per_criterion: dict[str, float] = field(default_factory=dict)
 
 
@@ -60,8 +70,8 @@ class GradeResult:
 class Rubric:
     name: str
     criteria: list[Criterion]
-    pass_mark: float = 70.0      # total >= pass_mark  -> pass
-    revise_mark: float = 50.0    # total >= revise_mark -> revise; below -> fail
+    pass_mark: float = 70.0  # total >= pass_mark  -> pass
+    revise_mark: float = 50.0  # total >= revise_mark -> revise; below -> fail
 
     def __post_init__(self):
         _validate_rubric(self)
@@ -73,35 +83,42 @@ def _validate_rubric(rubric: Rubric) -> None:
     can be poisoned afterwards — the boundary re-checks, every time."""
     if not rubric.criteria:
         raise ValueError(f"rubric {rubric.name} has no criteria")
-    rubric.pass_mark = _require_finite(rubric.pass_mark,
-                                       f"pass_mark of rubric '{rubric.name}'")
-    rubric.revise_mark = _require_finite(rubric.revise_mark,
-                                         f"revise_mark of rubric '{rubric.name}'")
+    rubric.pass_mark = _require_finite(
+        rubric.pass_mark, f"pass_mark of rubric '{rubric.name}'"
+    )
+    rubric.revise_mark = _require_finite(
+        rubric.revise_mark, f"revise_mark of rubric '{rubric.name}'"
+    )
     if not (0.0 <= rubric.revise_mark <= rubric.pass_mark <= 100.0):
         raise ValueError(
             f"rubric {rubric.name} marks out of order: revise_mark="
             f"{rubric.revise_mark}, pass_mark={rubric.pass_mark} (need "
-            "0 <= revise <= pass <= 100)")
+            "0 <= revise <= pass <= 100)"
+        )
     total_weight = 0.0
     for crit in rubric.criteria:
         # Re-run the criterion's own validation: fields may have been
         # mutated after construction.
-        crit.weight = _require_finite(
-            crit.weight, f"weight of criterion '{crit.name}'")
-        if crit.weight < 0:
-            raise ValueError(f"weight of criterion '{crit.name}' is negative")
-        crit.max_score = _require_finite(
-            crit.max_score, f"max_score of criterion '{crit.name}'")
-        if crit.max_score <= 0:
-            raise ValueError(
-                f"max_score of criterion '{crit.name}' must be positive")
+        _validate_criterion(crit)
         total_weight += crit.weight
     if not math.isfinite(total_weight) or abs(total_weight - 1.0) > 1e-6:
         raise ValueError(
-            f"rubric {rubric.name} weights sum to {total_weight:.4f}, must be 1.0")
+            f"rubric {rubric.name} weights sum to {total_weight:.4f}, must be 1.0"
+        )
     names = [c.name for c in rubric.criteria]
     if len(set(names)) != len(names):
         raise ValueError(f"rubric {rubric.name} has duplicate criterion names")
+
+
+def verdict_for(total: float, rubric: Rubric) -> Literal["pass", "revise", "fail"]:
+    """The verdict band a total falls in under a rubric's marks — the
+    one copy of the band logic; calibration measures band agreement
+    against these same bands."""
+    if total >= rubric.pass_mark:
+        return "pass"
+    if total >= rubric.revise_mark:
+        return "revise"
+    return "fail"
 
 
 def grade(rubric: Rubric, scores: Mapping[str, float]) -> GradeResult:
@@ -114,31 +131,29 @@ def grade(rubric: Rubric, scores: Mapping[str, float]) -> GradeResult:
     if not isinstance(scores, Mapping):
         raise ValueError(
             f"scores for rubric '{rubric.name}' must be a mapping of "
-            f"criterion -> score, got {type(scores).__name__}")
+            f"criterion -> score, got {type(scores).__name__}"
+        )
     per: dict[str, float] = {}
     total = 0.0
     for crit in rubric.criteria:
         if crit.name not in scores:
             raise ValueError(
                 f"missing score for criterion '{crit.name}' in rubric '{rubric.name}' "
-                "— refusing to grade (fail-closed)")
-        raw = _require_finite(scores[crit.name],
-                              f"score for criterion '{crit.name}'")
+                "— refusing to grade (fail-closed)"
+            )
+        raw = _require_finite(scores[crit.name], f"score for criterion '{crit.name}'")
         if raw < 0 or raw > crit.max_score:
             raise ValueError(
-                f"score for '{crit.name}' is {raw}, outside 0..{crit.max_score}")
+                f"score for '{crit.name}' is {raw}, outside 0..{crit.max_score}"
+            )
         per[crit.name] = raw
         total += (raw / crit.max_score) * crit.weight * 100.0
     if not math.isfinite(total):  # unreachable once inputs are finite; belt anyway
         raise ValueError(f"grading '{rubric.name}' produced a non-finite total")
-    if total >= rubric.pass_mark:
-        verdict = "pass"
-    elif total >= rubric.revise_mark:
-        verdict = "revise"
-    else:
-        verdict = "fail"
-    return GradeResult(rubric=rubric.name, total=round(total, 2),
-                       verdict=verdict, per_criterion=per)
+    verdict = verdict_for(total, rubric)
+    return GradeResult(
+        rubric=rubric.name, total=round(total, 2), verdict=verdict, per_criterion=per
+    )
 
 
 # The default rubric for worker outputs in a crew run.

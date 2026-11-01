@@ -7,20 +7,22 @@ A gate with no human attached DENIES by default: unattended authority
 is not authority. Every decision — approve or deny, human or policy —
 is written to an append-only audit log as a receipt.
 """
+
 from __future__ import annotations
 
 import json
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Callable
+from typing import Any
 
 from . import receipts as _receipts
 
 
-class ActionClass(str, Enum):
+class ActionClass(StrEnum):
     READ = "read"
     DRAFT = "draft"
     COMPUTE = "compute"
@@ -31,15 +33,20 @@ class ActionClass(str, Enum):
     CREDENTIAL = "credential"
 
 
-HUMAN_GATES: frozenset[ActionClass] = frozenset({
-    ActionClass.SPEND, ActionClass.EXTERNAL_SEND, ActionClass.PUBLISH,
-    ActionClass.IRREVERSIBLE, ActionClass.CREDENTIAL,
-})
+HUMAN_GATES: frozenset[ActionClass] = frozenset(
+    {
+        ActionClass.SPEND,
+        ActionClass.EXTERNAL_SEND,
+        ActionClass.PUBLISH,
+        ActionClass.IRREVERSIBLE,
+        ActionClass.CREDENTIAL,
+    }
+)
 
 
 @dataclass
 class EscalationRequest:
-    action: str                       # human-readable: what is being asked
+    action: str  # human-readable: what is being asked
     action_class: ActionClass
     detail: str = ""
     cost_usd: float | None = None
@@ -50,7 +57,7 @@ class EscalationRequest:
 class Decision:
     request: EscalationRequest
     approved: bool
-    decider: str                      # "policy" or the human's identifier
+    decider: str  # "policy" or the human's identifier
     rationale: str
     ts: float
 
@@ -78,28 +85,34 @@ class AuditLog:
     ``python -m chancellor.verify_log <log>``.
     """
 
-    def __init__(self, path: str | Path,
-                 signer: _receipts.Signer | None = None,
-                 checkpoint_path: str | Path | None = None):
+    def __init__(
+        self,
+        path: str | Path,
+        signer: _receipts.Signer | None = None,
+        checkpoint_path: str | Path | None = None,
+    ):
         self.path = Path(path)
         self.signer = signer if signer is not None else _receipts.default_signer()
-        self.checkpoint_path = (Path(checkpoint_path) if checkpoint_path
-                                is not None
-                                else _receipts.default_checkpoint_path(self.path))
+        self.checkpoint_path = (
+            Path(checkpoint_path)
+            if checkpoint_path is not None
+            else _receipts.default_checkpoint_path(self.path)
+        )
         existing = self.read_all()
         # Rebuild (and verify) chain state from what is already on disk.
         self._state = _receipts.scan_chain(existing)
 
     def record(self, decision: Decision) -> None:
         state = self._state
-        entry = {
+        entry: dict[str, Any] = {
             "schema": _receipts.SCHEMA,
             "seq": state.total_entries,
             "ts": decision.ts,
             "action": decision.request.action,
             "action_class": decision.request.action_class.value,
             "effect_axes": _receipts.effect_axes_for(
-                decision.request.action_class.value),
+                decision.request.action_class.value
+            ),
             "detail": decision.request.detail,
             "cost_usd": decision.request.cost_usd,
             "node_id": decision.request.node_id,
@@ -122,8 +135,11 @@ class AuditLog:
         """Sign a Merkle checkpoint over every chained entry so far and
         append it to the checkpoint sidecar. Returns the envelope."""
         envelope = _receipts.build_checkpoint(
-            signer=self.signer, log_size=self._state.chained,
-            leaves=self._state.leaves, head_hash=self._state.prev_hash)
+            signer=self.signer,
+            log_size=self._state.chained,
+            leaves=self._state.leaves,
+            head_hash=self._state.prev_hash,
+        )
         with self.checkpoint_path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(envelope) + "\n")
             fh.flush()
@@ -133,8 +149,11 @@ class AuditLog:
     def read_all(self) -> list[dict]:
         if not self.path.exists():
             return []
-        return [json.loads(line) for line in
-                self.path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        return [
+            json.loads(line)
+            for line in self.path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
 
 
 class AuditWriteError(RuntimeError):
@@ -147,8 +166,12 @@ class AuditWriteError(RuntimeError):
 
 
 class Gatekeeper:
-    def __init__(self, audit_log: AuditLog | None = None,
-                 approver: Approver | None = None, human_id: str = "human"):
+    def __init__(
+        self,
+        audit_log: AuditLog | None = None,
+        approver: Approver | None = None,
+        human_id: str = "human",
+    ):
         self.audit_log = audit_log
         self.approver = approver
         self.human_id = human_id
@@ -168,10 +191,12 @@ class Gatekeeper:
             decision = self._decide(request)
         except Exception as exc:
             decision = Decision(
-                request, False, "policy",
-                f"approver error — denied (fail-closed): "
-                f"{type(exc).__name__}: {exc}",
-                time.time())
+                request,
+                False,
+                "policy",
+                f"approver error — denied (fail-closed): {type(exc).__name__}: {exc}",
+                time.time(),
+            )
         if self.audit_log is not None:
             try:
                 self.audit_log.record(decision)
@@ -185,14 +210,21 @@ class Gatekeeper:
 
     def _decide(self, request: EscalationRequest) -> Decision:
         if request.action_class not in HUMAN_GATES:
-            return Decision(request, True, "policy",
-                            f"{request.action_class.value} is auto-approved by policy",
-                            time.time())
+            return Decision(
+                request,
+                True,
+                "policy",
+                f"{request.action_class.value} is auto-approved by policy",
+                time.time(),
+            )
         if self.approver is None:
             # Fail-closed: no human attached -> the gate does not open.
-            return Decision(request, False, "policy",
-                            "human gate with no approver attached — denied (fail-closed)",
-                            time.time())
+            return Decision(
+                request,
+                False,
+                "policy",
+                "human gate with no approver attached — denied (fail-closed)",
+                time.time(),
+            )
         approved, rationale = self.approver(request)
-        return Decision(request, bool(approved), self.human_id,
-                        rationale, time.time())
+        return Decision(request, bool(approved), self.human_id, rationale, time.time())

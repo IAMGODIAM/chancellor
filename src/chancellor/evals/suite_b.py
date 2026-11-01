@@ -37,51 +37,72 @@ this runner, its governance layers on vs off, on these scripted tasks
 and this deterministic manifest (AM-12d). Nothing here is comparable
 to published benchmark numbers.
 """
+
 from __future__ import annotations
 
 import hashlib
 import json
 import random
 from dataclasses import dataclass, field
+from typing import cast
 
 from ..api_client import CostMeter, MetaModelClient
 from ..escalation import Gatekeeper
 from ..grader import OUTPUT_RUBRIC
-from ..instruments import (CheckResult, InstrumentPanel, check_non_empty,
-                            check_required_keys)
+from ..instruments import (
+    CheckResult,
+    InstrumentPanel,
+    check_non_empty,
+    check_required_keys,
+)
 from ..orchestrator import CrewRunner
 from ..task_graph import TaskGraph
 from .suite_b_tasks import TASKS, TaskSpec
-from .suite_b_world import (FAULT_CRASH, FAULT_OMISSION, FAULT_VALUE,
-                            SUB_PLAIN, SUB_TIMING, FaultEntry, FaultInjector,
-                            ScriptedAgent, ToolBelt, World, checksum_of,
-                            suite_transport)
+from .suite_b_world import (
+    FAULT_CRASH,
+    FAULT_OMISSION,
+    FAULT_VALUE,
+    SUB_PLAIN,
+    SUB_TIMING,
+    FaultEntry,
+    FaultInjector,
+    ScriptedAgent,
+    ToolBelt,
+    World,
+    checksum_of,
+    suite_transport,
+)
 
-WORKER_MODEL = "muse-spark-1.3"     # metered at list prices (AM-5 ID)
+WORKER_MODEL = "muse-spark-1.3"  # metered at list prices (AM-5 ID)
 DEFAULT_SEED = 20261029
 MANIFEST_IDS = ("value", "omit", "timing", "crash", "valueopt")
 DISPLACEMENT_DROP = 20.0
 
-NARROW_CLAIM = ("Narrow claim (AM-12d): this runner (CrewRunner), its "
-                "governance layers on vs off, on Suite B's scripted tasks "
-                "under the deterministic manifest below. Descriptive "
-                "frontier only — not comparable to published benchmarks.")
+NARROW_CLAIM = (
+    "Narrow claim (AM-12d): this runner (CrewRunner), its "
+    "governance layers on vs off, on Suite B's scripted tasks "
+    "under the deterministic manifest below. Descriptive "
+    "frontier only — not comparable to published benchmarks."
+)
 
 
-# --------------------------------------------------------------------------
+# ---------------------------------------------------------------------
 # Manifest — deterministic, hashed, printed in every report (Scout 3 B3)
-# --------------------------------------------------------------------------
+# ---------------------------------------------------------------------
+
 
 def manifest_hash_of(entries: list[FaultEntry]) -> str:
-    blob = json.dumps([e.to_dict() for e in
-                       sorted(entries, key=lambda e: e.id)],
-                      sort_keys=True).encode()
+    """The content hash of a fault manifest — the identity a governed
+    run is bound to."""
+    blob = json.dumps(
+        [e.to_dict() for e in sorted(entries, key=lambda e: e.id)], sort_keys=True
+    ).encode()
     return hashlib.sha256(blob).hexdigest()
 
 
-def build_manifest(seed: int = DEFAULT_SEED,
-                   tasks: tuple[TaskSpec, ...] = TASKS
-                   ) -> tuple[dict[tuple[str, str], list[FaultEntry]], str]:
+def build_manifest(
+    seed: int = DEFAULT_SEED, tasks: tuple[TaskSpec, ...] = TASKS
+) -> tuple[dict[tuple[str, str], list[FaultEntry]], str]:
     """The demo manifest set: five archetypes per task, chosen from the
     task's declared susceptibility surface. Deterministic in `seed` —
     same seed, same manifest, same hash."""
@@ -89,44 +110,79 @@ def build_manifest(seed: int = DEFAULT_SEED,
     all_entries: list[FaultEntry] = []
     for task in tasks:
         rng = random.Random(f"suite-b:{seed}:{task.id}")
-        quality_expected = next(a.expected for a in task.assertions
-                                if not a.predicate)
+        # The builder seeds the quality assertion with an int value.
+        quality_expected = cast(
+            int, next(a.expected for a in task.assertions if not a.predicate)
+        )
         per_task: dict[str, list[FaultEntry]] = {
             # Value fault on the first required fetch: corrupts the
             # compute and the stored result (its direct effect).
-            "value": [FaultEntry(
-                id=f"{task.id}-value-0", task_id=task.id,
-                manifest_id="value", step="fetch_a", call=0,
-                fault=FAULT_VALUE, transform="scale10",
-                direct_keys=(task.result_key,))],
+            "value": [
+                FaultEntry(
+                    id=f"{task.id}-value-0",
+                    task_id=task.id,
+                    manifest_id="value",
+                    step="fetch_a",
+                    call=0,
+                    fault=FAULT_VALUE,
+                    transform="scale10",
+                    direct_keys=(task.result_key,),
+                )
+            ],
             # Omission on BOTH the first call and the retry: defeats
             # the worker's one-retry policy -> honest abort.
-            "omit": [FaultEntry(
-                id=f"{task.id}-omit-{c}", task_id=task.id,
-                manifest_id="omit", step="fetch_a", call=c,
-                fault=FAULT_OMISSION, subspecies=SUB_PLAIN)
-                for c in (0, 1)],
+            "omit": [
+                FaultEntry(
+                    id=f"{task.id}-omit-{c}",
+                    task_id=task.id,
+                    manifest_id="omit",
+                    step="fetch_a",
+                    call=c,
+                    fault=FAULT_OMISSION,
+                    subspecies=SUB_PLAIN,
+                )
+                for c in (0, 1)
+            ],
             # Timing on the optional enrich: the worker skips it. The
             # missing quality key IS the fault's direct effect.
-            "timing": [FaultEntry(
-                id=f"{task.id}-timing-0", task_id=task.id,
-                manifest_id="timing", step="enrich", call=0,
-                fault=FAULT_OMISSION, subspecies=SUB_TIMING,
-                direct_keys=(task.quality_key,))],
+            "timing": [
+                FaultEntry(
+                    id=f"{task.id}-timing-0",
+                    task_id=task.id,
+                    manifest_id="timing",
+                    step="enrich",
+                    call=0,
+                    fault=FAULT_OMISSION,
+                    subspecies=SUB_TIMING,
+                    direct_keys=(task.quality_key,),
+                )
+            ],
             # Crash on a required fetch (seed picks which one).
-            "crash": [FaultEntry(
-                id=f"{task.id}-crash-0", task_id=task.id,
-                manifest_id="crash",
-                step=rng.choice(["fetch_a", "fetch_b"]), call=0,
-                fault=FAULT_CRASH)],
+            "crash": [
+                FaultEntry(
+                    id=f"{task.id}-crash-0",
+                    task_id=task.id,
+                    manifest_id="crash",
+                    step=rng.choice(["fetch_a", "fetch_b"]),
+                    call=0,
+                    fault=FAULT_CRASH,
+                )
+            ],
             # Value fault on the optional enrich: plausible wrong
             # quality value; the predicate cannot see it, the score can.
-            "valueopt": [FaultEntry(
-                id=f"{task.id}-valueopt-0", task_id=task.id,
-                manifest_id="valueopt", step="enrich", call=0,
-                fault=FAULT_VALUE, transform="replace",
-                replacement=quality_expected + 7,
-                direct_keys=(task.quality_key,))],
+            "valueopt": [
+                FaultEntry(
+                    id=f"{task.id}-valueopt-0",
+                    task_id=task.id,
+                    manifest_id="valueopt",
+                    step="enrich",
+                    call=0,
+                    fault=FAULT_VALUE,
+                    transform="replace",
+                    replacement=quality_expected + 7,
+                    direct_keys=(task.quality_key,),
+                )
+            ],
         }
         for manifest_id, entries in per_task.items():
             manifests[(task.id, manifest_id)] = entries
@@ -134,11 +190,12 @@ def build_manifest(seed: int = DEFAULT_SEED,
     return manifests, manifest_hash_of(all_entries)
 
 
-# --------------------------------------------------------------------------
+# ---------------------------------------------------------------------
 # External grading — final-state predicate + outcome score (never the
 # worker's self-report; the summary the worker stores is its CLAIM, and
 # the predicate is the check on that claim)
-# --------------------------------------------------------------------------
+# ---------------------------------------------------------------------
+
 
 def score_state(task: TaskSpec, state: dict) -> tuple[bool, float]:
     """(predicate_pass, outcome_score 0..100) for a final world state."""
@@ -161,23 +218,28 @@ def check_payload_integrity(artifact: object) -> CheckResult:
         if isinstance(data, dict) and "value" in data and "checksum" in data:
             ok = checksum_of(data["value"]) == data["checksum"]
             return CheckResult(
-                "payload_integrity", ok,
-                "" if ok else "tool payload checksum mismatch — "
-                              "corrupted in transit (fail-closed)")
+                "payload_integrity",
+                ok,
+                ""
+                if ok
+                else "tool payload checksum mismatch — "
+                "corrupted in transit (fail-closed)",
+            )
     return CheckResult("payload_integrity", True, "no stamped payload")
 
 
 def _governed_panel() -> InstrumentPanel:
-    panel = InstrumentPanel(timeout_s=None)   # pure local checks; no hang risk
+    panel = InstrumentPanel(timeout_s=None)  # pure local checks; no hang risk
     panel.register("non_empty_output", check_non_empty)
     panel.register("required_keys", check_required_keys("text"))
     panel.register("payload_integrity", check_payload_integrity)
     return panel
 
 
-# --------------------------------------------------------------------------
+# ---------------------------------------------------------------------
 # One run
-# --------------------------------------------------------------------------
+# ---------------------------------------------------------------------
+
 
 @dataclass
 class RunOutcome:
@@ -207,9 +269,16 @@ class RunOutcome:
         return self.claimed_complete and self.predicate_pass
 
 
-def run_configuration(task: TaskSpec, arm: str, entries: list[FaultEntry],
-                      manifest_id: str = "custom", repeat: int = 0,
-                      clean_state: dict | None = None) -> RunOutcome:
+# CC 20 (radon) — one branch per outcome class of a single
+# configuration run (arm, manifest, recovery, drift accounting).
+def run_configuration(
+    task: TaskSpec,
+    arm: str,
+    entries: list[FaultEntry],
+    manifest_id: str = "custom",
+    repeat: int = 0,
+    clean_state: dict | None = None,
+) -> RunOutcome:
     """Run one task, in one arm, under one manifest's entries."""
     world = World(task.seed_state)
     meter = CostMeter()
@@ -222,15 +291,23 @@ def run_configuration(task: TaskSpec, arm: str, entries: list[FaultEntry],
     graph = TaskGraph(name=f"suiteB-{task.id}-{arm}-{manifest_id}-{repeat}")
     previous: str | None = None
     for step in task.steps:
-        graph.task(step.name, step.name,
-                   depends_on=[previous] if previous else [],
-                   worker="agent", requires_grade=False)
+        graph.task(
+            step.name,
+            step.name,
+            depends_on=[previous] if previous else [],
+            worker="agent",
+            requires_grade=False,
+        )
         previous = step.name
     workers = {"agent": lambda node: agent.run_step(steps_by_name[node.id])}
     if arm == "governed":
         runner = CrewRunner.governed(
-            graph, workers, panel=_governed_panel(), rubric=OUTPUT_RUBRIC,
-            gatekeeper=Gatekeeper())
+            graph,
+            workers,
+            panel=_governed_panel(),
+            rubric=OUTPUT_RUBRIC,
+            gatekeeper=Gatekeeper(),
+        )
     elif arm == "ungoverned":
         runner = CrewRunner.ungoverned(graph, workers)
     else:
@@ -240,8 +317,10 @@ def run_configuration(task: TaskSpec, arm: str, entries: list[FaultEntry],
     final_state = world.snapshot()
     claimed = (not report.halted) and graph.is_complete()
     predicate_pass, outcome_score = score_state(task, final_state)
-    triggered = [{"id": e.id, "fault": e.fault, "subspecies": e.subspecies}
-                 for e in injector.triggered]
+    triggered = [
+        {"id": e.id, "fault": e.fault, "subspecies": e.subspecies}
+        for e in injector.triggered
+    ]
     direct_keys = {k for e in injector.triggered for k in e.direct_keys}
 
     drift = claimed and not predicate_pass
@@ -249,25 +328,36 @@ def run_configuration(task: TaskSpec, arm: str, entries: list[FaultEntry],
     if claimed and clean_state is not None:
         all_keys = set(final_state) | set(clean_state)
         diverged_keys = sorted(
-            key for key in all_keys
-            if key not in direct_keys
-            and final_state.get(key) != clean_state.get(key))
+            key
+            for key in all_keys
+            if key not in direct_keys and final_state.get(key) != clean_state.get(key)
+        )
     displacement = False
     if claimed and predicate_pass and clean_state is not None:
         _, clean_score = score_state(task, clean_state)
         displacement = outcome_score <= clean_score - DISPLACEMENT_DROP
 
     return RunOutcome(
-        task_id=task.id, arm=arm, manifest_id=manifest_id, repeat=repeat,
-        claimed_complete=claimed, predicate_pass=predicate_pass,
-        outcome_score=outcome_score, drift=drift,
-        divergence=bool(diverged_keys), diverged_keys=diverged_keys,
-        displacement=displacement, triggered=triggered,
-        recovered_faults=0,   # set below: recovery is a run-level verdict
+        task_id=task.id,
+        arm=arm,
+        manifest_id=manifest_id,
+        repeat=repeat,
+        claimed_complete=claimed,
+        predicate_pass=predicate_pass,
+        outcome_score=outcome_score,
+        drift=drift,
+        divergence=bool(diverged_keys),
+        diverged_keys=diverged_keys,
+        displacement=displacement,
+        triggered=triggered,
+        recovered_faults=0,  # set below: recovery is a run-level verdict
         untriggered_ids=[e.id for e in injector.untriggered()],
-        halted=report.halted, halt_reason=report.halt_reason,
+        halted=report.halted,
+        halt_reason=report.halt_reason,
         steps_executed=len(report.completed),
-        cost_usd=meter.total_cost(), final_state=final_state)
+        cost_usd=meter.total_cost(),
+        final_state=final_state,
+    )
 
 
 def clean_reference_state(task: TaskSpec) -> dict:
@@ -276,9 +366,10 @@ def clean_reference_state(task: TaskSpec) -> dict:
     return run_configuration(task, "ungoverned", [], "clean").final_state
 
 
-# --------------------------------------------------------------------------
+# ---------------------------------------------------------------------
 # Arm + frontier reports
-# --------------------------------------------------------------------------
+# ---------------------------------------------------------------------
+
 
 def _class_key(t: dict) -> str:
     return SUB_TIMING if t.get("subspecies") == SUB_TIMING else t["fault"]
@@ -322,16 +413,19 @@ class ArmReport:
         return sum(1 for o in self.outcomes if o.drift)
 
     @property
-    def drift_per_injected_run(self):
+    def drift_per_injected_run(self) -> float | str:
         injected = [o for o in self.outcomes if o.manifest_id != "clean"]
         if not injected:
             return "n/a (no injected runs)"
         return round(self.drift_events / len(injected), 4)
 
     @property
-    def drift_among_unrecovered_value(self):
-        exposed = [o for o in self.outcomes if not o.success
-                   and any(t["fault"] == FAULT_VALUE for t in o.triggered)]
+    def drift_among_unrecovered_value(self) -> float | str:
+        exposed = [
+            o
+            for o in self.outcomes
+            if not o.success and any(t["fault"] == FAULT_VALUE for t in o.triggered)
+        ]
         if not exposed:
             return "n/a (no unrecovered value faults)"
         drifted = sum(1 for o in exposed if o.drift)
@@ -347,8 +441,7 @@ class ArmReport:
 
     # -- recovery (AM-3 denominators: triggered only; timing separate) --
     def _fault_counts(self, recovered: bool) -> dict[str, int]:
-        counts = {FAULT_CRASH: 0, FAULT_OMISSION: 0, FAULT_VALUE: 0,
-                  SUB_TIMING: 0}
+        counts = {FAULT_CRASH: 0, FAULT_OMISSION: 0, FAULT_VALUE: 0, SUB_TIMING: 0}
         for o in self.outcomes:
             for t in o.triggered:
                 if recovered and not o.success:
@@ -365,7 +458,7 @@ class ArmReport:
         return self._fault_counts(recovered=True)
 
     @property
-    def recovery_rate(self):
+    def recovery_rate(self) -> float | str:
         """Headline recovery: crash + plain omission + value, pooled.
         Timing is NEVER pooled into this number (AM-3)."""
         trig = self.triggered_by_class
@@ -377,7 +470,7 @@ class ArmReport:
         return round(numer / denom, 4)
 
     @property
-    def timing_recovery_rate(self):
+    def timing_recovery_rate(self) -> float | str:
         trig = self.triggered_by_class[SUB_TIMING]
         if trig == 0:
             return "n/a (no triggered timing faults)"
@@ -389,13 +482,13 @@ class ArmReport:
         return round(sum(o.cost_usd for o in self.outcomes), 6)
 
     @property
-    def cost_per_success(self):
+    def cost_per_success(self) -> float | str:
         if self.successes == 0:
             return "n/a (no completions)"
         return round(self.total_cost_usd / self.successes, 6)
 
     @property
-    def wasted_cost_share(self):
+    def wasted_cost_share(self) -> float | str:
         total = sum(o.cost_usd for o in self.outcomes)
         if total == 0:
             return "n/a (no metered spend)"
@@ -423,8 +516,7 @@ class ArmReport:
         configs = self._config_successes()
         if not configs:
             return 0.0
-        return round(sum(1 for v in configs.values() if all(v))
-                     / len(configs), 4)
+        return round(sum(1 for v in configs.values() if all(v)) / len(configs), 4)
 
     @property
     def untriggered_entry_ids(self) -> list[str]:
@@ -461,7 +553,7 @@ class SuiteBReport:
     seed: int
     repeats_k: int
     n_tasks: int
-    drift_without_value_fault: int     # Thoth's expander check
+    drift_without_value_fault: int  # Thoth's expander check
 
     # Legacy headline surface: the governed arm is the suite's subject.
     @property
@@ -477,7 +569,7 @@ class SuiteBReport:
         return self.governed.completion_rate
 
     @property
-    def recovery_rate(self):
+    def recovery_rate(self) -> float | str:
         return self.governed.recovery_rate
 
     @property
@@ -485,7 +577,7 @@ class SuiteBReport:
         return self.governed.drift_events
 
     @property
-    def cost_per_success(self):
+    def cost_per_success(self) -> float | str:
         return self.governed.cost_per_success
 
     def to_dict(self) -> dict:
@@ -511,9 +603,12 @@ class SuiteBReport:
         }
 
 
-def run_suite(n_tasks: int = 10, seed: int = DEFAULT_SEED, k: int = 3,
-              arms: tuple[str, ...] = ("governed", "ungoverned")
-              ) -> SuiteBReport:
+def run_suite(
+    n_tasks: int = 10,
+    seed: int = DEFAULT_SEED,
+    k: int = 3,
+    arms: tuple[str, ...] = ("governed", "ungoverned"),
+) -> SuiteBReport:
     """The full benchmark: every task x (clean + 5 manifests) x arms x
     k repeats, all deterministic. pass^k uses k=3 on this demo
     configuration; because the workers are scripted and deterministic,
@@ -528,19 +623,28 @@ def run_suite(n_tasks: int = 10, seed: int = DEFAULT_SEED, k: int = 3,
         outcomes: list[RunOutcome] = []
         for task in tasks:
             configs: list[tuple[str, list[FaultEntry]]] = [("clean", [])]
-            configs += [(mid, manifests[(task.id, mid)])
-                        for mid in MANIFEST_IDS]
+            configs += [(mid, manifests[(task.id, mid)]) for mid in MANIFEST_IDS]
             for manifest_id, entries in configs:
                 for rep in range(k):
                     outcome = run_configuration(
-                        task, arm, entries, manifest_id, rep,
-                        clean_state=clean_states[task.id])
+                        task,
+                        arm,
+                        entries,
+                        manifest_id,
+                        rep,
+                        clean_state=clean_states[task.id],
+                    )
                     outcomes.append(outcome)
                     if outcome.drift and not any(
-                            t["fault"] == FAULT_VALUE
-                            for t in outcome.triggered):
+                        t["fault"] == FAULT_VALUE for t in outcome.triggered
+                    ):
                         drift_without_value += 1
         arm_reports[arm] = ArmReport(arm=arm, outcomes=outcomes, repeats_k=k)
-    return SuiteBReport(arms=arm_reports, manifest_hash=mhash, seed=seed,
-                        repeats_k=k, n_tasks=len(tasks),
-                        drift_without_value_fault=drift_without_value)
+    return SuiteBReport(
+        arms=arm_reports,
+        manifest_hash=mhash,
+        seed=seed,
+        repeats_k=k,
+        n_tasks=len(tasks),
+        drift_without_value_fault=drift_without_value,
+    )

@@ -4,9 +4,10 @@ The production constructor refuses an ungoverned runner at build time;
 'revise' means the node goes back for another attempt; a blocked node
 re-evaluates only when a decider is actually attached.
 """
+
 import pytest
 
-from chancellor.escalation import ActionClass, Gatekeeper
+from chancellor.escalation import Gatekeeper
 from chancellor.grader import OUTPUT_RUBRIC
 from chancellor.instruments import InstrumentPanel, default_panel
 from chancellor.orchestrator import CrewRunner
@@ -29,29 +30,37 @@ def _ok(node):
 
 # -- construction ---------------------------------------------------------------
 
+
 def test_governed_requires_all_three_layers():
     g, w = _graph(), {"w": _ok}
     panel, gk = default_panel(), Gatekeeper()
     with pytest.raises(ValueError):
-        CrewRunner.governed(g, w, panel=None, rubric=OUTPUT_RUBRIC,
-                            gatekeeper=gk)
+        CrewRunner.governed(g, w, panel=None, rubric=OUTPUT_RUBRIC, gatekeeper=gk)
     with pytest.raises(ValueError):
         CrewRunner.governed(g, w, panel=panel, rubric=None, gatekeeper=gk)
     with pytest.raises(ValueError):
-        CrewRunner.governed(g, w, panel=panel, rubric=OUTPUT_RUBRIC,
-                            gatekeeper=None)
+        CrewRunner.governed(g, w, panel=panel, rubric=OUTPUT_RUBRIC, gatekeeper=None)
 
 
 def test_governed_rejects_empty_panel():
     with pytest.raises(ValueError):
-        CrewRunner.governed(_graph(), {"w": _ok}, panel=InstrumentPanel(),
-                            rubric=OUTPUT_RUBRIC, gatekeeper=Gatekeeper())
+        CrewRunner.governed(
+            _graph(),
+            {"w": _ok},
+            panel=InstrumentPanel(),
+            rubric=OUTPUT_RUBRIC,
+            gatekeeper=Gatekeeper(),
+        )
 
 
 def test_governed_runner_runs_and_reports_governed():
-    runner = CrewRunner.governed(_graph(), {"w": _ok}, panel=default_panel(),
-                                  rubric=OUTPUT_RUBRIC,
-                                  gatekeeper=Gatekeeper())
+    runner = CrewRunner.governed(
+        _graph(),
+        {"w": _ok},
+        panel=default_panel(),
+        rubric=OUTPUT_RUBRIC,
+        gatekeeper=Gatekeeper(),
+    )
     report = runner.run()
     assert report.ok and report.governed is True
 
@@ -64,14 +73,14 @@ def test_ungoverned_named_path_is_explicit():
 
 # -- revise means revise ----------------------------------------------------------
 
+
 def test_revise_requeues_and_second_attempt_can_pass():
     calls = {"n": 0}
 
     def improving(node):
         calls["n"] += 1
         scores = MEDIOCRE if calls["n"] == 1 else GOOD
-        return {"text": f"attempt {calls['n']}", "cost_usd": 0.0,
-                "scores": scores}
+        return {"text": f"attempt {calls['n']}", "cost_usd": 0.0, "scores": scores}
 
     g = _graph()
     report = CrewRunner(g, {"w": improving}, rubric=OUTPUT_RUBRIC).run()
@@ -107,6 +116,7 @@ def test_revise_with_cap_one_fails_immediately():
 
 # -- resume behavior through the runner --------------------------------------------
 
+
 def _spender_graph():
     g = TaskGraph("t")
     g.task("one", "One", worker="w")
@@ -114,16 +124,18 @@ def _spender_graph():
 
 
 def _spender(node):
-    return {"text": "buy it", "cost_usd": 5.0, "scores": GOOD,
-            "action": {"action": "Buy credits", "action_class": "spend",
-                       "cost_usd": 5.0}}
+    return {
+        "text": "buy it",
+        "cost_usd": 5.0,
+        "scores": GOOD,
+        "action": {"action": "Buy credits", "action_class": "spend", "cost_usd": 5.0},
+    }
 
 
 def test_blocked_node_reevaluates_when_approver_attaches(tmp_path):
     state = tmp_path / "state.json"
     g = _spender_graph()
-    runner = CrewRunner(g, {"w": _spender}, gatekeeper=Gatekeeper(),
-                        state_path=state)
+    runner = CrewRunner(g, {"w": _spender}, gatekeeper=Gatekeeper(), state_path=state)
     report = runner.run()
     assert report.blocked == ["one"]
 
@@ -131,8 +143,7 @@ def test_blocked_node_reevaluates_when_approver_attaches(tmp_path):
     g2 = TaskGraph.load(state)
     assert g2.nodes["one"].status is NodeStatus.BLOCKED
     gk = Gatekeeper(approver=lambda req: (True, "approved on resume"))
-    report2 = CrewRunner(g2, {"w": _spender}, gatekeeper=gk,
-                         state_path=state).run()
+    report2 = CrewRunner(g2, {"w": _spender}, gatekeeper=gk, state_path=state).run()
     assert report2.ok and report2.completed == ["one"]
     assert "re-evaluation" in report2.dispositions["one"]
 
@@ -140,11 +151,11 @@ def test_blocked_node_reevaluates_when_approver_attaches(tmp_path):
 def test_blocked_node_stays_blocked_without_approver(tmp_path):
     state = tmp_path / "state.json"
     g = _spender_graph()
-    CrewRunner(g, {"w": _spender}, gatekeeper=Gatekeeper(),
-               state_path=state).run()
+    CrewRunner(g, {"w": _spender}, gatekeeper=Gatekeeper(), state_path=state).run()
     g2 = TaskGraph.load(state)
-    report = CrewRunner(g2, {"w": _spender}, gatekeeper=Gatekeeper(),
-                        state_path=state).run()
+    report = CrewRunner(
+        g2, {"w": _spender}, gatekeeper=Gatekeeper(), state_path=state
+    ).run()
     assert report.halted and report.completed == []
     assert g2.nodes["one"].status is NodeStatus.BLOCKED
     assert "blocked" in report.dispositions["one"]

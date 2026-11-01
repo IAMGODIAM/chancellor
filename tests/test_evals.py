@@ -20,7 +20,7 @@ def test_suite_b_metrics_and_determinism():
     assert 0.0 <= r1.completion_rate <= 1.0
     assert isinstance(r1.recovery_rate, float) and 0.0 <= r1.recovery_rate <= 1.0
     assert isinstance(r1.cost_per_success, float) and r1.cost_per_success > 0.0
-    assert r1.total_drift == 0          # governed arm holds the line
+    assert r1.total_drift == 0  # governed arm holds the line
 
 
 def test_suite_b_no_failures_reports_na_not_vacuous_perfection():
@@ -28,6 +28,7 @@ def test_suite_b_no_failures_reports_na_not_vacuous_perfection():
     # suite reported recovery_rate == 1.0 — vacuous perfection. The
     # rebuilt suite reports "n/a (no triggered faults)" instead.
     from chancellor.evals.suite_b_tasks import TASKS
+
     task = TASKS[0]
     clean_run = suite_b.run_configuration(task, "governed", [], "clean")
     arm = suite_b.ArmReport(arm="governed", outcomes=[clean_run])

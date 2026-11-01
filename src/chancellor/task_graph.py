@@ -20,13 +20,14 @@ Durability discipline (W1):
   * Status transitions are guarded: DONE, FAILED, and SKIPPED are
     terminal, and any transition outside the lifecycle table raises.
 """
+
 from __future__ import annotations
 
 import json
 import os
 import time
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 SCHEMA_VERSION = 1
@@ -35,13 +36,13 @@ SCHEMA_VERSION = 1
 DEFAULT_MAX_ATTEMPTS = 3
 
 
-class NodeStatus(str, Enum):
+class NodeStatus(StrEnum):
     PENDING = "pending"
     READY = "ready"
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
-    BLOCKED = "blocked"   # stopped at an escalation gate
+    BLOCKED = "blocked"  # stopped at an escalation gate
     SKIPPED = "skipped"
 
 
@@ -61,23 +62,36 @@ class AttemptCapError(ValueError):
 # and SKIPPED are terminal — nothing leaves them. A failed node is never
 # silently resurrected; a completed node never re-runs.
 _TRANSITIONS: dict[NodeStatus, frozenset[NodeStatus]] = {
-    NodeStatus.PENDING: frozenset({
-        NodeStatus.READY, NodeStatus.RUNNING, NodeStatus.DONE,
-        NodeStatus.FAILED, NodeStatus.BLOCKED, NodeStatus.SKIPPED}),
-    NodeStatus.READY: frozenset({
-        NodeStatus.PENDING, NodeStatus.RUNNING, NodeStatus.DONE,
-        NodeStatus.FAILED, NodeStatus.BLOCKED, NodeStatus.SKIPPED}),
-    NodeStatus.RUNNING: frozenset({
-        NodeStatus.PENDING, NodeStatus.DONE, NodeStatus.FAILED,
-        NodeStatus.BLOCKED}),
+    NodeStatus.PENDING: frozenset(
+        {
+            NodeStatus.READY,
+            NodeStatus.RUNNING,
+            NodeStatus.DONE,
+            NodeStatus.FAILED,
+            NodeStatus.BLOCKED,
+            NodeStatus.SKIPPED,
+        }
+    ),
+    NodeStatus.READY: frozenset(
+        {
+            NodeStatus.PENDING,
+            NodeStatus.RUNNING,
+            NodeStatus.DONE,
+            NodeStatus.FAILED,
+            NodeStatus.BLOCKED,
+            NodeStatus.SKIPPED,
+        }
+    ),
+    NodeStatus.RUNNING: frozenset(
+        {NodeStatus.PENDING, NodeStatus.DONE, NodeStatus.FAILED, NodeStatus.BLOCKED}
+    ),
     NodeStatus.BLOCKED: frozenset({NodeStatus.PENDING}),
     NodeStatus.DONE: frozenset(),
     NodeStatus.FAILED: frozenset(),
     NodeStatus.SKIPPED: frozenset(),
 }
 
-TERMINAL_STATUSES = frozenset({
-    NodeStatus.DONE, NodeStatus.FAILED, NodeStatus.SKIPPED})
+TERMINAL_STATUSES = frozenset({NodeStatus.DONE, NodeStatus.FAILED, NodeStatus.SKIPPED})
 
 
 @dataclass
@@ -85,38 +99,46 @@ class TaskNode:
     id: str
     title: str
     depends_on: list[str] = field(default_factory=list)
-    worker: str = "agent"                 # key into the runner's worker table
+    worker: str = "agent"  # key into the runner's worker table
     status: NodeStatus = NodeStatus.PENDING
     output: object = None
-    grade: float | None = None            # 0-100 rubric total, once graded
+    grade: float | None = None  # 0-100 rubric total, once graded
     error: str | None = None
     updated_at: float = 0.0
-    attempts: int = 0                     # dispatches begun, incl. interrupted
+    attempts: int = 0  # dispatches begun, incl. interrupted
     max_attempts: int = DEFAULT_MAX_ATTEMPTS
-    requires_grade: bool = True           # False = explicit ungraded-class node
-    disposition: str | None = None        # last resume/lifecycle disposition
+    requires_grade: bool = True  # False = explicit ungraded-class node
+    disposition: str | None = None  # last resume/lifecycle disposition
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id, "title": self.title,
-            "depends_on": list(self.depends_on), "worker": self.worker,
-            "status": self.status.value, "output": self.output,
-            "grade": self.grade, "error": self.error,
+            "id": self.id,
+            "title": self.title,
+            "depends_on": list(self.depends_on),
+            "worker": self.worker,
+            "status": self.status.value,
+            "output": self.output,
+            "grade": self.grade,
+            "error": self.error,
             "updated_at": self.updated_at,
-            "attempts": self.attempts, "max_attempts": self.max_attempts,
+            "attempts": self.attempts,
+            "max_attempts": self.max_attempts,
             "requires_grade": self.requires_grade,
             "disposition": self.disposition,
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "TaskNode":
+    def from_dict(cls, d: dict) -> TaskNode:
         return cls(
-            id=d["id"], title=d["title"],
+            id=d["id"],
+            title=d["title"],
             depends_on=list(d.get("depends_on", [])),
             worker=d.get("worker", "agent"),
             status=NodeStatus(d.get("status", "pending")),
-            output=d.get("output"), grade=d.get("grade"),
-            error=d.get("error"), updated_at=d.get("updated_at", 0.0),
+            output=d.get("output"),
+            grade=d.get("grade"),
+            error=d.get("error"),
+            updated_at=d.get("updated_at", 0.0),
             attempts=int(d.get("attempts", 0)),
             max_attempts=int(d.get("max_attempts", DEFAULT_MAX_ATTEMPTS)),
             requires_grade=bool(d.get("requires_grade", True)),
@@ -138,15 +160,29 @@ class TaskGraph:
         self.nodes[node.id] = node
         return node
 
-    def task(self, id: str, title: str, depends_on=None, worker: str = "agent",
-             max_attempts: int = DEFAULT_MAX_ATTEMPTS,
-             requires_grade: bool = True) -> TaskNode:
-        return self.add(TaskNode(id=id, title=title,
-                                 depends_on=list(depends_on or []), worker=worker,
-                                 max_attempts=max_attempts,
-                                 requires_grade=requires_grade))
+    def task(
+        self,
+        id: str,
+        title: str,
+        depends_on=None,
+        worker: str = "agent",
+        max_attempts: int = DEFAULT_MAX_ATTEMPTS,
+        requires_grade: bool = True,
+    ) -> TaskNode:
+        return self.add(
+            TaskNode(
+                id=id,
+                title=title,
+                depends_on=list(depends_on or []),
+                worker=worker,
+                max_attempts=max_attempts,
+                requires_grade=requires_grade,
+            )
+        )
 
     # -- validation ----------------------------------------------------------
+    # CC 11 (radon) — one pass per invariant family: unknown deps,
+    # then cycle coloring.
     def validate(self) -> None:
         for node in self.nodes.values():
             for dep in node.depends_on:
@@ -154,7 +190,7 @@ class TaskGraph:
                     raise ValueError(f"node {node.id} depends on unknown node {dep}")
         # Cycle detection via iterative DFS coloring.
         WHITE, GRAY, BLACK = 0, 1, 2
-        color = {nid: WHITE for nid in self.nodes}
+        color = dict.fromkeys(self.nodes, WHITE)
         for start in self.nodes:
             if color[start] != WHITE:
                 continue
@@ -166,7 +202,9 @@ class TaskGraph:
                 advanced = False
                 for dep in it:
                     if color[dep] == GRAY:
-                        raise CycleError(f"dependency cycle: {' -> '.join(path + [dep])}")
+                        raise CycleError(
+                            f"dependency cycle: {' -> '.join(path + [dep])}"
+                        )
                     if color[dep] == WHITE:
                         color[dep] = GRAY
                         path.append(dep)
@@ -184,12 +222,13 @@ class TaskGraph:
             if node.status in TERMINAL_STATUSES:
                 raise IllegalTransitionError(
                     f"node {node.id}: {node.status.value} is terminal — "
-                    f"it cannot transition again (not even to itself)")
+                    f"it cannot transition again (not even to itself)"
+                )
             return
         if new not in _TRANSITIONS[node.status]:
             raise IllegalTransitionError(
-                f"node {node.id}: illegal transition "
-                f"{node.status.value} -> {new.value}")
+                f"node {node.id}: illegal transition {node.status.value} -> {new.value}"
+            )
         node.status = new
         self._touch(node)
 
@@ -204,7 +243,8 @@ class TaskGraph:
         if node.attempts >= node.max_attempts:
             raise AttemptCapError(
                 f"node {node_id}: attempt cap exhausted "
-                f"({node.attempts}/{node.max_attempts})")
+                f"({node.attempts}/{node.max_attempts})"
+            )
         self._set_status(node, NodeStatus.RUNNING)
         node.attempts += 1
         node.error = None
@@ -245,19 +285,23 @@ class TaskGraph:
         """Pending nodes whose dependencies are all DONE. Marks them READY."""
         out = []
         for node in self.nodes.values():
-            if node.status in (NodeStatus.PENDING, NodeStatus.READY):
-                if all(self.nodes[d].status is NodeStatus.DONE for d in node.depends_on):
-                    if node.status is NodeStatus.PENDING:
-                        self._set_status(node, NodeStatus.READY)
-                    out.append(node)
+            if node.status in (NodeStatus.PENDING, NodeStatus.READY) and all(
+                self.nodes[d].status is NodeStatus.DONE for d in node.depends_on
+            ):
+                if node.status is NodeStatus.PENDING:
+                    self._set_status(node, NodeStatus.READY)
+                out.append(node)
         return out
 
     def is_complete(self) -> bool:
         return all(n.status is NodeStatus.DONE for n in self.nodes.values())
 
     def unfinished(self) -> list[TaskNode]:
-        return [n for n in self.nodes.values()
-                if n.status not in (NodeStatus.DONE, NodeStatus.SKIPPED)]
+        return [
+            n
+            for n in self.nodes.values()
+            if n.status not in (NodeStatus.DONE, NodeStatus.SKIPPED)
+        ]
 
     # -- persistence -------------------------------------------------------------
     def save(self, path: str | Path) -> None:
@@ -265,9 +309,15 @@ class TaskGraph:
         os.replace, directory fsync. A kill at any point leaves either
         the old state or the new state — never a torn file."""
         path = Path(path)
-        data = {"schema_version": SCHEMA_VERSION, "name": self.name,
-                "nodes": [n.to_dict() for n in self.nodes.values()]}
-        payload = json.dumps(data, indent=2)
+        data = {
+            "schema_version": SCHEMA_VERSION,
+            "name": self.name,
+            "nodes": [n.to_dict() for n in self.nodes.values()],
+        }
+        # Compact separators: the state file is machine-read (load is
+        # format-agnostic); indent cost 1.6x the bytes and ~5x the
+        # save time at N=1000 (both measured) for no reader.
+        payload = json.dumps(data, separators=(",", ":"))
         tmp = path.with_name(f".{path.name}.tmp-{os.getpid()}")
         try:
             with tmp.open("w", encoding="utf-8") as fh:
@@ -285,20 +335,23 @@ class TaskGraph:
             os.close(dir_fd)
 
     @classmethod
-    def load(cls, path: str | Path) -> "TaskGraph":
+    def load(cls, path: str | Path) -> TaskGraph:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
         version = data.get("schema_version", 0)
         if not isinstance(version, int) or version > SCHEMA_VERSION:
             raise ValueError(
                 f"state file schema_version {version!r} is newer than this "
                 f"code understands ({SCHEMA_VERSION}) — refusing to load "
-                "(fail-closed)")
+                "(fail-closed)"
+            )
         graph = cls(name=data.get("name", "run"))
         for nd in data.get("nodes", []):
             graph.add(TaskNode.from_dict(nd))
         graph._reconcile_resume()
         return graph
 
+    # CC 11 (radon) — one branch per on-disk node state; each state
+    # reconciles independently of the others.
     def _reconcile_resume(self) -> None:
         """Reconcile state written by a process that may have died
         mid-flight. Names every node's disposition in resume_report."""
@@ -310,17 +363,21 @@ class TaskGraph:
                 node.attempts += 1
                 if node.attempts >= node.max_attempts:
                     self._set_status(node, NodeStatus.FAILED)
-                    node.error = ("attempt cap exhausted: interrupted "
-                                  "mid-run on the final attempt")
+                    node.error = (
+                        "attempt cap exhausted: interrupted "
+                        "mid-run on the final attempt"
+                    )
                     node.disposition = (
                         f"failed at resume: attempt cap exhausted "
-                        f"({node.attempts}/{node.max_attempts})")
+                        f"({node.attempts}/{node.max_attempts})"
+                    )
                 else:
                     self._set_status(node, NodeStatus.PENDING)
                     node.error = None
                     node.disposition = (
                         f"requeued at resume: interrupted mid-run "
-                        f"(attempt {node.attempts} of {node.max_attempts} spent)")
+                        f"(attempt {node.attempts} of {node.max_attempts} spent)"
+                    )
                 report[node.id] = node.disposition
             elif node.status is NodeStatus.FAILED:
                 detail = node.disposition or "failed before the interruption"
@@ -328,7 +385,8 @@ class TaskGraph:
             elif node.status is NodeStatus.BLOCKED:
                 node.disposition = (
                     "blocked: held at an escalation gate — re-evaluates "
-                    "when a runner with an approver attached resumes it")
+                    "when a runner with an approver attached resumes it"
+                )
                 report[node.id] = node.disposition
             elif node.status is NodeStatus.DONE:
                 report[node.id] = node.disposition or "done: kept"

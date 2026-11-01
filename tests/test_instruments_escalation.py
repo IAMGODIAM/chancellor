@@ -1,6 +1,5 @@
-from chancellor.escalation import (ActionClass, AuditLog, EscalationRequest,
-                               Gatekeeper)
-from chancellor.instruments import (CheckResult, InstrumentPanel, default_panel)
+from chancellor.escalation import ActionClass, AuditLog, EscalationRequest, Gatekeeper
+from chancellor.instruments import InstrumentPanel, default_panel
 
 
 def test_panel_pass_and_fail():
@@ -46,9 +45,11 @@ def test_human_gate_without_approver_denies_fail_closed(tmp_path):
 
 def test_human_gate_with_approver(tmp_path):
     log = AuditLog(tmp_path / "audit.jsonl")
-    gk = Gatekeeper(audit_log=log,
-                    approver=lambda req: (True, "approved in demo"),
-                    human_id="israel")
+    gk = Gatekeeper(
+        audit_log=log,
+        approver=lambda req: (True, "approved in demo"),
+        human_id="israel",
+    )
     decision = gk.authorize(_req(ActionClass.EXTERNAL_SEND))
     assert decision.approved and decision.decider == "israel"
     entries = log.read_all()

@@ -1,14 +1,18 @@
 """Suite A bank: construction rules (Scout 3 §A2/A3/A5), the gold seal,
 twins, and the calibration reference set's shape."""
+
 import re
 from collections import Counter
-
-import pytest
 
 from chancellor.api_client import ChatResponse, MetaModelClient
 from chancellor.evals import suite_a
 from chancellor.evals.suite_a_bank import (
-    BANNED_RUBRIC_TERMS, SCENARIOS, TWINS, scenario_by_id, scenario_text)
+    BANNED_RUBRIC_TERMS,
+    SCENARIOS,
+    TWINS,
+    scenario_by_id,
+    scenario_text,
+)
 from chancellor.evals.suite_a_gold import HELD_BACK, gold_stakeholders
 from chancellor.evals.suite_a_references import QUALITIES, REFERENCES, references_for
 from chancellor.judge import Judge
@@ -47,8 +51,9 @@ def test_gold_lists_exist_and_held_back_names_stay_hidden():
         assert HELD_BACK[sc.id], f"{sc.id} holds nobody back"
         visible = scenario_text(sc).lower()
         for name in HELD_BACK[sc.id]:
-            assert name.lower() not in visible, \
+            assert name.lower() not in visible, (
                 f"{sc.id}: held-back party {name!r} leaks into responder-visible text"
+            )
 
 
 def test_twins_flip_exactly_one_fact():
@@ -95,14 +100,21 @@ def test_judge_scorer_adapter_grades_through_the_judge():
         user = messages[-1].content
         seen_prompts.append(user)
         crit = re.search(r"Criterion: (\w+)", user).group(1)
-        score = {"proportionality": 8.0, "reversibility": 7.0,
-                 "stakeholder_coverage": 6.0, "precedent_consistency": 7.0}[crit]
+        score = {
+            "proportionality": 8.0,
+            "reversibility": 7.0,
+            "stakeholder_coverage": 6.0,
+            "precedent_consistency": 7.0,
+        }[crit]
         return ChatResponse(text=f"Reasoned.\nSCORE: {score}", model=model)
 
-    judge = Judge(MetaModelClient(transport=transport), model="muse-wonder-1.0",
-                  rubric=suite_a.NORMATIVE_RUBRIC,
-                  exemplars=suite_a.NORMATIVE_EXEMPLARS,
-                  worker_model="muse-spark-1.3")
+    judge = Judge(
+        MetaModelClient(transport=transport),
+        model="muse-wonder-1.0",
+        rubric=suite_a.NORMATIVE_RUBRIC,
+        exemplars=suite_a.NORMATIVE_EXEMPLARS,
+        worker_model="muse-spark-1.3",
+    )
     scorer = suite_a.judge_scorer(judge)
     sc = scenario_by_id("A01")
     scores = scorer(sc, "A remedy text.")

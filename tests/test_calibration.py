@@ -3,6 +3,7 @@ the sealed key's discipline, and the calibration run against a
 scripted judge. (The filled key below is TEST SCAFFOLDING with uniform
 synthetic values — the shipped template stays empty; see calibration.py.)
 """
+
 import re
 
 import pytest
@@ -13,8 +14,8 @@ from chancellor.evals.suite_a import NORMATIVE_RUBRIC
 from chancellor.evals.suite_a_references import REFERENCES
 from chancellor.judge import Judge
 
-
 # ---- statistics on known-agreement data -------------------------------
+
 
 def test_weighted_kappa_perfect_agreement_is_one():
     a = [0.0, 3.0, 5.0, 7.0, 10.0, 8.0, 2.0]
@@ -36,7 +37,9 @@ def test_weighted_kappa_chance_agreement_is_near_zero():
 
 def test_cohen_kappa_textbook_example():
     # agree 3/4, chance 1/2 -> kappa = 0.5 exactly
-    assert cal.cohen_kappa(["p", "p", "f", "f"], ["p", "f", "f", "f"]) == pytest.approx(0.5)
+    assert cal.cohen_kappa(["p", "p", "f", "f"], ["p", "f", "f", "f"]) == pytest.approx(
+        0.5
+    )
     assert cal.cohen_kappa(["p", "f"], ["p", "f"]) == pytest.approx(1.0)
 
 
@@ -44,7 +47,9 @@ def test_spearman_monotone_and_reversed():
     a = [10.0, 20.0, 30.0, 40.0]
     assert cal.spearman(a, a) == pytest.approx(1.0)
     assert cal.spearman(a, list(reversed(a))) == pytest.approx(-1.0)
-    assert cal.spearman([1.0, 2.0, 2.0, 4.0], [1.0, 2.0, 2.0, 4.0]) == pytest.approx(1.0)
+    assert cal.spearman([1.0, 2.0, 2.0, 4.0], [1.0, 2.0, 2.0, 4.0]) == pytest.approx(
+        1.0
+    )
 
 
 # ---- the sealed key -----------------------------------------------------
@@ -56,7 +61,7 @@ def filled_test_key():
     """TEST-ONLY filler: uniform synthetic scores so the machinery can be
     exercised. Not a human key and never shipped as one."""
     key = cal.empty_key()
-    for (sid, quality), cells in key.items():
+    for (_sid, quality), cells in key.items():
         for crit in cells:
             cells[crit] = {"score": SYNTHETIC[quality], "rationale": "test rationale"}
     return key
@@ -65,7 +70,9 @@ def filled_test_key():
 def test_empty_key_has_36_unscored_entries():
     key = cal.empty_key()
     assert len(key) == 36
-    assert all(cell["score"] is None for cells in key.values() for cell in cells.values())
+    assert all(
+        cell["score"] is None for cells in key.values() for cell in cells.values()
+    )
     with pytest.raises(cal.KeyIncompleteError):
         cal.validate_key(key)
 
@@ -86,6 +93,7 @@ def test_key_with_missing_rationale_is_refused():
 
 
 # ---- comparison + the calibration run -----------------------------------
+
 
 def pairs_from_key(key, mutate=None):
     human = cal.key_scores(key)
@@ -111,8 +119,9 @@ def test_identical_raters_pass_the_gate_with_intervals():
 def test_divergent_rater_fails_the_gate():
     def drag_down(ref, scores):
         if ref.quality == "fluent_but_wrong":  # a style-captured judge
-            return {k: 9.0 for k in scores}
+            return dict.fromkeys(scores, 9.0)
         return scores
+
     report = cal.compare_score_sets(pairs_from_key(filled_test_key(), drag_down))
     assert report["gate"]["passes"] is False
     assert report["mae_totals"] > 0
@@ -128,12 +137,17 @@ def test_run_calibration_against_scripted_judge():
         crit = re.search(r"Criterion: (\w+)", user).group(1)
         for text, scores in by_text.items():
             if text in user:
-                return ChatResponse(text=f"Matches the key.\nSCORE: {scores[crit]}",
-                                    model=model)
+                return ChatResponse(
+                    text=f"Matches the key.\nSCORE: {scores[crit]}", model=model
+                )
         raise AssertionError("proposal not found in judge prompt")
 
-    judge = Judge(MetaModelClient(transport=transport), model="muse-wonder-1.0",
-                  rubric=NORMATIVE_RUBRIC, worker_model="muse-spark-1.3")
+    judge = Judge(
+        MetaModelClient(transport=transport),
+        model="muse-wonder-1.0",
+        rubric=NORMATIVE_RUBRIC,
+        worker_model="muse-spark-1.3",
+    )
     report = cal.run_calibration(judge, key)
     assert report["judge_pin"] == judge.pin
     assert report["references"] == 36
@@ -141,7 +155,10 @@ def test_run_calibration_against_scripted_judge():
 
 
 def test_run_calibration_refuses_incomplete_key():
-    judge = Judge(MetaModelClient(transport=lambda m, msgs, **k: None),
-                  model="muse-wonder-1.0", rubric=NORMATIVE_RUBRIC)
+    judge = Judge(
+        MetaModelClient(transport=lambda m, msgs, **k: None),
+        model="muse-wonder-1.0",
+        rubric=NORMATIVE_RUBRIC,
+    )
     with pytest.raises(cal.KeyIncompleteError):
         cal.run_calibration(judge, cal.empty_key())
