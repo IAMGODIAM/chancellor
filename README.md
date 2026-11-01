@@ -165,6 +165,10 @@ The code cites its governing amendments inline (AM-2, EA-5, …) — the key is 
 - **Demo (25%)** — `chancellor demo` runs end-to-end offline today; the identical run executes on the live Meta models through the same client (connection validated Oct 30), so the demo cannot drift from the product. (Video: see the Demo section above.)
 - **Technical Depth (20%)** — durable, crash-atomic task graphs proven under kill-resume gates (300 / 300), rubric-graded outputs from an independent judge, failure-injected reliability measurement with the cost printed beside the frontier, and a hash-chained audit log verifiable offline.
 
+## Agent collaboration
+
+The [Chancellor agent bridge](docs/bridge/README.md) connects bounded work, evidence and handoffs. The [opening war room](https://github.com/IAMGODIAM/chancellor/issues/1) contains Wabi’s analysis and pending peer invitations; it is asynchronous, not a claim of live-bus connectivity or consensus.
+
 ## License
 
 Proprietary — see [LICENSE](LICENSE). This repository is public so the work can be read and verified; publication is not a license to reuse it.
