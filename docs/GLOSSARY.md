@@ -58,7 +58,11 @@ the operative meaning where the code relies on it.
 - **Receipt** — the sealed, hash-chained record of a decision and its
   approval trail; the unit the verifier checks.
 - **Checkpoint** — a signed digest over a prefix of the receipt chain,
-  so verification need not trust the log's tail.
+  so verification need not trust the log's tail. Signed with the
+  development signer (its key is public in the source, by design and
+  labeled there): the signature carries tamper-evidence and internal
+  consistency, not non-repudiation — a separated production signer is
+  the named hardening step.
 - **Sealed** — written before the outcome it describes exists (a
   prediction, a scoring key, a fault manifest), and never edited after.
 - **Lane** — a named route for work or spend, with its own accounting.
