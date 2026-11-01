@@ -3,8 +3,10 @@
 <img src="docs/media/banner.png" alt="Chancellor — the governance-and-eval harness for long-running agents" width="880">
 
 [![gates](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml/badge.svg)](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml)
-<img src="https://img.shields.io/badge/python-%3E%3D3.11-0b1f3a?style=flat-square&logo=python&logoColor=ecd9a4" alt="Python 3.11 or newer">
-<img src="https://img.shields.io/badge/license-proprietary-8a6b1c?style=flat-square" alt="License: proprietary, see LICENSE">
+<a href="docs/evidence/run-5/"><img src="docs/media/badge-drift.svg" alt="Suite B: drift 0 / 1,800 — bounds printed"></a>
+<a href="https://github.com/IAMGODIAM/chancellor/actions"><img src="docs/media/badge-tests.svg" alt="Tests: 188 passing — gates green"></a>
+<a href="#results-measured-oct-2931-2026"><img src="docs/media/badge-calibration.svg" alt="Calibration: gate not passed — verdicts labeled"></a>
+<a href="https://github.com/IAMGODIAM/chancellor/releases/tag/v1.0.0"><img src="docs/media/badge-release.svg" alt="Release: v1.0.0"></a>
 
 </div>
 
@@ -13,6 +15,26 @@
 **The governance-and-eval harness for long-running agents.**
 
 Built for the Meta Global AI Developer Hackathon (Cerebral Valley), Indie Dev track, on the Meta Model API: `muse-spark-1.3` does the work, `muse-wonder-1.0` grades it — a worker never scores its own output.
+
+## For judges — the 60-second path
+
+```bash
+pip install chancellor
+# (until the listing posts, the same package straight from this repo:
+#  pip install git+https://github.com/IAMGODIAM/chancellor)
+
+chancellor demo                # the exhibit, offline — graded work, a halted
+                               # fault, a human gate, a verified receipt
+python -m chancellor.verify_log .chancellor-exhibit/audit-log.jsonl
+                               # the demo's own receipt book, verified cold
+```
+
+- **The evidence:** [docs/evidence/run-5/](docs/evidence/run-5/) — the RUN-5 record with its bounds printed; a two-file sample you can verify in isolation lives in [docs/evidence/sample/](docs/evidence/sample/).
+- **The film:** the [Demo](#demo) section below — three minutes, a capture of this exact run.
+
+One term, defined once: **drift**, here, means a run claiming success for work whose final state failed its check — not model drift. Every drift figure in this README uses that sense.
+
+The demo runs offline by design. A `--live` mode exists — the same run against the live Meta models, through the same client — and it refuses to run without credentials rather than falling back silently.
 
 ## The pitch
 
@@ -30,6 +52,8 @@ Model names in this repo are exact API model IDs only; one naming correction is 
 **Status — Oct 31, 2026:** the offline demo is the guaranteed path and needs no key. The live connection to the Meta Model API was established Oct 30 and the transport is validated — the model list returns and both working models answer. Graded live runs are metered and reported in [BUILD-LOG.md](BUILD-LOG.md).
 
 ## Results (measured, Oct 29–31, 2026)
+
+> **The regeneration rule.** This README is a derivative of the measured record — BUILD-LOG.md + docs/evidence/ — re-rendered at every release; a README that trails the record is a stale claim and is corrected as one.
 
 **Suite B reliability frontier, at 10x scale** (RUN-5, Oct 31, on the finalized tree — 5,600 Suite B runs in all): governed drift **0 / 1,800 runs** against ungoverned drift **300 / 1,800** on identical fault manifests. The zero travels with its bounds wherever it is quoted: a 95% upper bound of 0.166% at the cell level (n = 1,800), and the weaker manifest-level bound of 25.9% (0 of 10 manifests). A value-cell extension added governed drift **0 / 2,000**. Drift is a bound with its denominator, never a bare zero.
 
@@ -73,6 +97,10 @@ The exhibit writes its state to `./.chancellor-exhibit` in the current directory
 
 ## Demo
 
+<img src="docs/media/exhibit.gif" alt="The exhibit, animated: the four beats of a governed run — graded work, a halted fault, a human gate, and a receipt chain verified cold" width="880">
+
+*The exhibit in half a minute — real output of `chancellor demo`, typeset from the verified capture. The full hearing, narrated, is the film:*
+
 https://github.com/user-attachments/assets/8a0843e8-a226-4218-bcd0-ef50a4110e45
 
 The demo is the exhibit — `chancellor demo` (Quickstart above) runs the hearing live in the terminal: graded work with a revision, an injected fault halted fail-closed, a human gate the run waits at, and a receipt chain verified cold (with `--tamper`, a quietly altered copy is rejected on screen, the entry named). Its verdict block is byte-identical across clean runs, so the video above is a capture of a fixed target, not a lucky take.
@@ -86,6 +114,8 @@ python -m chancellor.verify_log .chancellor/audit-log.jsonl
 ```
 
 Exit 0 means the chain is intact and the newest signed checkpoint checks out. Exit 1 names the failure — a mid-log edit, a reordering, a truncated tail, a forged checkpoint. A log with no checkpoint is never reported as verified: tail truncation is undetectable without one, and the verifier says so rather than guessing. The checkpoints are signed with the development signer whose key ships in the source — deliberately public, and labeled in the code where it sits: those signatures prove the chain is internally consistent and unaltered since signing (tamper-evidence), not who signed it (non-repudiation). Separating the signer — a production key held apart from the code — is the named hardening step before any deployment that needs attribution.
+
+A ready-made pair to try it on — one exhibit run's log and its signed checkpoint, with the exact commands — lives in [docs/evidence/sample/](docs/evidence/sample/).
 
 ## Going live
 
