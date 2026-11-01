@@ -19,21 +19,15 @@ refreshed hourly by an automated backstop.
 ## Status
 
 <!-- STATUS:BEGIN -->
-- **Segments done:** 9 / 11,520
-- **Steps executed:** 108
-- **Faults injected so far:** 0 (the first lands at segment 10; one
-  every ten segments thereafter)
-- **Segments complete / halted (fail-closed):** 9 / 0
+- **Segments done:** 49 / 11,520
+- **Steps executed:** 588
+- **Faults injected so far:** 4 (one every ten segments)
+- **Segments complete / halted (fail-closed):** 47 / 2
 - **Drift events:** 0
-- **Audit chain:** 10 entries · 1 signed checkpoint at last verify
-- **Last chain verification:** VERIFIED — the soak's own verify at
-  step 108 (ok, no failures) and an independent run of the product's
-  verifier against the snapshot published with this status
-- **Process kills resumed from checkpoint so far:** 1 (a deliberate
-  proof kill at segment 3, before this page first published — the
-  service restarted the soak, the chain verified across the kill)
-- **Status as of:** 2026-11-01 12:16 EST (refreshed hourly from the
-  soak's own state)
+- **Audit chain:** 43 entries under signed checkpoint in the published snapshot · 5 signed checkpoint(s) so far · the live log holds 50 entries (the tail past the newest checkpoint is not yet checkpointed — the verifier says so rather than guessing, by design)
+- **Last chain verification:** VERIFIED — the published snapshot pair was verified cold with the product's own verifier at this refresh; the soak's own in-run verifications: 5/5 ok
+- **Process kills resumed from checkpoint so far:** 1 (a deliberate proof kill at segment 3 — the service restarted the soak and the chain verified across the kill)
+- **Status as of:** 2026-11-01 13:42 EST (refreshed hourly from the soak's own state)
 <!-- STATUS:END -->
 
 ## How to read a halt — the language of this page, filed before the first segment
