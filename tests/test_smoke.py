@@ -39,7 +39,10 @@ def test_fake_transport_roundtrip():
 
 def test_cli_demo_runs(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    assert cli_main(["demo"]) == 0
+    # The demo is the exhibit now; the smoke test runs it at CI pace
+    # with the gate auto-approved. The staged default (full pace, a
+    # human at the gate) is the presenter's path, not CI's.
+    assert cli_main(["demo", "--fast", "--auto"]) == 0
 
 
 def test_cli_eval_suites_run(capsys):
