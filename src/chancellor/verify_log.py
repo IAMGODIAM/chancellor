@@ -23,6 +23,11 @@ root, head hash). Tamper classes detected, each with a named failure:
                            present) or head_hash_mismatch
   * checkpoint forgery  -> checkpoint_signature_invalid /
                            checkpoint_root_mismatch / checkpoint_schema
+  * frame abuse         -> frame_fields_missing / frame_mismatch
+                           (frame-era entries only: an entry declaring
+                           the current receipt schema must cite a
+                           governing frame this verifier holds, by id
+                           and hash, inside its committed body)
 
 Exit codes: 0 = verified, 1 = verification failed (named failures on
 stdout), 2 = usage / IO error.
@@ -130,6 +135,23 @@ def verify_log(
             failures.append(f"prev_hash_link_broken: seq {pos}")
         if receipts.entry_hash(entry) != entry["entry_hash"]:
             failures.append(f"entry_hash_mismatch: seq {pos} (entry edited)")
+        if entry.get("schema") == receipts.SCHEMA:
+            # Frame-era entries (receipt schema v2) must name their
+            # governing frame, and the citation must be a frame this
+            # verifier holds. Pre-frame (v1) entries skip the check:
+            # they verify under the rules of their era.
+            if "frame_id" not in entry or "frame_hash" not in entry:
+                failures.append(
+                    f"frame_fields_missing: seq {pos} declares "
+                    f"{receipts.SCHEMA} but carries no frame citation"
+                )
+            elif not receipts.frame_known(entry["frame_id"], entry["frame_hash"]):
+                failures.append(
+                    f"frame_mismatch: seq {pos} cites frame "
+                    f"{entry['frame_id']!r} with hash "
+                    f"{entry['frame_hash']!r} — not a frame this "
+                    f"verifier holds"
+                )
         chained_hashes.append(entry["entry_hash"])
         prev_hash = entry.get("entry_hash")
         prev_entry = entry
