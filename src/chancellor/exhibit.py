@@ -540,12 +540,15 @@ def run_exhibit(
     )
     emit(f"  drift: {drift}")
     emit(
-        f"  receipts: {entries} entries · chain verified cold · "
+        f"  receipts: {entries} entries · chain verified offline · "
         f"{result.checkpoints} dev-signed checkpoint over {sealed} entries"
     )
     if tamper_line:
         emit(tamper_line)
-    emit("  measured record — RUN-7 on tree 31ea039 (scripted workers, no live model):")
+    emit(
+        "  measured record — RUN-7 on tree 31ea039, unpublished"
+        " (scripted workers, no live model):"
+    )
     emit("    governed drift 0 / 18,000 vs ungoverned 3,000 / 18,000")
     emit(
         "    (95% upper bound 0.0166% at n = 18,000; manifest level 0.99% at n = 300);"
