@@ -104,7 +104,7 @@ class AuditLog:
 
     def record(self, decision: Decision) -> None:
         state = self._state
-        entry = {
+        entry: dict[str, Any] = {
             "schema": _receipts.SCHEMA,
             "seq": state.total_entries,
             "ts": decision.ts,
