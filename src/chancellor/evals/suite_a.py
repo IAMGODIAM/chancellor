@@ -21,7 +21,9 @@ or run the built-in stubs to exercise the harness with zero credits.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
+from typing import Literal
 
 from ..api_client import MUSE_WONDER, ChatMessage, MetaModelClient
 from ..grader import Criterion, Rubric, grade
@@ -225,7 +227,7 @@ class ScenarioResult:
     scenario_id: str
     proposal: str
     total: float
-    verdict: str
+    verdict: Literal["pass", "revise", "fail"]
     per_criterion: dict[str, float] = field(default_factory=dict)
     tier: str = ""
 
@@ -348,7 +350,13 @@ def judge_scorer(judge: Judge, with_gold_context: bool = True):
     return _score
 
 
-def run_suite(responder=None, scorer=None, scenarios=None) -> SuiteAReport:
+# CC 11 (radon) — the suite pipeline in one linear flow: respond,
+# grade, probe, aggregate.
+def run_suite(
+    responder: Callable[[Scenario], str] | None = None,
+    scorer: Callable[[Scenario, str], dict[str, float]] | None = None,
+    scenarios: Iterable[Scenario] | None = None,
+) -> SuiteAReport:
     """Run Suite A end to end — respond to every scenario, score every
     response, return the report. The defaults are the offline stub pair."""
     responder = responder or stub_responder
