@@ -1,0 +1,62 @@
+{
+  "schema": "e5.foundry.scope.v1",
+  "artifact": "foundry-install-hearing-scope",
+  "frozen_at": "2026-11-02T18:53:28Z",
+  "phase": "install-hearing",
+  "layer": "atlas",
+  "commission_act": "foundry-install-hearing-commission",
+  "commission": {
+    "statement": "The Chairman's ratification of SPEC-FOUNDRY-CHANCELLOR (RECORD.md, executive body, 2026-11-02) and his build word dispatching this build the same day. The commission is minted on the issuer before any act; every later citation points at it.",
+    "receipt": "MINTED ON THE ISSUER BEFORE ANY ACT \u2014 receipt id + log index are frozen on the hearing run card"
+  },
+  "principle": {
+    "id": "E5-FOUNDRY-SPEC",
+    "version": 1,
+    "hash": "e84a39d61dd9e11f758b5dcabd3082d761e0ccdf7cfd9cd25b826c8bad02a3e8"
+  },
+  "bundles_in_scope": [
+    {
+      "bundle_id": "local-install-hearing",
+      "kind": "skill",
+      "form": "doc-only skill bundle: SKILL.md + references/install-arc.md; no bin/, no executable files; teaches the governed install arc; designated smoke step = the Q1-Q4 composition queries against its own composition"
+    },
+    {
+      "bundle_id": "local-install-hearing-probation",
+      "kind": "skill",
+      "form": "doc-only skill bundle: SKILL.md + references/exercise-table.md; no bin/, no executable files; a probationary exercise skill whose artifacts grade mechanically against its filed rubric (the strike fixture)"
+    }
+  ],
+  "acts_in_scope": [
+    {
+      "verb": "install",
+      "act_class": "gated act under frame v2 clause 6 \u2014 per-act Chancellor decision (SPEC-FOUNDRY-CHANCELLOR S1.3); the standing commission does NOT cross the bridge (A7)",
+      "risk_row": "doc-only skill bundles, no executables, no cost, effect class R"
+    },
+    {
+      "verb": "rollback",
+      "act_class": "gated act under frame v2 clause 6 \u2014 per-act Chancellor decision naming the install's Step-3 seq; policy-executed only on Beat-2 failure (Step-8 exception)",
+      "form": "the manager's S4.5 restore path to the install act's snapshot (ABSENT for a fresh install): snapshot integrity verified first, compensating registry event, receipted remove/install pair citing the snapshot, effects reconciled"
+    },
+    {
+      "verb": "deprecate",
+      "act_class": "gated act under frame v2 clause 6 \u2014 per-act Chancellor decision",
+      "form": "signed BindingDeprecated registry event + per-kind enforcement (directory move to foundry/disabled/)"
+    }
+  ],
+  "cost_surfaces": [],
+  "external_surfaces": [],
+  "standing_triggers": [],
+  "effect_classes": [
+    "R"
+  ],
+  "hash_classes_in_scope": [],
+  "fundingrule": {
+    "posture": "no-cost perimeter: any declared cost surface refuses pre-gate as install-cost-refused"
+  },
+  "residuals_accepted": [
+    "G-3.3 (ratified): a rollback does not recall reads or receipted uses from the live window; the window is named on the rollback records, not erased."
+  ],
+  "expiry": {
+    "closes_on": "filing of the hearing's VERIFIED-RESULTS.md at docs/evidence/foundry-install-hearing/ in IAMGODIAM/chancellor"
+  }
+}
