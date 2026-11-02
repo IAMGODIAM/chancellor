@@ -1,5 +1,5 @@
 {
- "polled_at_est": "2026-11-02 13:27 EST",
+ "polled_at_est": "2026-11-02 13:31 EST",
  "label": "IN FLIGHT / UNVERIFIED",
  "boxes": [
   {
@@ -7837,7 +7837,7 @@
     "box": "b2",
     "cell": "B",
     "started_at": 1793615513.4087756,
-    "ts": 1793643984.0654
+    "ts": 1793644254.0715458
    },
    "soaks": [
     {
@@ -11497,35 +11497,43 @@
      "target": null,
      "checkpoint": {
       "seed": 9110,
-      "segments_done": 7,
-      "steps_done": 84,
+      "segments_done": 12,
+      "steps_done": 144,
       "drift_events": 0,
-      "segments_complete": 7,
-      "segments_halted": 0,
-      "faults_injected": 0,
-      "verifications": [],
+      "segments_complete": 11,
+      "segments_halted": 1,
+      "faults_injected": 1,
+      "verifications": [
+       {
+        "steps": 108,
+        "ok": true,
+        "entries": 9,
+        "checkpoints": 1,
+        "failures": []
+       }
+      ],
       "corrupted_state_files": 0,
       "started_at": 1793643549.1070297,
-      "updated_at": 1793643969.3939276
+      "updated_at": 1793644244.5809772
      },
      "supervision": {
-      "entries": 4,
+      "entries": 7,
       "events": {
        "supervision_started": 1,
-       "stall_anomaly": 1,
-       "supervisor_heartbeat": 2
+       "stall_anomaly": 2,
+       "supervisor_heartbeat": 4
       },
       "refusals": 0,
       "escalations": 0,
       "latest_event": {
-       "ts": 1793643729.0820403,
+       "ts": 1793644270.2444742,
        "event": "stall_anomaly",
        "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive"
       },
-      "last_log_size": null,
+      "last_log_size": 9,
       "resume_activity_ts": null
      },
-     "entries_present": 8,
+     "entries_present": 13,
      "dialogue": [
       {
        "ts": 1793643549.0398886,
@@ -11578,6 +11586,45 @@
        "ok": null,
        "age_s": 360.0817346572876,
        "log_size": null
+      },
+      {
+       "ts": 1793644089.166392,
+       "seq": 4,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 540.1232199668884,
+       "log_size": null
+      },
+      {
+       "ts": 1793644269.2414107,
+       "seq": 5,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 179.76968836784363,
+       "log_size": 9
+      },
+      {
+       "ts": 1793644270.2444742,
+       "seq": 6,
+       "event": "stall_anomaly",
+       "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive",
+       "rationale": "The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).",
+       "approved": false,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 180.77268862724304,
+       "log_size": 9
       }
      ]
     }
@@ -13238,17 +13285,17 @@
   }
  ],
  "totals": {
-  "segments_done": 1662,
+  "segments_done": 1667,
   "segments_target": 1440,
-  "segments_complete": 1524,
-  "segments_halted": 138,
-  "faults_injected": 165,
+  "segments_complete": 1528,
+  "segments_halted": 139,
+  "faults_injected": 166,
   "drift_events": 0,
   "refusals": 3,
   "escalations": 3,
   "events": {
    "supervision_started": 8,
-   "stall_anomaly": 216,
+   "stall_anomaly": 217,
    "interruption_detected": 30,
    "chain_verification": 27,
    "resume_launched": 27,
@@ -13261,7 +13308,7 @@
  },
  "anomalies": [],
  "notables": [
-  "stall_anomaly +1 (total 216) \u2014 diagnosed cadence background, inside the envelope (DIAGNOSIS-STALL-ANOMALY.md); filed, not paged"
+  "stall_anomaly +1 (total 217) \u2014 diagnosed cadence background, inside the envelope (DIAGNOSIS-STALL-ANOMALY.md); filed, not paged"
  ],
  "run_complete": false
 }
