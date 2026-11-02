@@ -54,6 +54,7 @@ The separation point already exists. `receipts.py` defines:
 ```python
 class Signer(Protocol):
     key_id: str
+
     def sign(self, data: bytes) -> bytes: ...
     def verify(self, data: bytes, sig: bytes) -> bool: ...
 ```
