@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chancellor — The Live Lab · RUN-9, the system in dialogue</title><style>
+:root{--ink:#0a0a0e;--navy:#0b1f3a;--navy2:#10294d;--gold:#c9a84c;--champ:#ecd9a4;--deep:#8a6b1c;--ivory:#f5efe1;--drift:#d64545}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--ink);color:var(--ivory);font-family:Georgia,'Times New Roman',serif;padding:56px 48px 48px}
+a{color:var(--champ);text-decoration:none;border-bottom:1px solid rgba(201,168,76,.45)}
+a:hover{color:var(--ivory)}
+.wrap{max-width:1180px;margin:0 auto}
+.kicker{font-size:12px;letter-spacing:.42em;color:var(--gold);text-transform:uppercase;text-align:center}
+.kicker .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--champ);margin-right:14px;vertical-align:1px;animation:beat 4s ease-in-out infinite}
+h1{font-size:44px;font-weight:normal;text-align:center;margin:14px 0 6px;color:var(--ivory)}
+.sub{text-align:center;font-style:italic;color:var(--champ);font-size:17px;margin-bottom:8px;line-height:1.55}
+.rule{height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:26px auto;width:82%}
+.prov{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.14em;color:var(--gold);text-transform:uppercase}
+.foot{margin-top:30px;text-align:center;line-height:1.9}
+.foot .prov{color:var(--deep)}
+.labelbar{text-align:center;margin:4px 0 2px}
+.labelbar .prov{color:var(--champ);border:1px solid rgba(236,217,164,.5);border-radius:999px;padding:6px 16px;display:inline-block;background:rgba(11,31,58,.55)}
+.cols{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;margin-top:30px}
+.col{background:linear-gradient(170deg,#0e2547,#0b1f3a 62%,#0a0a0e);border:1px solid rgba(201,168,76,.4);border-radius:32px 24px 34px 24px;padding:26px 22px 22px;text-align:center}
+.col.watch{border-color:rgba(236,217,164,.75);background:linear-gradient(170deg,#14305a,#0b1f3a 55%,#0a0a0e)}
+.col .dev{display:flex;justify-content:center;margin-bottom:10px}
+.col .rn{font-size:12px;letter-spacing:.4em;color:var(--deep)}
+.col h3{font-size:21px;font-weight:normal;margin:5px 0 3px}
+.col .what{font-style:italic;color:var(--champ);font-size:13.5px;min-height:38px;line-height:1.45}
+.col .fig{font-size:24px;color:var(--ivory);margin:10px 0 4px;line-height:1.2;font-variant-numeric:tabular-nums}
+.col.watch .fig{color:var(--champ)}
+.col .cap{font-family:ui-monospace,Menlo,monospace;font-size:10.6px;color:var(--gold);letter-spacing:.04em;line-height:1.55}
+.watchring .star{transform-origin:60px 60px;animation:beat 4s ease-in-out infinite}
+@keyframes beat{0%,100%{opacity:1}50%{opacity:.45}}
+h2.sect{font-size:27px;font-weight:normal;text-align:center;margin:44px 0 4px}
+.sectsub{text-align:center;font-style:italic;color:var(--champ);font-size:15.5px;line-height:1.55;max-width:840px;margin:0 auto}
+.minds{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:26px}
+.mind{background:linear-gradient(165deg,#0e2547,#0b1f3a 70%,#0a0a0e);border:1px solid rgba(201,168,76,.35);border-radius:22px 26px 22px 26px;padding:16px 18px 13px}
+.mind .mh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.mind .seed{font-size:16px;letter-spacing:.18em;color:var(--ivory)}
+.mind .cell{font-family:ui-monospace,Menlo,monospace;font-size:10px;color:var(--deep);letter-spacing:.12em;text-transform:uppercase}
+.mind .seg{font-size:21px;color:var(--champ);margin-top:6px;font-variant-numeric:tabular-nums}
+.mind .seg .den{color:var(--gold);font-size:14px}
+.mind .last{font-size:13.5px;line-height:1.5;margin-top:5px;color:var(--ivory)}
+.mind .age{font-family:ui-monospace,Menlo,monospace;font-size:10.6px;color:var(--gold);margin-top:6px;line-height:1.55}
+.stream{max-width:920px;margin:26px auto 0}
+.line{border-left:2px solid rgba(201,168,76,.35);padding:10px 4px 12px 20px;margin-left:6px;position:relative}
+.line:before{content:"";position:absolute;left:-5px;top:16px;width:8px;height:8px;border-radius:50%;background:var(--navy2);border:1px solid var(--gold)}
+.line .meta{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap}
+.line .t{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--deep);letter-spacing:.06em;font-variant-numeric:tabular-nums}
+.line .w{font-size:11px;letter-spacing:.3em;color:var(--gold);text-transform:uppercase}
+.line .tag{font-size:11px;letter-spacing:.26em;text-transform:uppercase;padding:2px 9px;border-radius:999px;border:1px solid rgba(201,168,76,.45);color:var(--gold)}
+.line .say{font-size:16.5px;line-height:1.6;margin-top:4px;color:var(--ivory)}
+.line .trace{font-family:ui-monospace,Menlo,monospace;font-size:10.4px;color:var(--deep);margin-top:3px;letter-spacing:.03em}
+.line.st-noticed .say{color:#cfc4a5}
+.line.st-noticed{border-left-color:rgba(138,107,28,.5)}
+.line.st-diagnosed .tag{color:var(--champ);border-color:rgba(236,217,164,.6)}
+.line.st-checked .tag{color:var(--ivory);border-color:rgba(245,239,225,.55)}
+.line.st-corrected{border-left-color:var(--champ)}
+.line.st-corrected .tag{color:var(--ink);background:var(--champ);border-color:var(--champ);font-weight:bold}
+.line.st-corrected:before{background:var(--champ)}
+.line.st-refused{border-left:3px solid var(--gold)}
+.line.st-refused .tag{color:var(--gold);border-color:var(--gold)}
+.line.st-refused.drift .tag{color:var(--drift);border-color:var(--drift)}
+.line.st-refused.drift:before{background:var(--drift);border-color:var(--drift)}
+.line.st-escalated{border-left:3px solid var(--champ)}
+.line.st-escalated .tag{color:var(--champ);border-color:var(--champ)}
+.line.st-completed .tag{color:var(--champ);border-color:rgba(236,217,164,.7)}
+.line.runline .say{font-style:italic}
+.note{max-width:840px;margin:30px auto 0;font-size:15px;line-height:1.65;text-align:center}
+.note.small{font-size:13.5px;color:#cfc4a5}
+.verify{max-width:820px;margin:34px auto 0;background:linear-gradient(165deg,#0e2547,#0b1f3a 70%);border:1px solid rgba(201,168,76,.4);border-radius:24px 30px 24px 30px;padding:24px 30px 20px;text-align:center}
+.verify h2{font-size:21px;font-weight:normal;margin-bottom:8px}
+.verify p{font-size:14.5px;line-height:1.65}
+.verify .links{font-size:14.5px;line-height:2.05;margin-top:10px}
+@media (max-width:980px){.cols{grid-template-columns:repeat(2,1fr)}.minds{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:600px){body{padding:36px 18px 32px}.cols{grid-template-columns:1fr}.minds{grid-template-columns:1fr}h1{font-size:31px}.line .say{font-size:15.5px}}
+@media (prefers-reduced-motion: reduce){.kicker .dot,.watchring .star{animation:none}}
+</style></head>
+<body><div class="wrap">
+<div class="kicker"><span class="dot"></span>Chancellor · RUN-9 · The KEEP Evidence Run · Live Lab</div>
+<h1>The Live Lab</h1>
+<div class="sub">The board tallies the run. This page listens to it — the supervisor's own<br>
+receipts, rendered in order: the conversation the system has with itself as it<br>
+notices, diagnoses, checks the chain, and only then corrects.</div>
+<div class="rule"></div>
+<div class="labelbar"><span class="prov">In flight / unverified — republished from the boxes' own state · as of 2026-11-02 06:16 EST · five-minute cadence</span></div>
+<div class="cols">
+  <div class="col"><div class="dev"><svg width="86" height="86" viewBox="0 0 120 120" role="img">
+<path d="M22 34 L98 34 L88 22 L32 22 Z" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="30" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="55.5" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="81" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="24" y="92" width="72" height="7" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+</svg></div><div class="rn">I</div><h3>Graded Work</h3>
+    <div class="what">No agent marks its own homework.</div>
+    <div class="fig">288 / 1440</div>
+    <div class="cap">segments of governed work across six watches · 268 complete · 20 halted fail-closed · 26 faults injected — a halt is the product working</div></div>
+  <div class="col"><div class="dev"><svg width="86" height="86" viewBox="0 0 120 120" role="img">
+<path d="M22 34 L98 34 L88 22 L32 22 Z" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="30" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="55.5" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="81" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="24" y="92" width="72" height="7" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+</svg></div><div class="rn">II</div><h3>Gated Authority</h3>
+    <div class="what">Consequential acts wait at the gate.</div>
+    <div class="fig">5 verifications</div>
+    <div class="cap">chain verifications at the signed checkpoint boundary — nothing resumes on an unverified chain · refusals 0 · escalations 0 so far; a refusal, when it comes, stands in the dialogue below as the watch working</div></div>
+  <div class="col"><div class="dev"><svg width="86" height="86" viewBox="0 0 120 120" role="img">
+<path d="M22 34 L98 34 L88 22 L32 22 Z" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="30" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="55.5" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="81" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="24" y="92" width="72" height="7" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+</svg></div><div class="rn">III</div><h3>Kept Receipts</h3>
+    <div class="what">Every decision leaves a receipt you can verify offline.</div>
+    <div class="fig">159</div>
+    <div class="cap">supervision receipts across the six watches, hash-chained and signed in the supervisor's own log beside each agent's — the dialogue below is drawn from them, in the supervisor's own words</div></div>
+  <div class="col watch"><div class="dev watchring"><svg width="86" height="86" viewBox="0 0 120 120" role="img" aria-label="The watch ring">
+<circle cx="60" cy="60" r="52" fill="none" stroke="#ecd9a4" stroke-width="1.6"/>
+<circle cx="60" cy="60" r="41" fill="none" stroke="#c9a84c" stroke-width="1"/>
+<circle cx="60" cy="60" r="5.5" fill="#ecd9a4"/>
+<g class="star"><path d="M60 4 L63.5 15 L60 19 L56.5 15 Z" fill="#ecd9a4"/></g>
+<path d="M60 26 L60 52" stroke="#ecd9a4" stroke-width="2.4"/>
+<path d="M60 60 L76 70" stroke="#c9a84c" stroke-width="2.4"/>
+</svg></div><div class="rn">IV</div><h3>KEEP — The Watch</h3>
+    <div class="what">The supervisor that notices, verifies, and resumes.</div>
+    <div class="fig">5 interruptions · 4 resumes confirmed</div>
+    <div class="cap">every interruption receipted with its cause graded — proven, plausible, or unknown — and never upgraded after the fact · resumes launched 5 · the freshest checkpoint across the watches was 43 s old at the last receipt before this refresh</div></div>
+</div>
+<h2 class="sect">The state of mind, per watch</h2>
+<p class="sectsub">Where each watch stands at this refresh — its segment, its last word, the age of the checkpoint it is watching.</p>
+<div class="minds"><div class="mind"><div class="mh"><span class="seed">WATCH 9101</span><span class="cell">Cell A — kill cycle</span></div>
+<div class="seg">54 <span class="den">/ 240</span></div><div class="last">last event: supervisor: agent stalled — checkpoint stale, process alive</div>
+<div class="age">checkpoint age 181 s at the last receipt · 34 supervision receipts this run</div></div><div class="mind"><div class="mh"><span class="seed">WATCH 9102</span><span class="cell">Cell A — kill cycle</span></div>
+<div class="seg">53 <span class="den">/ 240</span></div><div class="last">last event: supervisor: agent stalled — checkpoint stale, process alive</div>
+<div class="age">checkpoint age 239 s at the last receipt · 40 supervision receipts this run</div></div><div class="mind"><div class="mh"><span class="seed">WATCH 9103</span><span class="cell">Cell A — kill cycle (replication)</span></div>
+<div class="seg">46 <span class="den">/ 240</span></div><div class="last">last event: supervisor: agent stalled — checkpoint stale, process alive</div>
+<div class="age">checkpoint age 217 s at the last receipt · 22 supervision receipts this run</div></div><div class="mind"><div class="mh"><span class="seed">WATCH 9104</span><span class="cell">Cell A — kill cycle (replication)</span></div>
+<div class="seg">47 <span class="den">/ 240</span></div><div class="last">last event: supervisor: agent stalled — checkpoint stale, process alive</div>
+<div class="age">checkpoint age 237 s at the last receipt · 22 supervision receipts this run</div></div><div class="mind"><div class="mh"><span class="seed">WATCH 9105</span><span class="cell">Cell B — supervisor death + refusal</span></div>
+<div class="seg">45 <span class="den">/ 240</span></div><div class="last">last event: supervisor: agent stalled — checkpoint stale, process alive</div>
+<div class="age">checkpoint age 180 s at the last receipt · 21 supervision receipts this run</div></div><div class="mind"><div class="mh"><span class="seed">WATCH 9106</span><span class="cell">Cell C — stall vs death, then D — machine loss (staged)</span></div>
+<div class="seg">43 <span class="den">/ 240</span></div><div class="last">last event: supervisor: agent stalled — checkpoint stale, process alive</div>
+<div class="age">checkpoint age 43 s at the last receipt · 20 supervision receipts this run</div></div></div>
+<h2 class="sect">The Dialogue</h2>
+<p class="sectsub">the most recent 58 receipts across the six watches, drawn as 48 lines · heartbeats in runs of three or more are drawn as one line spanning the run — the sentence is the receipts' own, the count is the count. Every sentence below is a receipt's own rationale, verbatim —
+trimmed, where length forced it, only at a sentence boundary and marked with an ellipsis.
+The stage tags are this page's reading of the receipts (noticed · diagnosed · checked ·
+corrected · refused · escalated · completed); the raw event name stands under each line,
+so nothing here asks to be taken on the page's word.</p>
+<div class="stream"><div class="line st-noticed"><div class="meta"><span class="t">05:56:53 EST</span><span class="w">Watch 9103</span><span class="tag">NOTICED</span></div>
+<div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #13</div></div><div class="line st-noticed"><div class="meta"><span class="t">05:57:03 EST</span><span class="w">Watch 9104</span><span class="tag">NOTICED</span></div>
+<div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #13</div></div><div class="line st-diagnosed"><div class="meta"><span class="t">05:58:16 EST</span><span class="w">Watch 9102</span><span class="tag">DIAGNOSED</span></div>
+<div class="say">The relaunched agent died inside its provisional window, before its checkpoint advanced past the loss point — a distinct event, not a silent retry (R5).</div><div class="trace">resume_failed · receipt #26</div></div><div class="line st-diagnosed"><div class="meta"><span class="t">05:58:16 EST</span><span class="w">Watch 9102</span><span class="tag">DIAGNOSED · cause: proven</span></div>
+<div class="say">Interruption 3: the agent stopped at 33 committed entries (checkpoint age 314.9s at detection). Cause: proven — graded from the evidence that survived.</div><div class="trace">interruption_detected · receipt #27</div></div><div class="line st-checked"><div class="meta"><span class="t">05:58:16 EST</span><span class="w">Watch 9102</span><span class="tag">CHECKED</span></div>
+<div class="say">The chain verifies at the newest signed checkpoint boundary; resume may proceed from that boundary.</div><div class="trace">chain_verification · receipt #28</div></div><div class="line st-corrected"><div class="meta"><span class="t">05:58:16 EST</span><span class="w">Watch 9102</span><span class="tag">CORRECTED</span></div>
+<div class="say">Agent relaunched from the verified boundary at 33 entries; the relaunch is provisional until the chain advances (R5).</div><div class="trace">resume_launched · receipt #29</div></div><div class="line st-noticed"><div class="meta"><span class="t">05:58:17 EST</span><span class="w">Watch 9102</span><span class="tag">NOTICED</span></div>
+<div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #30</div></div><div class="line st-noticed runline"><div class="meta"><span class="t">05:58:41 – 06:04:41 EST</span><span class="w">Watch 9103</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat ×3 · receipts #14–#16 · one line spanning the run</div></div><div class="line st-noticed runline"><div class="meta"><span class="t">05:58:41 – 06:04:41 EST</span><span class="w">Watch 9104</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat ×3 · receipts #14–#16 · one line spanning the run</div></div><div class="line st-noticed"><div class="meta"><span class="t">05:59:05 EST</span><span class="w">Watch 9101</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #23</div></div><div class="line st-noticed"><div class="meta"><span class="t">05:59:05 EST</span><span class="w">Watch 9102</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #31</div></div><div class="line st-noticed"><div class="meta"><span class="t">05:59:29 EST</span><span class="w">Watch 9105</span><span class="tag">NOTICED</span></div>
+<div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #13</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:00:53 EST</span><span class="w">Watch 9106</span><span class="tag">NOTICED</span></div>
+<div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #13</div></div><div class="line st-corrected"><div class="meta"><span class="t">06:01:47 EST</span><span class="w">Watch 9102</span><span class="tag">CORRECTED</span></div>
+<div class="say">The resumed agent is alive and its checkpoint has advanced past the loss point; the relaunch has outlived its launcher (R5).</div><div class="trace">resume_confirmed · receipt #32</div></div><div class="line st-diagnosed"><div class="meta"><span class="t">06:01:53 EST</span><span class="w">Watch 9101</span><span class="tag">DIAGNOSED · cause: proven</span></div>
+<div class="say">Interruption 2: the agent stopped at 40 committed entries (checkpoint age 42.4s at detection). Cause: proven — graded from the evidence that survived.</div><div class="trace">interruption_detected · receipt #24</div></div><div class="line st-checked"><div class="meta"><span class="t">06:01:53 EST</span><span class="w">Watch 9101</span><span class="tag">CHECKED</span></div>
+<div class="say">The chain verifies at the newest signed checkpoint boundary; resume may proceed from that boundary.</div><div class="trace">chain_verification · receipt #25</div></div><div class="line st-corrected"><div class="meta"><span class="t">06:01:53 EST</span><span class="w">Watch 9101</span><span class="tag">CORRECTED</span></div>
+<div class="say">Agent relaunched from the verified boundary at 40 entries; the relaunch is provisional until the chain advances (R5).</div><div class="trace">resume_launched · receipt #26</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:01:53 EST</span><span class="w">Watch 9105</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #14</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:02:05 EST</span><span class="w">Watch 9102</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #33</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:02:05 EST</span><span class="w">Watch 9101</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #27</div></div><div class="line st-noticed runline"><div class="meta"><span class="t">06:02:56 – 06:08:56 EST</span><span class="w">Watch 9106</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat ×3 · receipts #14–#16 · one line spanning the run</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:04:11 EST</span><span class="w">Watch 9101</span><span class="tag">NOTICED</span></div>
+<div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #28</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:04:47 EST</span><span class="w">Watch 9102</span><span class="tag">NOTICED</span></div>
+<div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #34</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:04:54 EST</span><span class="w">Watch 9105</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #15</div></div><div class="line st-noticed runline"><div class="meta"><span class="t">06:05:05 – 06:11:05 EST</span><span class="w">Watch 9102</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat ×3 · receipts #35–#37 · one line spanning the run</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:05:05 EST</span><span class="w">Watch 9101</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #29</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:05:14 EST</span><span class="w">Watch 9103</span><span class="tag">NOTICED</span></div>
+<div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #17</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:05:39 EST</span><span class="w">Watch 9104</span><span class="tag">NOTICED</span></div>
+<div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #17</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:07:41 EST</span><span class="w">Watch 9103</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #18</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:07:41 EST</span><span class="w">Watch 9104</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #18</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:07:50 EST</span><span class="w">Watch 9105</span><span class="tag">NOTICED</span></div>
+<div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #16</div></div><div class="line st-noticed runline"><div class="meta"><span class="t">06:07:54 – 06:13:54 EST</span><span class="w">Watch 9105</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat ×3 · receipts #17–#19 · one line spanning the run</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:08:05 EST</span><span class="w">Watch 9101</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #30</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:09:23 EST</span><span class="w">Watch 9106</span><span class="tag">NOTICED</span></div>
+<div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #17</div></div><div class="line st-corrected"><div class="meta"><span class="t">06:09:39 EST</span><span class="w">Watch 9101</span><span class="tag">CORRECTED</span></div>
+<div class="say">The resumed agent is alive and its checkpoint has advanced past the loss point; the relaunch has outlived its launcher (R5).</div><div class="trace">resume_confirmed · receipt #31</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:10:42 EST</span><span class="w">Watch 9104</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #19</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:10:42 EST</span><span class="w">Watch 9103</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #19</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:11:05 EST</span><span class="w">Watch 9101</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #32</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:11:56 EST</span><span class="w">Watch 9106</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #18</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:12:39 EST</span><span class="w">Watch 9101</span><span class="tag">NOTICED</span></div>
+<div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #33</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:12:45 EST</span><span class="w">Watch 9104</span><span class="tag">NOTICED</span></div>
+<div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #20</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:13:05 EST</span><span class="w">Watch 9103</span><span class="tag">NOTICED</span></div>
+<div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #20</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:13:07 EST</span><span class="w">Watch 9102</span><span class="tag">NOTICED</span></div>
+<div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #38</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:13:42 EST</span><span class="w">Watch 9104</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #21</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:13:42 EST</span><span class="w">Watch 9103</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #21</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:14:05 EST</span><span class="w">Watch 9102</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #39</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:14:55 EST</span><span class="w">Watch 9105</span><span class="tag">NOTICED</span></div>
+<div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #20</div></div><div class="line st-noticed"><div class="meta"><span class="t">06:14:56 EST</span><span class="w">Watch 9106</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #19</div></div></div>
+<p class="note">Read it as the product's thesis, demonstrated on itself: a death is noticed
+and its cause graded before anything moves; the chain is checked before anything resumes;
+a refusal is spoken aloud and receipted, never papered over. The watch does not guess,
+and it does not stay silent about what it cannot prove.</p>
+<p class="note small">The stall sentences recur by design on this run: the instrument signs a
+checkpoint every ~505 s against the supervisor's 180 s stale threshold, so a healthy watch
+earns stall receipts on a cadence sawtooth — diagnosed background, filed in the run folder as
+DIAGNOSIS-STALL-ANOMALY.md. They are rendered here as they land; the dialogue does not edit
+the system's speech.</p>
+<div class="verify"><h2>The records behind the voice</h2>
+<p>This page is a window, not evidence. The evidence is the run's own files and the
+independent recount filed after collection. The board tallies what this page voices;
+the soak's composed display keeps the judging-week record.</p>
+<div class="links">
+<a href="https://github.com/IAMGODIAM/chancellor/blob/run9-live/LIVE-KEEP.md">the live board — LIVE-KEEP.md</a> · <a href="https://github.com/IAMGODIAM/chancellor/blob/run9-live/status.json">the board's status.json</a><br>
+<a href="https://iamgodiam.github.io/chancellor/live.html">The Long Watch — the judging soak, live</a> · <a href="https://github.com/IAMGODIAM/chancellor/blob/judging-soak/LIVE-SOAK.md">its canonical record</a><br>
+<a href="https://github.com/IAMGODIAM/chancellor">the repository</a>
+</div></div>
+<div class="foot"><span class="prov">Rendered mechanically from the supervision logs the board polls · refreshed on the board's five-minute cadence · every figure in flight / unverified · the verified recount governs</span></div>
+</div></body></html>
