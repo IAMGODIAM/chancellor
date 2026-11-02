@@ -19,6 +19,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import Literal
 
 
 def _require_finite(value: object, what: str) -> float:
@@ -61,7 +62,7 @@ def _validate_criterion(crit: Criterion) -> None:
 class GradeResult:
     rubric: str
     total: float  # normalized 0..100
-    verdict: str  # "pass" | "revise" | "fail"
+    verdict: Literal["pass", "revise", "fail"]
     per_criterion: dict[str, float] = field(default_factory=dict)
 
 
@@ -109,7 +110,7 @@ def _validate_rubric(rubric: Rubric) -> None:
         raise ValueError(f"rubric {rubric.name} has duplicate criterion names")
 
 
-def verdict_for(total: float, rubric: Rubric) -> str:
+def verdict_for(total: float, rubric: Rubric) -> Literal["pass", "revise", "fail"]:
     """The verdict band a total falls in under a rubric's marks — the
     one copy of the band logic; calibration measures band agreement
     against these same bands."""
