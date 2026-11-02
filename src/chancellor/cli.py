@@ -10,6 +10,12 @@
                        escalation to the human gate
     chancellor eval-a  run Eval Suite A (normative judgment) with stub agents
     chancellor eval-b  run Eval Suite B (long-horizon reliability)
+    chancellor installs status
+                       the capability-install office (frame v2): fold
+                       probation state from an audit log and print it
+                       (there is no install verb in the product CLI —
+                       installs run through the governed arc in
+                       chancellor.installs, never as a bare command)
 
 Everything runs offline against stub workers until the live API is
 wired (Stage W5).
@@ -42,6 +48,7 @@ from .escalation import ActionClass, AuditLog, EscalationRequest, Gatekeeper
 from .evals import suite_a, suite_b
 from .exhibit import DEFAULT_SEED, run_exhibit
 from .grader import OUTPUT_RUBRIC
+from .installs import fold_all_probation, format_status_lines
 from .instruments import default_panel
 from .judge import Exemplar, Judge
 from .orchestrator import CrewRunner
@@ -331,6 +338,43 @@ def _supervise_command(args: list[str]) -> int:
     return Supervisor(config).run()
 
 
+def _installs_command(args: list[str]) -> int:
+    """`chancellor installs status [--log PATH]`: print the probation
+    fold from an audit log — per capability: standing, uses in the
+    window, strikes, and the chain head the fold was taken at. A read
+    surface only; the governed arc itself lives in chancellor.installs."""
+    if not args or args[0] != "status":
+        print("usage: chancellor installs status [--log PATH]",
+              file=sys.stderr)
+        return 2
+    log_path = Path(".chancellor/audit-log.jsonl")
+    rest = args[1:]
+    i = 0
+    while i < len(rest):
+        if rest[i] == "--log" and i + 1 < len(rest):
+            log_path = Path(rest[i + 1])
+            i += 2
+        else:
+            print(f"unknown installs flag: {rest[i]}", file=sys.stderr)
+            return 2
+    if not log_path.exists():
+        print(f"installs: no audit log at {log_path}", file=sys.stderr)
+        return 2
+    entries = [
+        json.loads(line)
+        for line in log_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    states = fold_all_probation(entries)
+    if not states:
+        print("installs: no capability records in this chain")
+        return 0
+    head = entries[-1].get("entry_hash") if entries else None
+    for line in format_status_lines(states, head=head):
+        print(line)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Console entry point: dispatch the demo, supervise, verify-log,
     and eval subcommands."""
@@ -340,6 +384,8 @@ def main(argv: list[str] | None = None) -> int:
         return _demo_command(argv[1:])
     if cmd == "supervise":
         return _supervise_command(argv[1:])
+    if cmd == "installs":
+        return _installs_command(argv[1:])
     if cmd == "eval-a":
         print(json.dumps(suite_a.run_suite().to_dict(), indent=2))
         return 0
@@ -347,7 +393,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(suite_b.run_suite().to_dict(), indent=2))
         return 0
     print(
-        f"unknown command: {cmd} (expected demo | supervise | eval-a | eval-b)",
+        f"unknown command: {cmd} (expected demo | supervise | installs | "
+        "eval-a | eval-b)",
         file=sys.stderr,
     )
     return 2

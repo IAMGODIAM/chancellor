@@ -60,6 +60,7 @@ from .escalation import (
     EscalationRequest,
     Gatekeeper,
 )
+from .installs import fold_all_probation, format_status_lines
 from .receipts import ChainIntegrityError
 
 # ------------------------------------------------------------------ causes
@@ -509,6 +510,30 @@ class Supervisor:
             f"entries, age {age_s:.1f}s (stale threshold "
             f"{self.config.stale_threshold_s:.0f}s)"
         )
+        self._emit_probation_status()
+
+    def _emit_probation_status(self) -> None:
+        """Probation surfaces (frame v2, spec §2 P6): when this
+        watch's own chain carries capability-install records, the
+        status line folds each capability's probation state from the
+        chain and prints it age-stamped (fold head + its timestamp).
+        Ordinary watches carry no such records and print nothing
+        extra — the surface exists only where the state does."""
+        if self._log is None:
+            return
+        entries = self._log.read_all()
+        if not entries:
+            return
+        states = fold_all_probation(entries)
+        if not states:
+            return
+        head = entries[-1].get("entry_hash")
+        head_ts = entries[-1].get("ts")
+        for line in format_status_lines(states, head=head):
+            self._emit(
+                f"[supervise] probation: {line} "
+                f"(head ts {head_ts})"
+            )
 
     # -------------------------------------------------- cadence advice
     def _snapshot_written_at(self, snap: CheckpointSnapshot, now: float) -> float:
