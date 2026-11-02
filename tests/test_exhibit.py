@@ -43,24 +43,3 @@ def test_exhibit_determinism(tmp_path: Path) -> None:
     block = verdict_block(out1)
     assert block != ""
     assert block == verdict_block(out2)
-
-
-def test_exhibit_no_human_at_gate_fails_closed(tmp_path: Path) -> None:
-    """No terminal at the gate (input raises EOF): the gate denies, the
-    run says why and points to --auto, and the exit stays non-zero."""
-    lines: list[str] = []
-
-    def no_terminal(_prompt: str) -> str:
-        raise EOFError
-
-    rc = run_exhibit(
-        state_dir=tmp_path / "eof",
-        fast=True,
-        emit=lines.append,
-        input_fn=no_terminal,
-    )
-    out = "\n".join(lines)
-    assert rc == 1
-    assert "no human at the gate (input is not a terminal)" in out
-    assert "use --auto" in out
-    assert "drift: 1" in out

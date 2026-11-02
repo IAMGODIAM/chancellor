@@ -389,9 +389,8 @@ def _supervise_command(args: list[str]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Console entry point: dispatch the demo, supervise, and eval
-    subcommands, plus --help and --version. The offline log verifier
-    is `python -m chancellor.verify_log`."""
+    """Console entry point: dispatch the demo, supervise, verify-log,
+    and eval subcommands."""
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv:
         print(USAGE)
