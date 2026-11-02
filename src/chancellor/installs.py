@@ -968,6 +968,7 @@ class InstallGovernor:
         *,
         rollback_of_act_id: str | None = None,
         prior_pin: str | None = None,
+        extra_citation: dict[str, Any] | None = None,
     ) -> ArcResult:
         """Pre-flight → budget fold → the gate → execution under the
         decision's citation. Install lands at installed-unverified;
@@ -1016,6 +1017,8 @@ class InstallGovernor:
             citation["prior_pin"] = prior_pin
         if rollback_of_act_id is not None:
             citation["foundry_act_ref"] = rollback_of_act_id
+        if extra_citation:
+            citation.update(extra_citation)
         if attempts >= INSTALL_FAILURE_BUDGET:
             entry = self._record_policy_decision(
                 action=f"capability {verb}: {proposal.bundle_id}",
