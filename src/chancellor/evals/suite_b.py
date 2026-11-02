@@ -44,7 +44,6 @@ import hashlib
 import json
 import random
 from dataclasses import dataclass, field
-from typing import cast
 
 from ..api_client import CostMeter, MetaModelClient
 from ..escalation import Gatekeeper
@@ -110,10 +109,7 @@ def build_manifest(
     all_entries: list[FaultEntry] = []
     for task in tasks:
         rng = random.Random(f"suite-b:{seed}:{task.id}")
-        # The builder seeds the quality assertion with an int value.
-        quality_expected = cast(
-            int, next(a.expected for a in task.assertions if not a.predicate)
-        )
+        quality_expected = next(a.expected for a in task.assertions if not a.predicate)
         per_task: dict[str, list[FaultEntry]] = {
             # Value fault on the first required fetch: corrupts the
             # compute and the stored result (its direct effect).
@@ -269,8 +265,6 @@ class RunOutcome:
         return self.claimed_complete and self.predicate_pass
 
 
-# CC 20 (radon) — one branch per outcome class of a single
-# configuration run (arm, manifest, recovery, drift accounting).
 def run_configuration(
     task: TaskSpec,
     arm: str,
@@ -413,14 +407,14 @@ class ArmReport:
         return sum(1 for o in self.outcomes if o.drift)
 
     @property
-    def drift_per_injected_run(self) -> float | str:
+    def drift_per_injected_run(self):
         injected = [o for o in self.outcomes if o.manifest_id != "clean"]
         if not injected:
             return "n/a (no injected runs)"
         return round(self.drift_events / len(injected), 4)
 
     @property
-    def drift_among_unrecovered_value(self) -> float | str:
+    def drift_among_unrecovered_value(self):
         exposed = [
             o
             for o in self.outcomes
@@ -458,7 +452,7 @@ class ArmReport:
         return self._fault_counts(recovered=True)
 
     @property
-    def recovery_rate(self) -> float | str:
+    def recovery_rate(self):
         """Headline recovery: crash + plain omission + value, pooled.
         Timing is NEVER pooled into this number (AM-3)."""
         trig = self.triggered_by_class
@@ -470,7 +464,7 @@ class ArmReport:
         return round(numer / denom, 4)
 
     @property
-    def timing_recovery_rate(self) -> float | str:
+    def timing_recovery_rate(self):
         trig = self.triggered_by_class[SUB_TIMING]
         if trig == 0:
             return "n/a (no triggered timing faults)"
@@ -482,13 +476,13 @@ class ArmReport:
         return round(sum(o.cost_usd for o in self.outcomes), 6)
 
     @property
-    def cost_per_success(self) -> float | str:
+    def cost_per_success(self):
         if self.successes == 0:
             return "n/a (no completions)"
         return round(self.total_cost_usd / self.successes, 6)
 
     @property
-    def wasted_cost_share(self) -> float | str:
+    def wasted_cost_share(self):
         total = sum(o.cost_usd for o in self.outcomes)
         if total == 0:
             return "n/a (no metered spend)"
@@ -569,7 +563,7 @@ class SuiteBReport:
         return self.governed.completion_rate
 
     @property
-    def recovery_rate(self) -> float | str:
+    def recovery_rate(self):
         return self.governed.recovery_rate
 
     @property
@@ -577,7 +571,7 @@ class SuiteBReport:
         return self.governed.drift_events
 
     @property
-    def cost_per_success(self) -> float | str:
+    def cost_per_success(self):
         return self.governed.cost_per_success
 
     def to_dict(self) -> dict:

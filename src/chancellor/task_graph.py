@@ -181,8 +181,6 @@ class TaskGraph:
         )
 
     # -- validation ----------------------------------------------------------
-    # CC 11 (radon) — one pass per invariant family: unknown deps,
-    # then cycle coloring.
     def validate(self) -> None:
         for node in self.nodes.values():
             for dep in node.depends_on:
@@ -314,10 +312,7 @@ class TaskGraph:
             "name": self.name,
             "nodes": [n.to_dict() for n in self.nodes.values()],
         }
-        # Compact separators: the state file is machine-read (load is
-        # format-agnostic); indent cost 1.6x the bytes and ~5x the
-        # save time at N=1000 (both measured) for no reader.
-        payload = json.dumps(data, separators=(",", ":"))
+        payload = json.dumps(data, indent=2)
         tmp = path.with_name(f".{path.name}.tmp-{os.getpid()}")
         try:
             with tmp.open("w", encoding="utf-8") as fh:
@@ -350,8 +345,6 @@ class TaskGraph:
         graph._reconcile_resume()
         return graph
 
-    # CC 11 (radon) — one branch per on-disk node state; each state
-    # reconciles independently of the others.
     def _reconcile_resume(self) -> None:
         """Reconcile state written by a process that may have died
         mid-flight. Names every node's disposition in resume_report."""

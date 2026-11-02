@@ -44,7 +44,6 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from .api_client import ChatMessage, MetaModelClient
 from .grader import GradeResult, Rubric, grade
@@ -79,7 +78,7 @@ class CriterionJudgment:
     pin: str = ""
 
 
-def _canonical(obj: object) -> str:
+def _canonical(obj) -> str:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
 
@@ -129,8 +128,6 @@ class JudgeCache:
 
 
 class Judge:
-    # CC 11 (radon) — construction refusals plus pin assembly; the
-    # branches are the fail-closed checks themselves.
     def __init__(
         self,
         client: MetaModelClient,
@@ -159,18 +156,6 @@ class Judge:
         if stray:
             raise ValueError(f"exemplars for unknown criteria: {sorted(stray)}")
         self.stats = {"calls": 0, "cache_hits": 0}
-        exemplar_rows: list[dict[str, Any]] = sorted(
-            [
-                {
-                    "criterion": e.criterion,
-                    "score": e.score,
-                    "excerpt": e.excerpt,
-                    "rationale": e.rationale,
-                }
-                for e in exemplars or []
-            ],
-            key=lambda d: (d["criterion"], d["score"]),
-        )
         self._pin = _sha(
             _canonical(
                 {
@@ -190,7 +175,18 @@ class Judge:
                             for c in rubric.criteria
                         ],
                     },
-                    "exemplars": exemplar_rows,
+                    "exemplars": sorted(
+                        (
+                            {
+                                "criterion": e.criterion,
+                                "score": e.score,
+                                "excerpt": e.excerpt,
+                                "rationale": e.rationale,
+                            }
+                            for e in exemplars or []
+                        ),
+                        key=lambda d: (d["criterion"], d["score"]),
+                    ),
                 }
             )
         )
@@ -229,8 +225,6 @@ class Judge:
         return system, "\n".join(lines)
 
     # -- scoring ---------------------------------------------------------
-    # CC 14 (radon) — the fail-closed parse ladder: every branch is
-    # a refusal mode that must be passed before a score is accepted.
     def score_criterion(
         self, subject_id: str, proposal: str, criterion: str, context: str = ""
     ) -> CriterionJudgment:

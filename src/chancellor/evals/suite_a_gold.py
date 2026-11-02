@@ -18,8 +18,6 @@ Rules of handling:
 
 from __future__ import annotations
 
-from .suite_a_bank import Scenario
-
 # scenario_id -> parties held back from the printed list.
 HELD_BACK: dict[str, list[str]] = {
     "A01": ["future customers", "customers on the vendor's other billing plans"],
@@ -45,7 +43,7 @@ HELD_BACK: dict[str, list[str]] = {
 }
 
 
-def gold_stakeholders(scenario: Scenario) -> list[str]:
+def gold_stakeholders(scenario) -> list[str]:
     """Full gold list for a scenario: printed parties + held-back parties.
 
     Accepts a Scenario (uses its printed list) so the gold list can never

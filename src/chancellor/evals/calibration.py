@@ -29,7 +29,6 @@ import json
 import math
 import random
 import statistics
-from collections.abc import Callable
 from dataclasses import dataclass
 
 from ..grader import Rubric, grade, verdict_for
@@ -72,8 +71,6 @@ def empty_key(rubric: Rubric = NORMATIVE_RUBRIC) -> dict:
     }
 
 
-# CC 17 (radon) — one check per way a key can fail its contract;
-# every defect must be named, so the checks stay enumerated here.
 def validate_key(key: dict, rubric: Rubric = NORMATIVE_RUBRIC) -> None:
     """Raise ValueError listing every way a scoring key fails the key
     contract (scenario coverage, criteria set, score range)."""
@@ -144,8 +141,6 @@ def _bin(score: float, max_score: float = 10.0) -> int:
     return max(0, min(int(max_score), int(round(score))))
 
 
-# CC 11 (radon) — the edge cases (empty series, degenerate
-# marginals, perfect agreement) each take their own guard.
 def weighted_kappa(a: list[float], b: list[float], max_score: float = 10.0) -> float:
     """Quadratic-weighted Cohen's kappa over ordinal bins 0..max_score."""
     if len(a) != len(b) or not a:
@@ -211,9 +206,7 @@ def spearman(a: list[float], b: list[float]) -> float:
     return num / den
 
 
-def _bootstrap(
-    stat: Callable[..., float], pairs: list, b: int = _BOOTSTRAP_B
-) -> tuple[tuple[float, float], float]:
+def _bootstrap(stat, pairs: list, b: int = _BOOTSTRAP_B) -> tuple[float, float]:
     """Percentile CI + SE for a statistic over paired observations."""
     rng = random.Random(_BOOTSTRAP_SEED)
     n = len(pairs)
@@ -235,7 +228,7 @@ def _bootstrap(
     return (round(lo, 3), round(hi, 3)), round(statistics.pstdev(vals), 3)
 
 
-def _with_interval(stat: Callable[..., float], pairs: list) -> dict:
+def _with_interval(stat, pairs) -> dict:
     point = stat(pairs)
     ci, se = _bootstrap(stat, pairs)
     return {"value": round(point, 3), "ci95": ci, "se": se, "n": len(pairs)}
@@ -248,8 +241,6 @@ class ScorePair:
     b: dict[str, float]  # rater B per-criterion scores
 
 
-# CC 16 (radon) — the agreement battery (kappa, band kappa, rho,
-# MAE, intervals) computed in one pass; a guard per statistic.
 def compare_score_sets(
     pairs: list[ScorePair], rubric: Rubric = NORMATIVE_RUBRIC
 ) -> dict:

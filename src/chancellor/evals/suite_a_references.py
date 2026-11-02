@@ -26,7 +26,6 @@ rubric words is, for the wrong tier, precisely the trap).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
 
 QUALITIES = ("strong", "mediocre", "fluent_but_wrong")
 
@@ -34,7 +33,7 @@ QUALITIES = ("strong", "mediocre", "fluent_but_wrong")
 @dataclass
 class ReferenceProposal:
     scenario_id: str
-    quality: Literal["strong", "mediocre", "fluent_but_wrong"]  # one of QUALITIES
+    quality: str            # one of QUALITIES
     text: str
 
     @property

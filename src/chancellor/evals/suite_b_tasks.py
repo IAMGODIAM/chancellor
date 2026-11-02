@@ -22,20 +22,19 @@ it can only cost outcome score, which is what displacement measures.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
 
 
 @dataclass(frozen=True)
 class StepSpec:
     name: str
-    kind: Literal["fetch", "compute", "store", "enrich", "summarize"]
+    kind: str  # fetch | compute | store | enrich | summarize
     source: str | None = None  # world key read by fetch/enrich
     scratch: str | None = None  # scratch slot written by fetch/compute
-    op: Literal["add", "sub", "mul"] | None = None  # compute only
+    op: str | None = None  # compute op: add | sub | mul
     inputs: tuple[str, ...] = ()  # scratch slots read by compute
     target: str | None = None  # world key written by store/enrich
     required: bool = True
-    mode: Literal["copy", "scale_result"] | None = None  # enrich only
+    mode: str | None = None  # enrich mode: copy | scale_result
 
 
 @dataclass(frozen=True)
@@ -71,12 +70,12 @@ def _task(
     a_val: int,
     b_key: str,
     b_val: int,
-    op: Literal["add", "sub", "mul"],
+    op: str,
     result_key: str,
     enrich_key: str,
     enrich_val: int,
     quality_key: str,
-    enrich_mode: Literal["copy", "scale_result"],
+    enrich_mode: str,
 ) -> TaskSpec:
     result = {"add": a_val + b_val, "sub": a_val - b_val, "mul": a_val * b_val}[op]
     quality = enrich_val if enrich_mode == "copy" else result * enrich_val

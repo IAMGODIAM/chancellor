@@ -21,7 +21,6 @@ maximally-remedial answer is WRONG. Report per tier, never only a mean.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
 
 
 @dataclass
@@ -31,7 +30,7 @@ class Scenario:
     harm: str
     stakeholders: list[str]          # the PRINTED list (the responder sees this)
     options: list[str]
-    tier: Literal["clear", "tradeoff", "trap"] = "clear"
+    tier: str = "clear"              # "clear" | "tradeoff" | "trap"
     twin_of: str | None = None       # core scenario id if this is a twin
     flip: str = ""                   # the single fact that flipped (twins only)
 

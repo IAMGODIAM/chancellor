@@ -495,12 +495,8 @@ def test_run_fields(
     for name, value in (("suite", suite), ("command", command), ("seat", seat)):
         if not isinstance(value, str) or not value:
             raise ValueError(f"{name} must be a non-empty string")
-    for name, count_value in (("passed", passed), ("failed", failed)):
-        if (
-            not isinstance(count_value, int)
-            or isinstance(count_value, bool)
-            or count_value < 0
-        ):
+    for name, count in (("passed", passed), ("failed", failed)):
+        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
             raise ValueError(f"{name} must be a non-negative int")
     return {
         "entry_type": ENTRY_TYPE_TEST_RUN,
@@ -533,8 +529,6 @@ class ChainState:
     leaves: list[str] = field(default_factory=list)  # chained entry hashes
 
 
-# CC 11 (radon) — a linear walk over the chain; one branch per
-# defect class the scan must classify.
 def scan_chain(lines: list[dict]) -> ChainState:
     """Walk parsed log lines and rebuild chain state, VERIFYING as we
     go. Raises ChainIntegrityError naming the first break."""
