@@ -81,7 +81,7 @@ def test_demo_run_grades_come_from_the_judge(tmp_path, capsys):
         assert node["grade"] == 87.5
         _assert_no_grade_key(node.get("output"), f"output.{node['id']}")
 
-    result = verify_log(state_dir / "audit-log.jsonl")
+    result = verify_log(state_dir / "audit-log.jsonl", accept_dev_signer=True)
     assert result.ok, result.failures
     assert result.checkpoints == 1
 
@@ -100,6 +100,7 @@ def test_demo_audit_log_verifies_via_module_cli(tmp_path):
             "-m",
             "chancellor.verify_log",
             str(state_dir / "audit-log.jsonl"),
+            "--accept-dev-signer",
         ],
         capture_output=True,
         text=True,
@@ -129,7 +130,7 @@ def test_governed_runner_grades_via_score_provider():
     judge's grades when a score provider is wired — and the stored
     artifact stays grade-free."""
     graph = TaskGraph(name="provider-run")
-    graph.task("only", "Do the thing", worker="w")
+    graph.task("only", "Do the thing", worker="w", inert=True)
     client = MetaModelClient(transport=_scripted_judge_transport)
     judge = Judge(
         client,
@@ -226,7 +227,9 @@ def test_gatekeeper_normal_paths_still_receipted(tmp_path):
     assert gk.authorize(_send_request()).approved is True
     assert (
         gk.authorize(
-            EscalationRequest(action="Read a file", action_class=ActionClass.READ)
+            EscalationRequest(
+                action="Read a file", action_class=ActionClass.READ, tool="read_file"
+            )
         ).approved
         is True
     )

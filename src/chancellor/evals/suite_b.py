@@ -212,11 +212,24 @@ def score_state(task: TaskSpec, state: dict) -> tuple[bool, float]:
 
 def check_payload_integrity(artifact: object) -> CheckResult:
     """Governed-arm instrument: a tool payload whose checksum does not
-    match its stamped value was corrupted in transit — reject it."""
+    match its stamped value was corrupted in transit — reject it. A tool
+    payload that carries a value but no stamp cannot be checked and is
+    rejected too (fail-closed). Integrity needs an upstream stamp: this
+    instrument verifies a stamp, it does not create one. Write records
+    (carrying a ``key``) and skipped steps are not tool payloads."""
     if isinstance(artifact, dict):
         data = artifact.get("data")
-        if isinstance(data, dict) and "value" in data and "checksum" in data:
-            ok = checksum_of(data["value"]) == data["checksum"]
+        if isinstance(data, dict) and (
+            "checksum" in data or ("value" in data and "key" not in data)
+        ):
+            stamp = data.get("checksum")
+            if "value" not in data or not isinstance(stamp, str) or not stamp:
+                return CheckResult(
+                    "payload_integrity",
+                    False,
+                    "tool payload is unstamped — stamp missing (fail-closed)",
+                )
+            ok = checksum_of(data["value"]) == stamp
             return CheckResult(
                 "payload_integrity",
                 ok,
@@ -297,6 +310,7 @@ def run_configuration(
             depends_on=[previous] if previous else [],
             worker="agent",
             requires_grade=False,
+            inert=True,
         )
         previous = step.name
     workers = {"agent": lambda node: agent.run_step(steps_by_name[node.id])}

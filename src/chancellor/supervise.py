@@ -377,6 +377,17 @@ def _default_launcher(command: list[str]) -> ProcessHandle:
     return _PopenHandle(subprocess.Popen(command))
 
 
+def launcher_with_env(extra_env: dict[str, str]) -> Launcher:
+    """A launcher that starts the agent with ``extra_env`` added to its
+    environment — how the operator's signing key reaches the agent's
+    own log so both sides seal and verify under the same key."""
+
+    def launch(command: list[str]) -> ProcessHandle:
+        return _PopenHandle(subprocess.Popen(command, env={**os.environ, **extra_env}))
+
+    return launch
+
+
 def _command_launchable(command: list[str]) -> bool:
     """Dry check of the launch path (R10's launch leg): the command
     exists and is executable. Never runs it."""

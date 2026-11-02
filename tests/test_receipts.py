@@ -81,7 +81,7 @@ def test_checkpoint_roundtrip_verifies(tmp_path):
     assert payload["head_receipt_hash"] == log.read_all()[-1]["entry_hash"]
     assert receipts.checkpoint_signature_valid(envelope, log.signer)
 
-    result = verify_log(path)
+    result = verify_log(path, accept_dev_signer=True)
     assert result.ok, result.failures
     assert result.chained_entries == 5 and result.checkpoints == 1
 
@@ -93,7 +93,7 @@ def test_verify_detects_mid_log_edit(tmp_path):
     rows = log.read_all()
     rows[2]["approved"] = False  # flip a decision after the fact
     _rewrite(path, rows)
-    result = verify_log(path)
+    result = verify_log(path, accept_dev_signer=True)
     assert not result.ok
     assert any(f.startswith("entry_hash_mismatch") for f in result.failures)
 
@@ -103,7 +103,7 @@ def test_verify_detects_tail_truncation(tmp_path):
     log = _seed_log(path, n=5)
     log.checkpoint()
     _rewrite(path, log.read_all()[:3])  # drop the tail
-    result = verify_log(path)
+    result = verify_log(path, accept_dev_signer=True)
     assert not result.ok
     assert any(f.startswith("tail_truncation") for f in result.failures)
 
@@ -115,7 +115,7 @@ def test_verify_detects_reordering(tmp_path):
     rows = log.read_all()
     rows[1], rows[2] = rows[2], rows[1]
     _rewrite(path, rows)
-    result = verify_log(path)
+    result = verify_log(path, accept_dev_signer=True)
     assert not result.ok
     assert any(
         "seq_mismatch" in f or "prev_hash_link_broken" in f for f in result.failures
@@ -130,7 +130,7 @@ def test_verify_detects_forged_checkpoint_signature(tmp_path):
     env = json.loads(cp_path.read_text().splitlines()[0])
     env["signatures"][0]["sig"] = "AAAA" + env["signatures"][0]["sig"][4:]
     cp_path.write_text(json.dumps(env) + "\n")
-    result = verify_log(path)
+    result = verify_log(path, accept_dev_signer=True)
     assert not result.ok
     assert any("checkpoint_signature_invalid" in f for f in result.failures)
 
@@ -147,7 +147,7 @@ def test_verify_detects_doctored_checkpoint_root(tmp_path):
     # check and the signature check must fire; at least root must name.
     env["payload"] = receipts._b64(receipts.canonical(payload))
     cp_path.write_text(json.dumps(env) + "\n")
-    result = verify_log(path)
+    result = verify_log(path, accept_dev_signer=True)
     assert not result.ok
     assert any(
         "checkpoint_root_mismatch" in f or "checkpoint_signature_invalid" in f
@@ -158,10 +158,10 @@ def test_verify_detects_doctored_checkpoint_root(tmp_path):
 def test_uncheckpointed_log_is_not_called_verified(tmp_path):
     path = tmp_path / "audit.jsonl"
     _seed_log(path, n=2)
-    result = verify_log(path)
+    result = verify_log(path, accept_dev_signer=True)
     assert not result.ok
     assert any(f.startswith("no_checkpoint") for f in result.failures)
-    relaxed = verify_log(path, allow_uncheckpointed=True)
+    relaxed = verify_log(path, allow_uncheckpointed=True, accept_dev_signer=True)
     assert relaxed.ok and relaxed.warnings
 
 
@@ -195,20 +195,20 @@ def test_legacy_prefix_anchors_and_is_reported(tmp_path):
     assert entries[1]["seq"] == 1
     assert entries[1]["prev_hash"] == receipts.legacy_anchor(legacy)
     log.checkpoint()
-    strict = verify_log(path)
+    strict = verify_log(path, accept_dev_signer=True)
     assert not strict.ok
     assert any(f.startswith("unchained_legacy_entries") for f in strict.failures)
-    assert verify_log(path, allow_legacy_prefix=True).ok
+    assert verify_log(path, allow_legacy_prefix=True, accept_dev_signer=True).ok
 
 
 def test_verifier_cli_exit_codes(tmp_path, capsys):
     path = tmp_path / "audit.jsonl"
     log = _seed_log(path, n=3)
     log.checkpoint()
-    assert verify_main([str(path)]) == 0
+    assert verify_main([str(path), "--accept-dev-signer"]) == 0
     rows = log.read_all()
     rows[0]["approved"] = False
     _rewrite(path, rows)
-    assert verify_main([str(path)]) == 1
+    assert verify_main([str(path), "--accept-dev-signer"]) == 1
     assert "NOT VERIFIED" in capsys.readouterr().out
     assert verify_main([str(tmp_path / "missing.jsonl")]) == 2

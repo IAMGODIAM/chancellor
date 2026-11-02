@@ -2,8 +2,9 @@
 
     python -m chancellor.verify_log <audit-log.jsonl> [--checkpoints <file>]
                                 [--allow-legacy-prefix] [--allow-uncheckpointed]
+                                [--accept-dev-signer]
     python -m chancellor.verify_log resolve <audit-log.jsonl> <manifest_sha256>
-                                [--checkpoints <file>]
+                                [--checkpoints <file>] [--accept-dev-signer]
 
 The ``resolve`` verb walks freeze provenance (receipts.freeze_manifest /
 test_run entries): given a manifest hash it prints the freeze_manifest
@@ -28,6 +29,12 @@ root, head hash). Tamper classes detected, each with a named failure:
                            the current receipt schema must cite a
                            governing frame this verifier holds, by id
                            and hash, inside its committed body)
+
+Signer label: a log sealed under the built-in dev key
+(``chancellor-dev-hmac-sha256``, a public key anyone can recompute) is
+tamper-evidence only. The verifier prints ``SIGNER: dev-hmac (public) —
+tamper-evidence only`` whenever it sees that key id, and fails such a log
+unless ``--accept-dev-signer`` is passed.
 
 Exit codes: 0 = verified, 1 = verification failed (named failures on
 stdout), 2 = usage / IO error.
@@ -67,6 +74,62 @@ class VerificationResult:
     chained_entries: int = 0  # entries carrying a hash-chain link
     checkpoints: int = 0  # checkpoint envelopes seen
     checkpoint_log_size: int | None = None
+    dev_signer: bool = False  # a checkpoint was sealed under the dev key
+
+
+DEV_SIGNER_LABEL = "SIGNER: dev-hmac (public) — tamper-evidence only"
+
+
+def _dev_signer_seen(cp_path: Path, signer: receipts.Signer) -> bool:
+    """True when the sidecar carries the dev key id (in a signature or as
+    a payload issuer), or the verifying signer is the dev signer and a
+    checkpoint exists. Reads leniently: a malformed sidecar is the
+    verifier's failure to name elsewhere."""
+    if not cp_path.exists():
+        return False
+    seen = False
+    for line in cp_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        seen = True
+        try:
+            env = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(env, dict):
+            continue
+        sigs = env.get("signatures")
+        if isinstance(sigs, list) and any(
+            isinstance(sg, dict) and sg.get("keyid") == receipts.DEV_SIGNER_KEY_ID
+            for sg in sigs
+        ):
+            return True
+        try:
+            if receipts.checkpoint_payload(env).get("issuer") == (
+                receipts.DEV_SIGNER_KEY_ID
+            ):
+                return True
+        except Exception:
+            continue
+    return seen and signer.key_id == receipts.DEV_SIGNER_KEY_ID
+
+
+def _apply_dev_gate(result, cp_path: Path, signer: receipts.Signer, accept: bool):
+    """Label a dev-signed result, and fail it unless the caller accepted
+    the dev signer."""
+    if not _dev_signer_seen(cp_path, signer):
+        return result
+    result.dev_signer = True
+    if accept:
+        result.warnings.append(DEV_SIGNER_LABEL)
+    else:
+        result.failures.append(
+            "dev_signer_not_accepted: checkpoints are sealed under the public "
+            "dev key — tamper-evidence only; pass --accept-dev-signer to "
+            "acknowledge"
+        )
+        result.ok = False
+    return result
 
 
 def _load_jsonl(path: Path, failures: list[str]) -> list[dict] | None:
@@ -95,11 +158,33 @@ def verify_log(
     signer: receipts.Signer | None = None,
     allow_legacy_prefix: bool = False,
     allow_uncheckpointed: bool = False,
+    accept_dev_signer: bool = False,
+) -> VerificationResult:
+    """Verify a receipt chain offline (see _verify_log_core). A log sealed
+    under the public dev key is labelled and FAILS unless
+    ``accept_dev_signer`` is set."""
+    signer = signer if signer is not None else receipts.default_signer()
+    result = _verify_log_core(
+        log_path, checkpoint_path, signer, allow_legacy_prefix, allow_uncheckpointed
+    )
+    cp_path = (
+        Path(checkpoint_path)
+        if checkpoint_path is not None
+        else receipts.default_checkpoint_path(log_path)
+    )
+    return _apply_dev_gate(result, cp_path, signer, accept_dev_signer)
+
+
+def _verify_log_core(
+    log_path: str | Path,
+    checkpoint_path: str | Path | None,
+    signer: receipts.Signer,
+    allow_legacy_prefix: bool,
+    allow_uncheckpointed: bool,
 ) -> VerificationResult:
     """Verify a receipt chain offline: hashes, signatures, checkpoints,
     and the authority invariants. Failures are named per class; an
     unreadable log is a failed verification, never an exception."""
-    signer = signer if signer is not None else receipts.default_signer()
     failures: list[str] = []
     warnings: list[str] = []
 
@@ -113,6 +198,7 @@ def verify_log(
     prev_entry: dict | None = None
     legacy = 0
     chain_started = False
+    frame_era = False
     for pos, entry in enumerate(rows):
         if "entry_hash" not in entry:
             if chain_started:
@@ -135,7 +221,19 @@ def verify_log(
             failures.append(f"prev_hash_link_broken: seq {pos}")
         if receipts.entry_hash(entry) != entry["entry_hash"]:
             failures.append(f"entry_hash_mismatch: seq {pos} (entry edited)")
-        if entry.get("schema") == receipts.SCHEMA:
+        schema = entry.get("schema")
+        if schema not in (receipts.SCHEMA_V1, receipts.SCHEMA):
+            failures.append(
+                f"frame_fields_missing: seq {pos} carries schema={schema!r}, "
+                f"not a receipt schema this verifier holds (no frame stamp)"
+            )
+        elif schema == receipts.SCHEMA_V1 and frame_era:
+            failures.append(
+                f"schema_downgrade: seq {pos} declares {receipts.SCHEMA_V1} "
+                f"after the chain entered the frame era"
+            )
+        if schema == receipts.SCHEMA:
+            frame_era = True
             # Frame-era entries (receipt schema v2) must name their
             # governing frame, and the citation must be a frame this
             # verifier holds. Pre-frame (v1) entries skip the check:
@@ -231,7 +329,13 @@ def verify_log(
                         f"checkpoint_size_mismatch: checkpoint log_size="
                         f"{checkpoint_log_size!r}, log holds "
                         f"{len(chained_hashes)} chained entries (log grew "
-                        f"past the newest checkpoint — re-checkpoint)"
+                        f"past the newest checkpoint — re-checkpoint"
+                        + (
+                            f"; unsealed tail: "
+                            f"{len(chained_hashes) - checkpoint_log_size} entries)"
+                            if isinstance(checkpoint_log_size, int)
+                            else ")"
+                        )
                     )
             if (
                 chained_hashes
@@ -262,6 +366,19 @@ def verify_holder_proof(
     checkpoint_path: str | Path,
     proof: dict,
     signer: receipts.Signer | None = None,
+    accept_dev_signer: bool = False,
+) -> VerificationResult:
+    """Verify a holder-presented proof (see _verify_holder_proof_core);
+    dev-signed checkpoints are labelled and fail unless accepted."""
+    signer = signer if signer is not None else receipts.default_signer()
+    result = _verify_holder_proof_core(checkpoint_path, proof, signer)
+    return _apply_dev_gate(result, Path(checkpoint_path), signer, accept_dev_signer)
+
+
+def _verify_holder_proof_core(
+    checkpoint_path: str | Path,
+    proof: dict,
+    signer: receipts.Signer,
 ) -> VerificationResult:
     """Verify a HOLDER-PRESENTED v2 inclusion proof against the newest
     checkpoint in a sidecar — standalone: the log itself is neither
@@ -270,7 +387,6 @@ def verify_holder_proof(
     exactly (proof_count_mismatch REFUSES the proof outright — an
     anchor without a count verifies nothing, as a rule), and the path
     must fold to the checkpoint root."""
-    signer = signer if signer is not None else receipts.default_signer()
     failures: list[str] = []
 
     cp_rows: list[dict] = []
@@ -370,6 +486,8 @@ class ResolveResult:
     manifest_entry: dict | None = None  # the freeze_manifest entry
     test_runs: list[dict] = field(default_factory=list)  # covering test_run entries
     checkpoint: dict | None = None  # payload of the sealing checkpoint
+    warnings: list[str] = field(default_factory=list)
+    dev_signer: bool = False  # a checkpoint was sealed under the dev key
 
 
 # CC 24 (radon) — one branch per gap resolve must fail closed on.
@@ -378,13 +496,31 @@ def resolve_manifest(
     manifest_sha256: str,
     checkpoint_path: str | Path | None = None,
     signer: receipts.Signer | None = None,
+    accept_dev_signer: bool = False,
+) -> ResolveResult:
+    """Resolve a manifest hash (see _resolve_manifest_core); dev-signed
+    checkpoints are labelled and fail unless accepted."""
+    signer = signer if signer is not None else receipts.default_signer()
+    result = _resolve_manifest_core(log_path, manifest_sha256, checkpoint_path, signer)
+    cp_path = (
+        Path(checkpoint_path)
+        if checkpoint_path is not None
+        else receipts.default_checkpoint_path(log_path)
+    )
+    return _apply_dev_gate(result, cp_path, signer, accept_dev_signer)
+
+
+def _resolve_manifest_core(
+    log_path: str | Path,
+    manifest_sha256: str,
+    checkpoint_path: str | Path | None,
+    signer: receipts.Signer,
 ) -> ResolveResult:
     """Resolve a freeze manifest hash to its covering test_run receipts
     and the checkpoint that seals them. Fail-closed: a broken chain, an
     absent manifest, a manifest with no covering test run, ANY test run
     bound to a manifest that appears nowhere in the log, or the absence
     of a sealing checkpoint each fail the resolution by name."""
-    signer = signer if signer is not None else receipts.default_signer()
     failures: list[str] = []
 
     rows = _load_jsonl(Path(log_path), failures)
@@ -550,12 +686,25 @@ def _resolve_main(argv: list[str]) -> int:
         default=None,
         help="checkpoint sidecar path (default: <log>.checkpoints.jsonl)",
     )
+    parser.add_argument(
+        "--accept-dev-signer",
+        action="store_true",
+        help="acknowledge checkpoints sealed under the public dev key "
+        "(tamper-evidence only); without it such a log fails",
+    )
     args = parser.parse_args(argv)
 
     if not Path(args.log).exists():
         print(f"error: log not found: {args.log}", file=sys.stderr)
         return 2
-    result = resolve_manifest(args.log, args.manifest, checkpoint_path=args.checkpoints)
+    result = resolve_manifest(
+        args.log,
+        args.manifest,
+        checkpoint_path=args.checkpoints,
+        accept_dev_signer=args.accept_dev_signer,
+    )
+    if result.dev_signer:
+        print(DEV_SIGNER_LABEL)
     if result.manifest_entry is not None:
         m = result.manifest_entry
         print(
@@ -611,6 +760,12 @@ def main(argv: list[str] | None = None) -> int:
         help="accept a log with no checkpoint (tail truncation then undetectable)",
     )
     parser.add_argument(
+        "--accept-dev-signer",
+        action="store_true",
+        help="acknowledge checkpoints sealed under the public dev key "
+        "(tamper-evidence only); without it such a log fails",
+    )
+    parser.add_argument(
         "--proof",
         default=None,
         help="verify a holder-presented v2 inclusion proof (JSON file) "
@@ -633,7 +788,11 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as exc:
             print(f"error: proof file unreadable: {exc}", file=sys.stderr)
             return 2
-        result = verify_holder_proof(cp_path, proof)
+        result = verify_holder_proof(
+            cp_path, proof, accept_dev_signer=args.accept_dev_signer
+        )
+        if result.dev_signer:
+            print(DEV_SIGNER_LABEL)
         print(
             f"checkpoints: {result.checkpoints}, "
             f"checkpoint log_size: {result.checkpoint_log_size}"
@@ -654,13 +813,17 @@ def main(argv: list[str] | None = None) -> int:
         checkpoint_path=args.checkpoints,
         allow_legacy_prefix=args.allow_legacy_prefix,
         allow_uncheckpointed=args.allow_uncheckpointed,
+        accept_dev_signer=args.accept_dev_signer,
     )
+    if result.dev_signer:
+        print(DEV_SIGNER_LABEL)
     print(
         f"entries: {result.entries} (chained: {result.chained_entries}), "
         f"checkpoints: {result.checkpoints}"
     )
     for warning in result.warnings:
-        print(f"WARNING: {warning}")
+        if warning != DEV_SIGNER_LABEL:
+            print(f"WARNING: {warning}")
     if result.ok:
         print("VERIFIED: chain intact, newest checkpoint consistent")
         return 0

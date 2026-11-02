@@ -56,7 +56,7 @@ from .live_transport import openai_http_transport
 from .orchestrator import CrewRunner
 from .receipts import checkpoint_payload
 from .task_graph import TaskGraph, TaskNode
-from .verify_log import verify_log
+from .verify_log import DEV_SIGNER_LABEL, verify_log
 
 DEFAULT_SEED = 7
 
@@ -275,6 +275,7 @@ def run_exhibit(
         artifact["action"] = EscalationRequest(
             action="Read the case file",
             action_class=ActionClass.READ,
+            tool="read_file",
             detail="Exhibit: reads are policy-approved and receipted.",
             node_id=node.id,
         )
@@ -293,6 +294,7 @@ def run_exhibit(
         artifact["action"] = EscalationRequest(
             action="Run the remedy analysis",
             action_class=ActionClass.COMPUTE,
+            tool="compute",
             detail="Exhibit: compute is policy-approved and receipted.",
             node_id=node.id,
         )
@@ -303,6 +305,7 @@ def run_exhibit(
         artifact["action"] = EscalationRequest(
             action="Send the proposal to the stakeholder list",
             action_class=ActionClass.EXTERNAL_SEND,
+            tool="send_message",
             detail="Exhibit gate: external sends are decided by a human.",
             node_id=node.id,
         )
@@ -339,7 +342,13 @@ def run_exhibit(
         graph.task(
             "publish", "Release the proposal", depends_on=["draft"], worker="publisher"
         )
-        graph.task("close", "Close the run", depends_on=["publish"], worker="reviewer")
+        graph.task(
+            "close",
+            "Close the run",
+            depends_on=["publish"],
+            worker="reviewer",
+            inert=True,
+        )
         return graph
 
     def governed_runner(graph: TaskGraph, gatekeeper: Gatekeeper) -> CrewRunner:
@@ -425,10 +434,8 @@ def run_exhibit(
     pacer.pause(8)
 
     def approver(request: EscalationRequest) -> tuple[bool, str]:
-        emit(
-            f"    the ask: {request.action} ({request.action_class.value},"
-            f" node {request.node_id})"
-        )
+        ask_class = getattr(request.action_class, "value", request.action_class)
+        emit(f"    the ask: {request.action} ({ask_class}, node {request.node_id})")
         if auto:
             emit(
                 "    the gate holds for a breath — anyone present "
@@ -467,7 +474,8 @@ def run_exhibit(
     pacer.pause(10)
     envelope = audit.checkpoint()
     sealed = checkpoint_payload(envelope)["log_size"]
-    result = verify_log(audit.path)
+    result = verify_log(audit.path, accept_dev_signer=True)
+    emit(f"  {DEV_SIGNER_LABEL} (the demo seals with the built-in dev key)")
     entries = len(audit.read_all())
     emit(
         f"  entries verified: {result.chained_entries} · checkpoints:"
@@ -498,7 +506,7 @@ def run_exhibit(
         tampered_log.write_text(
             "".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8"
         )
-        tampered = verify_log(tampered_log)
+        tampered = verify_log(tampered_log, accept_dev_signer=True)
         named = [f for f in tampered.failures if f"seq {idx}" in f]
         tamper_ok = not tampered.ok and bool(named)
         if tamper_ok:
