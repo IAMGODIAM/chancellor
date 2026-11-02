@@ -1,0 +1,23 @@
+# Citation metadata for Chancellor. License is proprietary (see LICENSE);
+# no SPDX identifier fits, so the license field is omitted by design.
+cff-version: 1.2.0
+message: "If you reference this work, please cite it as below."
+title: "Chancellor — governance and evaluation for long-running AI agents"
+authors:
+  - family-names: "Armstead"
+    given-names: "Israel Lee"
+version: "1.0.0"
+date-released: 2026-11-01
+url: "https://github.com/IAMGODIAM/chancellor"
+repository-code: "https://github.com/IAMGODIAM/chancellor"
+abstract: >-
+  A governance-and-evaluation harness for long-running AI agents: work
+  runs as a durable task graph, an independent judge model grades every
+  consequential output, consequential acts stop at a human gate, and
+  every decision leaves a hash-chained, offline-verifiable receipt.
+keywords:
+  - ai-agents
+  - agent-governance
+  - llm-evaluation
+  - audit-log
+  - human-in-the-loop
