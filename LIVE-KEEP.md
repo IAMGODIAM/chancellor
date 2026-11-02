@@ -14,6 +14,16 @@ It refuses what fails verification, and it receipts its refusals.
 This board is that watch, watched — the supervisor's own evidence
 run, displayed in the live way, while it runs.
 
+## The Live Lab
+
+The board tallies; the lab listens. Beside this board stands a
+composed page that renders the supervisor's own receipts as what
+they are — the conversation the system has with itself: noticing,
+diagnosing, checking the chain, and only then correcting, each
+line in the supervisor's own signed words, refreshed on this
+board's cadence. [The Live Lab — RUN-9 in
+dialogue](https://iamgodiam.github.io/chancellor/keep-lab.html).
+
 ## The four elements
 
 **I · The Work Is Graded.** No agent marks its own homework. On this
@@ -43,25 +53,30 @@ receipts as they land.
 
 <!-- STATUS:BEGIN -->
 - **Standing:** IN FLIGHT — every figure UNVERIFIED, republished from the boxes’ own state files.
-- **As of:** 2026-11-02 06:11 EST (five-minute cadence)
-- **Boxes reporting:** 0 / 4
-- **Segments:** 0 / 0 across the watches polled · complete 0 · halted fail-closed 0 · faults injected 0
+- **As of:** 2026-11-02 06:16 EST (five-minute cadence)
+- **Boxes reporting:** 4 / 4
+- **Segments:** 288 / 1440 across the watches polled · complete 268 · halted fail-closed 20 · faults injected 26
 - **Drift events:** 0
-- **The watch's receipts so far:** refusals 0 · escalations 0
+- **The watch's receipts so far:** refusals 0 · escalations 0 · chain_verification 5 · interruption_detected 5 · resume_confirmed 4 · resume_failed 1 · resume_launched 5 · stall_anomaly 40 · supervision_started 6
 
 ### Box b0 — Cell A — kill cycle · us-east-1
-- Not yet reported — not present in lambda list. The cadence catches up; nothing is filled in by assumption.
+- **Phase:** RUN · **Step:** seed-9102 · *supervised soak started*
+- **Watch 9101:** segments 54 / 240 · complete 50 · halted 4 · faults 5 · drift 0 · corrupted state files 0 · in-run chain verifications 6/6 ok · supervision receipts 34 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
+- **Watch 9102:** segments 53 / 240 · complete 49 · halted 4 · faults 5 · drift 0 · corrupted state files 0 · in-run chain verifications 6/6 ok · supervision receipts 40 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
 
 ### Box b1 — Cell A — kill cycle (replication) · us-west-1
-- Not yet reported — not present in lambda list. The cadence catches up; nothing is filled in by assumption.
+- **Phase:** RUN · **Step:** seed-9104 · *supervised soak started*
+- **Watch 9103:** segments 46 / 240 · complete 43 · halted 3 · faults 4 · drift 0 · corrupted state files 0 · in-run chain verifications 5/5 ok · supervision receipts 22 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
+- **Watch 9104:** segments 47 / 240 · complete 44 · halted 3 · faults 4 · drift 0 · corrupted state files 0 · in-run chain verifications 5/5 ok · supervision receipts 22 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
 
 ### Box b2 — Cell B — supervisor death + refusal · us-east-1
-- Not yet reported — not present in lambda list. The cadence catches up; nothing is filled in by assumption.
+- **Phase:** RUN · **Step:** seed-9105 · *supervised run starting (B-main)*
+- **Watch 9105:** segments 45 / 240 · complete 42 · halted 3 · faults 4 · drift 0 · corrupted state files 0 · in-run chain verifications 5/5 ok · supervision receipts 21 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
 
 ### Box b3 — Cell C — stall vs death, then D — machine loss (staged) · us-west-1
-- Not yet reported — not present in lambda list. The cadence catches up; nothing is filled in by assumption.
+- **Phase:** RUN · **Step:** seed-9106 · *supervised run starting (C)*
+- **Watch 9106:** segments 43 / 240 · complete 40 · halted 3 · faults 4 · drift 0 · corrupted state files 0 · in-run chain verifications 5/5 ok · supervision receipts 20 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
 
-**Anomalies this cycle:** box b0 unreachable — not present in lambda list; box b1 unreachable — not present in lambda list; box b2 unreachable — not present in lambda list; box b3 unreachable — not present in lambda list
 <!-- STATUS:END -->
 
 ## How to read this board — the language, filed before the first kill
