@@ -37,6 +37,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import cast
 
 from .escalation import ActionClass, EscalationRequest, Gatekeeper
 from .grader import Rubric, grade
@@ -92,7 +93,7 @@ class CrewRunner:
         self.gatekeeper = gatekeeper
         self.state_path = Path(state_path) if state_path else None
         self.score_provider = score_provider
-        self.governed = False
+        self.is_governed = False
 
     @classmethod
     def governed(
@@ -130,7 +131,7 @@ class CrewRunner:
             state_path=state_path,
             score_provider=score_provider,
         )
-        runner.governed = True
+        runner.is_governed = True
         return runner
 
     @classmethod
@@ -171,11 +172,12 @@ class CrewRunner:
                     node.id,
                     "requeued at resume: gate re-evaluation (approver attached)",
                 )
-                report.dispositions[node.id] = self.graph.nodes[node.id].disposition
+                # requeue() sets the disposition on the line above.
+                report.dispositions[node.id] = cast(str, node.disposition)
 
     def run(self) -> RunReport:
         self.graph.validate()
-        report = RunReport(graph_name=self.graph.name, governed=self.governed)
+        report = RunReport(graph_name=self.graph.name, governed=self.is_governed)
         report.dispositions.update(self.graph.resume_report)
         self._reevaluate_blocked(report)
         self._persist()
@@ -189,7 +191,10 @@ class CrewRunner:
             for node in ready:
                 if not self._run_node(node, report):
                     return report  # halted — fail-closed
-            self._persist()
+            # No per-wave persist: every _run_node exit path persists
+            # after its last mutation (mutation-path verification,
+            # council R9) — a wave-end write would rewrite identical
+            # bytes.
         return report
 
     # -- gate boundary ------------------------------------------------------
@@ -237,6 +242,9 @@ class CrewRunner:
 
     # -- one node -------------------------------------------------------------
 
+    # CC 25 (radon) — the governed path in one visible flow: check,
+    # grade, gate, escalate, persist. Deliberately not scattered
+    # across handlers; each branch is a governance outcome.
     def _run_node(self, node: TaskNode, report: RunReport) -> bool:
         """Returns False when the run must halt."""
         try:
