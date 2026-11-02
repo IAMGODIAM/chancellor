@@ -107,6 +107,14 @@ Zero runtime dependencies — stdlib only, Python ≥ 3.11. Allow about two minu
 
 The exhibit writes its state to `./.chancellor-exhibit` in the current directory (task-graph state, the audit log, and its checkpoints). Its verdict block is byte-identical across clean runs. `chancellor demo --classic` runs the original scripted governed run, which keeps its state in `./.chancellor`.
 
+## Supervise a long-running agent
+
+```bash
+chancellor supervise -- <agent command...>
+```
+
+`--cadence` is the agent's **signed-checkpoint interval in seconds**, not its work or segment rate; the stale threshold is `--cadence × --missed` (default 60 × 3 = 180 seconds). If a healthy agent repeatedly draws `stall_anomaly` receipts, match `--cadence` to the interval between its signed checkpoints. The supervisor emits one advisory-only `cadence_advisory` when observed checkpoint timing makes that mismatch likely. Full guidance, including the RUN-9 field case: [docs/supervision-cadence.md](docs/supervision-cadence.md).
+
 ## Demo
 
 <img src="docs/media/exhibit.gif" alt="The exhibit, animated: the four beats of a governed run — graded work, a halted fault, a human gate, and a receipt chain verified cold" width="880">
