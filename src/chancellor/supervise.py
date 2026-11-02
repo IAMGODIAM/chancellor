@@ -398,6 +398,7 @@ class CheckpointSnapshot:
     head_hash: str | None
     created_at: int | None
     age_s: float
+    written_at: float | None = None  # sidecar write time, when known
 
 
 # -------------------------------------------------------------- config
@@ -485,6 +486,14 @@ class Supervisor:
         self._stall_open = False
         self._last_verified_size: int | None = None
         self._last_heartbeat = 0.0
+        self._cadence_advisory_emitted = False
+        self._cadence_checkpoint_seen = False
+        self._cadence_checkpoint_key: (
+            tuple[int, str | None, int | None, float | None] | None
+        ) = None
+        self._cadence_checkpoint_written_at: float | None = None
+        self._cadence_fresh_start = False
+        self._cadence_initial_launch = True
 
     # ------------------------------------------------------------ text
     def anchoring_disclosure(self) -> str:
@@ -500,6 +509,131 @@ class Supervisor:
             f"entries, age {age_s:.1f}s (stale threshold "
             f"{self.config.stale_threshold_s:.0f}s)"
         )
+
+    # -------------------------------------------------- cadence advice
+    def _snapshot_written_at(self, snap: CheckpointSnapshot, now: float) -> float:
+        """Best available write time for a checkpoint snapshot."""
+        if snap.written_at is not None:
+            return snap.written_at
+        if snap.created_at is not None and snap.created_at > 0:
+            return float(snap.created_at)
+        return now - snap.age_s
+
+    def _emit_cadence_advisory(
+        self,
+        *,
+        basis: str,
+        observed_s: float,
+        agent_log_size: int | None,
+    ) -> None:
+        """Receipt and print the once-per-watch cadence advisory.
+
+        Advisory only: this method records a diagnosis and its remedy.
+        It does not alter the stale threshold, gate a resume, escalate,
+        or change dead-versus-stalled discrimination.
+        """
+        if self._cadence_advisory_emitted:
+            return
+        self._cadence_advisory_emitted = True
+        threshold = self.config.stale_threshold_s
+        remedy = (
+            "set --cadence (SupervisorConfig.cadence_s) to the agent's "
+            "signed-checkpoint interval"
+        )
+        if basis == "fresh_start_no_checkpoint":
+            line = (
+                "[supervise] CADENCE ADVISORY — no signed checkpoint after "
+                f"{observed_s:.1f}s from a fresh start, reaching the stale "
+                f"threshold {threshold:.1f}s (cadence "
+                f"{self.config.cadence_s:.1f}s × missed {self.config.missed}). "
+                f"Advisory only: {remedy}; no resume, escalation, or "
+                "threshold changed."
+            )
+            observed_detail = {"observed_no_checkpoint_after_s": observed_s}
+        else:
+            line = (
+                "[supervise] CADENCE ADVISORY — observed signed-checkpoint "
+                f"interval {observed_s:.1f}s exceeds the stale threshold "
+                f"{threshold:.1f}s (cadence {self.config.cadence_s:.1f}s "
+                f"× missed {self.config.missed}). Advisory only: {remedy} "
+                f"(about {observed_s:.0f}s); no resume, escalation, or "
+                "threshold changed."
+            )
+            observed_detail = {"observed_checkpoint_interval_s": observed_s}
+        self._receipt(
+            "cadence advisory — checkpoint interval exceeds stale threshold",
+            event="cadence_advisory",
+            approved=True,
+            rationale=(
+                "The observed signed-checkpoint timing does not match "
+                "the configured supervision cadence. Advisory only: no "
+                "act was gated, no resume was blocked, and no escalation "
+                "was raised."
+            ),
+            detail={
+                "basis": basis,
+                **observed_detail,
+                "observed_s": observed_s,
+                "cadence_s": self.config.cadence_s,
+                "missed": self.config.missed,
+                "stale_threshold_s": threshold,
+                "agent_log_size": agent_log_size,
+                "remedy": remedy,
+                "advisory_only": True,
+            },
+        )
+        assert self._log is not None
+        self._log.checkpoint()
+        self._emit(line)
+
+    def _observe_cadence(self, snap: CheckpointSnapshot | None, now: float) -> None:
+        """Look for the two pre-registered cadence-mismatch symptoms.
+
+        (a) Two consecutive signed checkpoints are farther apart than
+        the stale threshold; or (b) a watch that began with no signed
+        checkpoint reaches the stale threshold still without one. The
+        checkpoint baseline and advisory latch survive relaunches in
+        the same supervisor run.
+        """
+        if self._cadence_advisory_emitted:
+            return
+        threshold = self.config.stale_threshold_s
+        if snap is None:
+            if self._cadence_fresh_start and not self._cadence_checkpoint_seen:
+                observed_s = now - self._agent_started_at
+                if observed_s >= threshold:
+                    self._emit_cadence_advisory(
+                        basis="fresh_start_no_checkpoint",
+                        observed_s=observed_s,
+                        agent_log_size=None,
+                    )
+            return
+
+        self._cadence_checkpoint_seen = True
+        written_at = self._snapshot_written_at(snap, now)
+        key = (snap.log_size, snap.head_hash, snap.created_at, written_at)
+        if key == self._cadence_checkpoint_key:
+            return
+        previous_written_at = self._cadence_checkpoint_written_at
+        self._cadence_checkpoint_key = key
+        self._cadence_checkpoint_written_at = written_at
+        if previous_written_at is None:
+            if self._cadence_fresh_start:
+                first_wait_s = written_at - self._agent_started_at
+                if first_wait_s >= threshold:
+                    self._emit_cadence_advisory(
+                        basis="fresh_start_no_checkpoint",
+                        observed_s=first_wait_s,
+                        agent_log_size=snap.log_size,
+                    )
+            return
+        observed_s = written_at - previous_written_at
+        if observed_s > threshold:
+            self._emit_cadence_advisory(
+                basis="consecutive_checkpoints",
+                observed_s=observed_s,
+                agent_log_size=snap.log_size,
+            )
 
     # ---------------------------------------------------------- record
     def _receipt(
@@ -571,6 +705,7 @@ class Supervisor:
             head_hash=payload.get("head_receipt_hash"),
             created_at=created_at if isinstance(created_at, int) else None,
             age_s=max(0.0, self._clock() - written_at),
+            written_at=written_at,
         )
 
     # ------------------------------------------------------ self-proof
@@ -629,12 +764,30 @@ class Supervisor:
 
     # ----------------------------------------------------------- launch
     def _launch(self) -> None:
+        if self._cadence_initial_launch:
+            # The fresh-start advisory case is defined by the state of
+            # the watch when this run first launches its agent: no
+            # signed checkpoint existed to inherit. Relaunches in the
+            # same run deliberately do not reset the advisory latch or
+            # this classification.
+            self._cadence_fresh_start = not self.agent_checkpoints.exists()
+            self._cadence_initial_launch = False
         self._child = self._launcher(self.config.agent_command)
         self._agent_started_at = self._clock()
         self._stall_open = False
 
     # -------------------------------------------------------------- run
     def run(self) -> int:
+        # The cadence advisory is latched per Supervisor.run() — one
+        # advisory in this watch, including across agent relaunches.
+        # A later supervisor run is a new watch and may advise again;
+        # the latch is not rebuilt from a prior run's supervision log.
+        self._cadence_advisory_emitted = False
+        self._cadence_checkpoint_seen = False
+        self._cadence_checkpoint_key = None
+        self._cadence_checkpoint_written_at = None
+        self._cadence_fresh_start = False
+        self._cadence_initial_launch = True
         refusal = self.self_proof()
         if refusal is not None:
             self._emit(f"[supervise] REFUSED: {refusal}")
@@ -724,6 +877,7 @@ class Supervisor:
             age = snap.age_s
         else:
             age = now - self._agent_started_at
+        self._observe_cadence(snap, now)
 
         if status is not None:
             if status == 0:
