@@ -12,7 +12,12 @@ What a chained entry carries beyond the plain audit fields:
   * ``seq``        — the entry's position in the log (0-based);
   * ``prev_hash``  — the previous entry's hash (the chain link);
   * ``entry_hash`` — sha256 over the canonical JSON of the entry body;
-  * ``schema``     — ``e5.decision_receipt.v1``;
+  * ``schema``     — ``e5.decision_receipt.v2`` for entries written
+    since the frame's adoption (v1 entries are the pre-frame legacy
+    form and verify under v1 rules);
+  * ``frame_id`` / ``frame_hash`` — the governing frame the entry was
+    decided under, cited by identifier and by the frame document's
+    sha256, inside the committed body (v2 entries; see FRAME below);
   * ``effect_axes``— AM-2 axes for the gated action (see EFFECT_AXES).
 
 A bare chain misses one attack — tail truncation: drop the last entries
@@ -49,13 +54,52 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
-SCHEMA = "e5.decision_receipt.v1"
+SCHEMA_V1 = "e5.decision_receipt.v1"
+SCHEMA = "e5.decision_receipt.v2"
 CHECKPOINT_SCHEMA = "e5.receipt_checkpoint.v1"
 CHECKPOINT_SCHEMA_V2 = "e5.receipt_checkpoint.v2"
 PAYLOAD_TYPE = "application/vnd.e5.decision-receipt.v1+json"
 CHECKPOINT_PAYLOAD_TYPE = "application/vnd.e5.receipt-checkpoint.v1+json"
 CHECKPOINT_PAYLOAD_TYPE_V2 = "application/vnd.e5.receipt-checkpoint.v2+json"
 TREE_RFC9162 = "rfc9162"
+
+# ------------------------------------------------------------- the frame
+# Frame-named receipts (Council M6, ADAPT — pattern after LaSalle/CAPPZ
+# PrinciplesChainlet invocation records; Thoth's placement adopted):
+# every NEW receipt and gate verdict names the governing frame it was
+# decided under — frame_id + frame_hash as fields of the entry body,
+# inside the hash-committed, checkpoint-sealed payload, never sidecar
+# metadata. A decision that cannot name its governing text is a quote
+# without a source; a verdict under frame v1 is never silently re-read
+# under v2.
+#
+# The frame document is docs/governance-frame.md. FRAME_HASH is the
+# sha256 over that document's exact bytes, and a test recomputes it —
+# amending the document without amending this registry fails the gate.
+# Amending the frame is a visible act: new version, new hash — and the
+# OLD pair stays in KNOWN_FRAMES forever (an appended act, never an
+# erasure), so receipts issued under a superseded frame still verify.
+FRAME_ID = "e5.chancellor_frame.v1"
+FRAME_HASH = "2c57e4e50af380eceb8c4256be71221fca1c1e2814e3d5e623b1a5a177458749"
+FRAME_DOCUMENT = "docs/governance-frame.md"
+
+KNOWN_FRAMES: dict[str, str] = {FRAME_ID: FRAME_HASH}
+
+
+def current_frame_fields() -> dict[str, str]:
+    """The frame citation stamped into every new receipt and verdict."""
+    return {"frame_id": FRAME_ID, "frame_hash": FRAME_HASH}
+
+
+def frame_known(frame_id: object, frame_hash: object) -> bool:
+    """True iff (frame_id, frame_hash) names a frame this build holds
+    in its registry — the verifier's side of the citation."""
+    return (
+        isinstance(frame_id, str)
+        and isinstance(frame_hash, str)
+        and KNOWN_FRAMES.get(frame_id) == frame_hash
+    )
+
 
 # --------------------------------------------------------------------- AM-2
 # Effect axes (Council AM-2): an action carries every axis it truly has;
