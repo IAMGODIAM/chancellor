@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chancellor — The Judging-Week Soak, Live</title><style>
+:root{--ink:#0a0a0e;--navy:#0b1f3a;--navy2:#10294d;--gold:#c9a84c;--champ:#ecd9a4;--deep:#8a6b1c;--ivory:#f5efe1}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--ink);color:var(--ivory);font-family:Georgia,'Times New Roman',serif;padding:56px 48px 48px}
+a{color:var(--champ);text-decoration:none;border-bottom:1px solid rgba(201,168,76,.45)}
+a:hover{color:var(--ivory)}
+.wrap{max-width:1180px;margin:0 auto}
+.kicker{font-size:12px;letter-spacing:.42em;color:var(--gold);text-transform:uppercase;text-align:center}
+.kicker .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--champ);margin-right:14px;vertical-align:1px;animation:beat 4s ease-in-out infinite}
+h1{font-size:44px;font-weight:normal;text-align:center;margin:14px 0 6px;color:var(--ivory)}
+.sub{text-align:center;font-style:italic;color:var(--champ);font-size:17px;margin-bottom:8px;line-height:1.55}
+.rule{height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:26px auto;width:82%}
+.prov{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.14em;color:var(--gold);text-transform:uppercase}
+.foot{margin-top:30px;text-align:center;line-height:1.9}
+.foot .prov{color:var(--deep)}
+.hero{text-align:center;margin:10px 0 2px}
+.hero .n{font-size:76px;line-height:1.05;color:var(--ivory);font-variant-numeric:tabular-nums}
+.hero .n .den{color:var(--gold);font-size:44px}
+.hero .l{font-size:12px;letter-spacing:.34em;color:var(--gold);text-transform:uppercase;margin-top:8px}
+.stats{display:flex;justify-content:center;gap:44px;flex-wrap:wrap;margin:22px 0 4px}
+.stat{text-align:center}
+.stat .n{font-size:40px;color:var(--champ);font-variant-numeric:tabular-nums}
+.stat .n.driftbad{color:#d64545}
+.stat .l{font-size:11px;letter-spacing:.3em;color:var(--gold);text-transform:uppercase;margin-top:4px}
+.river{margin-top:26px}
+.riverbar{display:flex;height:30px;border-radius:15px;overflow:hidden;border:1px solid rgba(201,168,76,.5)}
+.riverbar .c{background:linear-gradient(90deg,#8a6b1c,#c9a84c)}
+.riverbar .h{background:#10294d}
+.riverbar .r{background:#0a0a0e}
+.riverlab{display:flex;justify-content:space-between;margin-top:9px;gap:12px;flex-wrap:wrap}
+.cols{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;margin-top:34px}
+.col{background:linear-gradient(170deg,#0e2547,#0b1f3a 62%,#0a0a0e);border:1px solid rgba(201,168,76,.4);border-radius:32px 24px 34px 24px;padding:30px 24px 26px;text-align:center}
+.col.watch{border-color:rgba(236,217,164,.75);background:linear-gradient(170deg,#14305a,#0b1f3a 55%,#0a0a0e)}
+.col .dev{display:flex;justify-content:center;margin-bottom:14px}
+.col .rn{font-size:12px;letter-spacing:.4em;color:var(--deep)}
+.col h3{font-size:23px;font-weight:normal;margin:6px 0 4px}
+.col .what{font-style:italic;color:var(--champ);font-size:14.5px;min-height:42px;line-height:1.45}
+.col .fig{font-size:31px;color:var(--ivory);margin:14px 0 4px;line-height:1.15;font-variant-numeric:tabular-nums}
+.col.watch .fig{color:var(--champ)}
+.col.haltcol .fig{color:var(--gold)}
+.col .cap{font-family:ui-monospace,Menlo,monospace;font-size:10.8px;color:var(--gold);letter-spacing:.05em;line-height:1.55}
+.note{text-align:center;font-size:16px;line-height:1.6;max-width:820px;margin:24px auto 0}
+.watchring .star{transform-origin:60px 60px;animation:beat 4s ease-in-out infinite}
+@keyframes beat{0%,100%{opacity:1}50%{opacity:.45}}
+.verify{max-width:820px;margin:34px auto 0;background:linear-gradient(165deg,#0e2547,#0b1f3a 70%);border:1px solid rgba(201,168,76,.4);border-radius:24px 30px 24px 30px;padding:26px 30px 22px}
+.verify h2{font-size:22px;font-weight:normal;text-align:center;margin-bottom:8px}
+.verify p{font-size:15px;line-height:1.6;text-align:center}
+.verify pre{background:#0a0a0e;border:1px solid rgba(201,168,76,.35);border-radius:12px;padding:14px 16px;margin:16px 0 6px;overflow-x:auto;text-align:center}
+.verify code{font-family:ui-monospace,Menlo,monospace;font-size:13.5px;color:var(--champ)}
+.verify .links{text-align:center;font-size:14.5px;line-height:2;margin-top:10px}
+@media (max-width:980px){.cols{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:600px){body{padding:36px 20px 32px}.cols{grid-template-columns:1fr}h1{font-size:32px}.hero .n{font-size:52px}.hero .n .den{font-size:30px}}
+@media (prefers-reduced-motion: reduce){.kicker .dot,.watchring .star{animation:none}}
+</style></head><body><div class="wrap">
+<div class="kicker"><span class="dot"></span>Chancellor · The Judging-Week Soak · Live</div>
+<h1>The Long Watch</h1>
+<div class="sub">Eleven thousand five hundred twenty segments of governed work, run in the open<br>
+through judging week — every decision receipted, every halt published, and the watch<br>
+that keeps the run alive standing in frame.</div>
+<div class="rule"></div>
+<div class="hero">
+  <div class="n">892 <span class="den">/ 11,520</span></div>
+  <div class="l">segments done · the run advances one segment a minute</div>
+</div>
+<div class="stats">
+  <div class="stat"><div class="n">10,704</div><div class="l">steps executed</div></div>
+  <div class="stat"><div class="n">89 <span style="font-size:22px;color:var(--gold)">/ 1,152</span></div><div class="l">faults injected so far</div></div>
+  <div class="stat"><div class="n">0</div><div class="l">drift events</div></div>
+  <div class="stat"><div class="n">863</div><div class="l">chain entries under checkpoint</div></div>
+</div>
+<div class="river">
+  <div class="riverbar"><div class="c" style="width:92.26%"></div><div class="h" style="width:7.74%"></div></div>
+  <div class="riverlab">
+    <span class="prov">823 segments complete</span>
+    <span class="prov">69 halted — fail-closed, by design</span>
+  </div>
+  <div class="riverbar" style="margin-top:16px"><div class="c" style="width:7.74%"></div><div class="r" style="width:92.26%"></div></div>
+  <div class="riverlab">
+    <span class="prov">7.7% of the judging-week run</span>
+    <span class="prov">launched 2026-11-01 · runs through finals, 2026-11-09</span>
+  </div>
+</div>
+<div class="cols">
+  <div class="col">
+    <div class="dev"><svg width="120" height="120" viewBox="0 0 120 120" role="img">
+<path d="M22 34 L98 34 L88 22 L32 22 Z" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="30" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="55.5" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="81" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="24" y="92" width="72" height="7" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+</svg></div>
+    <div class="rn">I</div><h3>Graded Work</h3>
+    <div class="what">No agent marks its own homework.</div>
+    <div class="fig">10,704</div>
+    <div class="cap">steps of governed work executed, twelve to a segment — each graded at the gate before it was allowed to count, and each grade receipted in the chain</div>
+  </div>
+  <div class="col haltcol">
+    <div class="dev"><svg width="120" height="120" viewBox="0 0 120 120" role="img">
+<path d="M22 34 L98 34 L88 22 L32 22 Z" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="30" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="55.5" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="81" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="24" y="92" width="72" height="7" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+</svg></div>
+    <div class="rn">II</div><h3>Gated Authority</h3>
+    <div class="what">Consequential acts wait at the gate.</div>
+    <div class="fig">69</div>
+    <div class="cap">segments halted fail-closed, in gold because a halt is the product working: the gate refused work a fault had corrupted, counted the refusal in the open, and the run went on</div>
+  </div>
+  <div class="col">
+    <div class="dev"><svg width="120" height="120" viewBox="0 0 120 120" role="img">
+<path d="M22 34 L98 34 L88 22 L32 22 Z" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="30" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="55.5" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="81" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+<rect x="24" y="92" width="72" height="7" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
+</svg></div>
+    <div class="rn">III</div><h3>Kept Receipts</h3>
+    <div class="what">Every decision leaves a receipt you can verify offline.</div>
+    <div class="fig">863</div>
+    <div class="cap">audit entries under signed checkpoint in the published snapshot · 107 signed checkpoints · corrupted state files: 0 · verified cold at this refresh with the product's own verifier — the live log holds 863 entries; the tail past the newest checkpoint is not yet checkpointed, and the verifier says so rather than guessing</div>
+  </div>
+  <div class="col watch">
+    <div class="dev watchring"><svg width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="The watch ring">
+<circle cx="60" cy="60" r="52" fill="none" stroke="#ecd9a4" stroke-width="1.6"/>
+<circle cx="60" cy="60" r="41" fill="none" stroke="#c9a84c" stroke-width="1"/>
+<circle cx="60" cy="60" r="5.5" fill="#ecd9a4"/>
+<g class="star"><path d="M60 4 L63.5 15 L60 19 L56.5 15 Z" fill="#ecd9a4"/></g>
+<path d="M60 26 L60 52" stroke="#ecd9a4" stroke-width="2.4"/>
+<path d="M60 60 L76 70" stroke="#c9a84c" stroke-width="2.4"/>
+</svg></div>
+    <div class="rn">IV</div><h3>KEEP — The Watch</h3>
+    <div class="what">The supervisor that notices, verifies, and resumes.</div>
+    <div class="fig">7 interruptions · 7 resumes</div>
+    <div class="cap">1 deliberate proof kill · 6 supervision losses — every one resumed from the last signed checkpoint, the chain verified across the break · the run's own chain verifications stand 107/107 ok · the newest checkpoint was written 4 seconds before this refresh</div>
+  </div>
+</div>
+<p class="note">Drift is the one true failure this page exists to make visible — a run claiming
+success for work whose final state failed its check. The drift counter above is expected to
+read zero for the entire run; if it ever reads nonzero, that is the headline, and it will not
+be edited away. The counters on this page are refreshed mechanically from the soak's own state
+files, and the snapshot published beside the record lets any reader check every count.</p>
+<div class="verify">
+  <h2>Verify the chain yourself</h2>
+  <p>Download the snapshot pair — they must sit side by side — install the package from the
+  repository, and run the verifier the product ships. Offline, no credentials, no network.
+  Exit 0 means the chain is intact and the newest signed checkpoint checks out.</p>
+  <pre><code>python -m chancellor.verify_log audit-snapshot.jsonl</code></pre>
+  <div class="links">
+    <a href="https://raw.githubusercontent.com/IAMGODIAM/chancellor/judging-soak/audit-snapshot.jsonl">audit-snapshot.jsonl</a> · <a href="https://raw.githubusercontent.com/IAMGODIAM/chancellor/judging-soak/audit-snapshot.jsonl.checkpoints.jsonl">its checkpoint sidecar</a><br>
+    <a href="https://github.com/IAMGODIAM/chancellor/blob/judging-soak/LIVE-SOAK.md">the canonical text record — LIVE-SOAK.md</a> · <a href="https://github.com/IAMGODIAM/chancellor">the repository</a>
+  </div>
+</div>
+<div class="foot"><span class="prov">Refreshed hourly from the soak's own state · snapshot cut at the newest signed checkpoint and verified cold before publishing · status as of 2026-11-02 10:34 EST · figures are the soak's published snapshot, labeled as such</span></div>
+</div></body></html>
