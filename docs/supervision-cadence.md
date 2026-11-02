@@ -58,6 +58,7 @@ Set the cadence to the agent's real signed-checkpoint interval. For
 an agent that signs about every 505 seconds:
 
 ```bash
+# CHANCELLOR_SUPERVISE_KEY must hold your operator-supplied signing key
 chancellor supervise --cadence 505 --missed 3 -- <agent command...>
 ```
 

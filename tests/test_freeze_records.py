@@ -119,7 +119,7 @@ def test_freeze_entries_live_in_the_same_verified_chain(tmp_path):
     manifest = _manifest_entry(log)
     _test_run_entry(log, manifest["manifest_sha256"])
     log.checkpoint()
-    result = verify_log(path)
+    result = verify_log(path, accept_dev_signer=True)
     assert result.ok, result.failures
     assert result.chained_entries == 2
 
@@ -130,7 +130,7 @@ def test_resolve_happy_path(tmp_path):
     manifest = _manifest_entry(log)
     _test_run_entry(log, manifest["manifest_sha256"])
     log.checkpoint()
-    result = resolve_manifest(path, manifest["manifest_sha256"])
+    result = resolve_manifest(path, manifest["manifest_sha256"], accept_dev_signer=True)
     assert result.ok, result.failures
     assert result.manifest_entry["entry_hash"] == manifest["entry_hash"]
     assert len(result.test_runs) == 1
@@ -143,7 +143,7 @@ def test_resolve_manifest_without_test_run_fails_closed(tmp_path):
     log = AuditLog(path)
     manifest = _manifest_entry(log)
     log.checkpoint()
-    result = resolve_manifest(path, manifest["manifest_sha256"])
+    result = resolve_manifest(path, manifest["manifest_sha256"], accept_dev_signer=True)
     assert not result.ok
     assert any(f.startswith("manifest_without_test_run") for f in result.failures)
 
@@ -154,7 +154,7 @@ def test_resolve_unknown_manifest_fails_closed(tmp_path):
     manifest = _manifest_entry(log)
     _test_run_entry(log, manifest["manifest_sha256"])
     log.checkpoint()
-    result = resolve_manifest(path, "cd" * 32)
+    result = resolve_manifest(path, "cd" * 32, accept_dev_signer=True)
     assert not result.ok
     assert any(f.startswith("manifest_not_found") for f in result.failures)
 
@@ -165,7 +165,7 @@ def test_resolve_test_run_against_unknown_manifest_fails_closed(tmp_path):
     manifest = _manifest_entry(log)
     _test_run_entry(log, "ef" * 32)  # bound to a manifest never recorded
     log.checkpoint()
-    result = resolve_manifest(path, manifest["manifest_sha256"])
+    result = resolve_manifest(path, manifest["manifest_sha256"], accept_dev_signer=True)
     assert not result.ok
     assert any(f.startswith("test_run_unknown_manifest") for f in result.failures)
 
@@ -176,7 +176,7 @@ def test_resolve_checkpoint_not_covering_fails_closed(tmp_path):
     manifest = _manifest_entry(log)
     log.checkpoint()  # seals seq 0 only
     _test_run_entry(log, manifest["manifest_sha256"])  # lands after the seal
-    result = resolve_manifest(path, manifest["manifest_sha256"])
+    result = resolve_manifest(path, manifest["manifest_sha256"], accept_dev_signer=True)
     assert not result.ok
     assert any(f.startswith("checkpoint_not_covering") for f in result.failures)
     assert result.checkpoint is None
@@ -187,7 +187,7 @@ def test_resolve_no_checkpoint_fails_closed(tmp_path):
     log = AuditLog(path)
     manifest = _manifest_entry(log)
     _test_run_entry(log, manifest["manifest_sha256"])
-    result = resolve_manifest(path, manifest["manifest_sha256"])
+    result = resolve_manifest(path, manifest["manifest_sha256"], accept_dev_signer=True)
     assert not result.ok
     assert any(f.startswith("no_checkpoint") for f in result.failures)
 
@@ -201,7 +201,7 @@ def test_resolve_tampered_chain_fails_closed(tmp_path):
     rows = log.read_all()
     rows[1]["passed"] = 999  # rewrite the recorded result after the fact
     path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
-    result = resolve_manifest(path, manifest["manifest_sha256"])
+    result = resolve_manifest(path, manifest["manifest_sha256"], accept_dev_signer=True)
     assert not result.ok
     assert any(f.startswith("entry_hash_mismatch") for f in result.failures)
 
@@ -212,9 +212,14 @@ def test_resolve_cli_exit_codes(tmp_path, capsys):
     manifest = _manifest_entry(log)
     _test_run_entry(log, manifest["manifest_sha256"])
     log.checkpoint()
-    assert verify_main(["resolve", str(path), manifest["manifest_sha256"]]) == 0
+    assert (
+        verify_main(
+            ["resolve", str(path), manifest["manifest_sha256"], "--accept-dev-signer"]
+        )
+        == 0
+    )
     out = capsys.readouterr().out
     assert "RESOLVED" in out and "test_run:" in out and "sealed_by:" in out
-    assert verify_main(["resolve", str(path), "cd" * 32]) == 1
+    assert verify_main(["resolve", str(path), "cd" * 32, "--accept-dev-signer"]) == 1
     assert "NOT RESOLVED" in capsys.readouterr().out
     assert verify_main(["resolve", str(tmp_path / "missing.jsonl"), "ab" * 32]) == 2

@@ -5,8 +5,14 @@ For each ready node, in dependency order:
   2. the instrument panel checks the artifact — any failure (including an
      instrument error or a check that never answers) rejects it and
      HALTS the run, fail-closed
-  3. if the artifact requests a gated action, the Gatekeeper decides —
-     a denial blocks the node and halts the run for a human
+  3. the Gatekeeper decides the node's action — classified from the
+     policy table, never from the worker's say-so alone; a denial, an
+     unclassifiable action, or a missing action (unless the graph
+     declares the node inert) blocks the node and halts the run for a
+     human. Every node leaves a receipt, including "no action declared"
+     and failure before the gate. With a ToolBroker attached, a final
+     reconcile step halts on any mismatch between what was approved and
+     what ran
   4. the artifact is graded against the rubric — grading is not opt-in:
      a node either requires scores or declares itself ungraded on the
      graph; a scores-less artifact on a graded node halts the run.
@@ -34,14 +40,23 @@ test-only paths use them), and a scores-less artifact still halts.
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import cast
 
-from .escalation import ActionClass, EscalationRequest, Gatekeeper
+from .escalation import (
+    REFUSAL_NODE_FAILED,
+    REFUSAL_RECONCILE_MISMATCH,
+    REFUSAL_UNCLASSIFIED,
+    ActionClass,
+    EscalationRequest,
+    Gatekeeper,
+)
 from .grader import Rubric, grade
 from .instruments import InstrumentPanel
+from .interception import ToolBroker
 from .task_graph import AttemptCapError, NodeStatus, TaskGraph, TaskNode
 
 # A worker maps a node -> artifact dict.
@@ -78,6 +93,7 @@ class CrewRunner:
         gatekeeper: Gatekeeper | None = None,
         state_path: str | Path | None = None,
         score_provider: Callable | None = None,
+        broker: ToolBroker | None = None,
     ):
         """The low-level constructor. Every governance layer is optional
         here, which makes this the TEST-ONLY path — production code must
@@ -93,7 +109,10 @@ class CrewRunner:
         self.gatekeeper = gatekeeper
         self.state_path = Path(state_path) if state_path else None
         self.score_provider = score_provider
+        self.broker = broker
         self.is_governed = False
+        self._attempt_receipted = False
+        self._broker_mark = 0
 
     @classmethod
     def governed(
@@ -106,6 +125,7 @@ class CrewRunner:
         gatekeeper: Gatekeeper,
         state_path: str | Path | None = None,
         score_provider: Callable | None = None,
+        broker: ToolBroker | None = None,
     ) -> CrewRunner:
         """The production constructor. All three governance layers are
         required, and the panel must be non-empty — a governed runner
@@ -130,6 +150,7 @@ class CrewRunner:
             gatekeeper=gatekeeper,
             state_path=state_path,
             score_provider=score_provider,
+            broker=broker,
         )
         runner.is_governed = True
         return runner
@@ -151,7 +172,30 @@ class CrewRunner:
         if self.state_path is not None:
             self.graph.save(self.state_path)
 
-    def _fail_node(self, node: TaskNode, report: RunReport, reason: str) -> bool:
+    def _fail_node(
+        self,
+        node: TaskNode,
+        report: RunReport,
+        reason: str,
+        *,
+        refusal_state: str = REFUSAL_NODE_FAILED,
+        force_receipt: bool = False,
+    ) -> bool:
+        # Every node attempt leaves a receipt; one that fails before its
+        # gate gets a denial receipt naming why.
+        if self.gatekeeper is not None and (
+            force_receipt or not self._attempt_receipted
+        ):
+            # The node is failing anyway; the halt stands if the write fails.
+            with contextlib.suppress(Exception):
+                self.gatekeeper.note(
+                    node_id=node.id,
+                    action=f"node {node.id}",
+                    approved=False,
+                    rationale=reason,
+                    refusal_state=refusal_state,
+                )
+            self._attempt_receipted = True
         self.graph.fail(node.id, reason)
         report.failed.append(node.id)
         report.halted = True
@@ -201,23 +245,21 @@ class CrewRunner:
 
     def _coerce_request(self, node: TaskNode, raw: object) -> EscalationRequest:
         """Coerce an artifact's action into an EscalationRequest at the
-        gate boundary. Action classes arrive as enum members or as
-        strings (model output drifts in case and whitespace); a string
-        is coerced through the enum and validated — a case-drifted
-        "SPEND" must reach the human gate, never slip past it, and an
-        unknown class is malformed. Raises ValueError on anything
-        malformed; the caller turns that into a halt, never a crash."""
+        gate boundary. The declared class is passed through untouched —
+        the Gatekeeper's policy table decides the class, and a declared
+        class it cannot read is denied there, with a receipt. The node id
+        is always the runner's, never the worker's. Raises ValueError on
+        a malformed request; the caller turns that into a halt."""
         if isinstance(raw, EscalationRequest):
-            req = raw
-            if req.node_id is None:
-                req.node_id = node.id
-            if not isinstance(req.action_class, ActionClass):
-                req.action_class = self._coerce_class(req.action_class)
-            return req
+            return replace(raw, node_id=node.id)
         if isinstance(raw, dict):
             data = dict(raw)
-            if "action_class" in data:
-                data["action_class"] = self._coerce_class(data["action_class"])
+            data.pop("node_id", None)
+            if "effects" in data:
+                effects = data["effects"]
+                data["effects"] = (
+                    (effects,) if isinstance(effects, str) else tuple(effects or ())
+                )
             try:
                 return EscalationRequest(node_id=node.id, **data)
             except TypeError as exc:
@@ -227,17 +269,86 @@ class CrewRunner:
             f"EscalationRequest, got {type(raw).__name__}"
         )
 
-    @staticmethod
-    def _coerce_class(value: object) -> ActionClass:
-        if isinstance(value, ActionClass):
-            return value
-        if isinstance(value, str):
-            try:
-                return ActionClass(value.strip().lower())
-            except ValueError:
-                raise ValueError(f"unknown action_class: {value!r}") from None
-        raise ValueError(
-            f"action_class must be an ActionClass or string, got {type(value).__name__}"
+    def _receipted(self) -> None:
+        self._attempt_receipted = True
+
+    def _gate(
+        self, node: TaskNode, artifact: object, report: RunReport
+    ) -> tuple[bool, EscalationRequest | None, EscalationRequest | None]:
+        """The node's gate. Returns (proceed, decided request, declared
+        request). Every path leaves a receipt: an action decision, "no
+        action declared", or a denial naming why."""
+        gatekeeper = self.gatekeeper
+        assert gatekeeper is not None
+        if not (isinstance(artifact, dict) and "action" in artifact):
+            if node.inert or self._brokered_calls(node):
+                gatekeeper.note(
+                    node_id=node.id,
+                    action=f"node {node.id}: no action declared",
+                    approved=True,
+                    rationale="no action declared — node declared inert by the "
+                    "graph, or its actions went through the broker",
+                )
+                self._receipted()
+                return True, None, None
+            gatekeeper.note(
+                node_id=node.id,
+                action=f"node {node.id}: no action declared",
+                approved=False,
+                rationale="no action declared and the node is not declared inert "
+                "— denied (fail-closed)",
+                refusal_state=REFUSAL_UNCLASSIFIED,
+            )
+            self._receipted()
+            self.graph.block(node.id, "gate denied: no action declared")
+            report.blocked.append(node.id)
+            report.halted = True
+            report.halt_reason = (
+                f"node {node.id}: gate denied (no action declared, fail-closed)"
+            )
+            self._persist()
+            return False, None, None
+        try:
+            declared = self._coerce_request(node, artifact["action"])
+        except ValueError as exc:
+            self._fail_node(node, report, str(exc), refusal_state=REFUSAL_UNCLASSIFIED)
+            return False, None, None
+        if self.broker is not None and self.broker.has_tool(declared.tool):
+            # A brokered tool was already checked, per call, before it
+            # ran; the reconcile step compares the claim to the ledger.
+            self._receipted()
+            return True, declared, declared
+        try:
+            decision = gatekeeper.authorize(declared)
+        except Exception as exc:
+            # FAIL-CLOSED: a gatekeeper that raises has not approved
+            # anything. The node blocks for a human; the run halts.
+            self._receipted()
+            self.graph.block(
+                node.id,
+                f"gatekeeper error — denied (fail-closed): {type(exc).__name__}: {exc}",
+            )
+            report.blocked.append(node.id)
+            report.halted = True
+            report.halt_reason = (
+                f"node {node.id}: gatekeeper error — denied (fail-closed): {exc}"
+            )
+            self._persist()
+            return False, None, declared
+        self._receipted()
+        if not decision.approved:
+            self.graph.block(node.id, f"gate denied: {decision.rationale}")
+            report.blocked.append(node.id)
+            report.halted = True
+            report.halt_reason = f"node {node.id}: gate denied ({decision.rationale})"
+            self._persist()
+            return False, decision.request, declared
+        return True, decision.request, declared
+
+    def _brokered_calls(self, node: TaskNode) -> bool:
+        broker = self.broker
+        return broker is not None and any(
+            r.node_id == node.id for r in broker.ledger[self._broker_mark :]
         )
 
     # -- one node -------------------------------------------------------------
@@ -247,6 +358,8 @@ class CrewRunner:
     # across handlers; each branch is a governance outcome.
     def _run_node(self, node: TaskNode, report: RunReport) -> bool:
         """Returns False when the run must halt."""
+        self._attempt_receipted = False
+        self._broker_mark = self.broker.mark() if self.broker is not None else 0
         try:
             self.graph.start(node.id)
         except AttemptCapError as exc:
@@ -269,44 +382,23 @@ class CrewRunner:
                     node, report, f"instrument failure: {panel_result.halt_reason}"
                 )
 
-        # Escalation gate — a denied gate blocks the node and halts the run.
-        if (
-            self.gatekeeper is not None
-            and isinstance(artifact, dict)
-            and "action" in artifact
-        ):
-            try:
-                req = self._coerce_request(node, artifact["action"])
-            except ValueError as exc:
-                return self._fail_node(node, report, str(exc))
-            try:
-                decision = self.gatekeeper.authorize(req)
-            except Exception as exc:
-                # FAIL-CLOSED: a gatekeeper that raises has not approved
-                # anything. The node blocks for a human; the run halts.
-                # (The Gatekeeper's own audit write is Lane 2's surface;
-                # the denial is receipted here in the persisted state.)
-                self.graph.block(
-                    node.id,
-                    f"gatekeeper error — denied (fail-closed): "
-                    f"{type(exc).__name__}: {exc}",
-                )
-                report.blocked.append(node.id)
-                report.halted = True
-                report.halt_reason = (
-                    f"node {node.id}: gatekeeper error — denied (fail-closed): {exc}"
-                )
-                self._persist()
+        # Escalation gate — every node is decided and receipted; a denied
+        # or unclassifiable gate blocks the node and halts the run.
+        decided: EscalationRequest | None = None
+        if self.gatekeeper is not None:
+            proceed, decided, declared = self._gate(node, artifact, report)
+            if not proceed:
                 return False
-            if not decision.approved:
-                self.graph.block(node.id, f"gate denied: {decision.rationale}")
-                report.blocked.append(node.id)
-                report.halted = True
-                report.halt_reason = (
-                    f"node {node.id}: gate denied ({decision.rationale})"
-                )
-                self._persist()
-                return False
+            if self.broker is not None:
+                mismatches = self.broker.reconcile(node.id, self._broker_mark, declared)
+                if mismatches:
+                    return self._fail_node(
+                        node,
+                        report,
+                        "reconcile mismatch — halted: " + "; ".join(mismatches),
+                        refusal_state=REFUSAL_RECONCILE_MISMATCH,
+                        force_receipt=True,
+                    )
 
         # Grading — not opt-in. With a rubric set, a node either
         # requires scores or has declared itself ungraded on the graph.
@@ -371,11 +463,13 @@ class CrewRunner:
         if isinstance(artifact, dict) and isinstance(
             artifact.get("action"), EscalationRequest
         ):
-            a = artifact["action"]
+            a = decided if decided is not None else artifact["action"]
             stored = dict(artifact)
             stored["action"] = {
                 "action": a.action,
-                "action_class": a.action_class.value,
+                "action_class": a.action_class.value
+                if isinstance(a.action_class, ActionClass)
+                else a.action_class,
                 "detail": a.detail,
                 "cost_usd": a.cost_usd,
                 "gate": "decided — see audit log",

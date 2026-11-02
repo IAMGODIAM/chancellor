@@ -20,12 +20,13 @@ credentials, no network beyond the install itself.
 pip install chancellor
 
 # from the folder holding the two files (or point at the path directly):
-python -m chancellor.verify_log audit-log.jsonl
+python -m chancellor.verify_log audit-log.jsonl --accept-dev-signer
 ```
 
 Expected output:
 
 ```
+SIGNER: dev-hmac (public) — tamper-evidence only
 entries: 5 (chained: 5), checkpoints: 1
 VERIFIED: chain intact, newest checkpoint consistent
 ```
@@ -42,8 +43,12 @@ Inside a clone of this repository the same check is one line from the
 repo root:
 
 ```bash
-python -m chancellor.verify_log docs/evidence/sample/audit-log.jsonl
+python -m chancellor.verify_log docs/evidence/sample/audit-log.jsonl --accept-dev-signer
 ```
+
+The `--accept-dev-signer` flag acknowledges that the checkpoint is
+signed with the development signer: without it the verifier labels the
+signer and exits non-zero.
 
 The checkpoint is signed with the development signer whose key ships in
 the source — deliberately public, and labeled in the code where it sits:

@@ -143,7 +143,14 @@ def test_gate_actions_never_auto(tmp_path):
         ActionClass.IRREVERSIBLE,
         ActionClass.CREDENTIAL,
     }
+    tools = {
+        ActionClass.READ: "read_file",
+        ActionClass.DRAFT: "draft_text",
+        ActionClass.COMPUTE: "compute",
+    }
     for cls in ActionClass:
+        if cls in (ActionClass.NONE, ActionClass.UNCLASSIFIED):
+            continue  # internal classes, never a worker declaration
         log = AuditLog(tmp_path / f"audit-{cls.value}.jsonl")
         g = TaskGraph("t")
         g.task("one", "One", worker="w")
@@ -152,6 +159,8 @@ def test_gate_actions_never_auto(tmp_path):
             "action_class": cls.value,
             "cost_usd": 1.0,
         }
+        if cls in tools:
+            action["tool"] = tools[cls]
         runner = CrewRunner(
             g, {"w": _gated_worker(action)}, gatekeeper=Gatekeeper(audit_log=log)
         )
@@ -180,7 +189,7 @@ def test_gate_class_string_coerced_and_validated():
     # An auto class as a raw string coerces and passes by policy.
     g = TaskGraph("t")
     g.task("one", "One", worker="w")
-    action = {"action": "compute", "action_class": "compute"}
+    action = {"action": "compute", "action_class": "compute", "tool": "compute"}
     report = CrewRunner(g, {"w": _gated_worker(action)}, gatekeeper=Gatekeeper()).run()
     assert report.completed == ["one"]
 
@@ -199,7 +208,7 @@ def test_malformed_gate_requests_halt_never_crash():
         g.task("one", "One", worker="w")
         report = CrewRunner(g, {"w": _gated_worker(bad)}, gatekeeper=Gatekeeper()).run()
         assert report.halted and report.completed == [], bad
-        assert report.failed == ["one"], bad
+        assert report.failed == ["one"] or report.blocked == ["one"], bad
 
 
 def test_approver_that_raises_is_a_denial_not_a_crash(tmp_path):

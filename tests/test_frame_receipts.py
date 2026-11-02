@@ -96,7 +96,7 @@ def test_untampered_frame_era_log_verifies(tmp_path):
     path = tmp_path / "audit.jsonl"
     log = _seed_log(path)
     log.checkpoint()
-    result = verify_log(path)
+    result = verify_log(path, accept_dev_signer=True)
     assert result.ok, result.failures
 
 
@@ -107,7 +107,7 @@ def test_frame_id_altered_fails_verification(tmp_path):
     rows = log.read_all()
     rows[1]["frame_id"] = "e5.chancellor_frame.v99"
     _rewrite(path, rows)
-    result = verify_log(path)
+    result = verify_log(path, accept_dev_signer=True)
     assert not result.ok
     assert any(f.startswith("frame_mismatch") for f in result.failures)
     assert any(f.startswith("entry_hash_mismatch") for f in result.failures)
@@ -120,7 +120,7 @@ def test_frame_hash_altered_fails_verification(tmp_path):
     rows = log.read_all()
     rows[0]["frame_hash"] = "0" * 64
     _rewrite(path, rows)
-    result = verify_log(path)
+    result = verify_log(path, accept_dev_signer=True)
     assert not result.ok
     assert any(f.startswith("frame_mismatch") for f in result.failures)
 
@@ -133,7 +133,7 @@ def test_frame_fields_stripped_refused_with_named_reason(tmp_path):
     del rows[2]["frame_id"]
     del rows[2]["frame_hash"]
     _rewrite(path, rows)
-    result = verify_log(path)
+    result = verify_log(path, accept_dev_signer=True)
     assert not result.ok
     assert any(f.startswith("frame_fields_missing") for f in result.failures)
 
@@ -151,7 +151,7 @@ def test_refusal_receipt_no_approver_attached(tmp_path):
     assert entry["frame_id"] == receipts.FRAME_ID
     assert entry["frame_hash"] == receipts.FRAME_HASH
     log.checkpoint()
-    result = verify_log(path)
+    result = verify_log(path, accept_dev_signer=True)
     assert result.ok, result.failures  # a refusal verifies like any record
 
 
@@ -186,7 +186,7 @@ def test_refusal_receipt_approver_error_fail_closed(tmp_path):
 
 def test_pre_frame_sample_evidence_verifies_unchanged():
     sample = REPO_ROOT / "docs" / "evidence" / "sample" / "audit-log.jsonl"
-    result = verify_log(sample)
+    result = verify_log(sample, accept_dev_signer=True)
     assert result.ok, result.failures
     rows = [
         json.loads(line) for line in sample.read_text().splitlines() if line.strip()

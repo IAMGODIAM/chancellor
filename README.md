@@ -25,8 +25,9 @@ pip install chancellor
 
 chancellor demo                # the exhibit, offline — graded work, a halted
                                # fault, a human gate, a verified receipt
-python -m chancellor.verify_log .chancellor-exhibit/audit-log.jsonl
+python -m chancellor.verify_log .chancellor-exhibit/audit-log.jsonl --accept-dev-signer
                                # the demo's own receipt book, verified cold
+                               # (dev-signed: tamper-evidence only)
 ```
 
 - **The evidence:** [docs/evidence/run-7/](docs/evidence/run-7/) — the 10x record (RUN-7) with its bounds printed, verified by an independent recount; the first measurement (RUN-5) stands at [docs/evidence/run-5/](docs/evidence/run-5/); a two-file sample you can verify in isolation lives in [docs/evidence/sample/](docs/evidence/sample/).
@@ -113,8 +114,11 @@ The exhibit writes its state to `./.chancellor-exhibit` in the current directory
 ## Supervise a long-running agent
 
 ```bash
+export CHANCELLOR_SUPERVISE_KEY=<your signing key>   # operator-supplied
 chancellor supervise -- <agent command...>
 ```
+
+`supervise` needs a signing key that you supply, from `CHANCELLOR_SUPERVISE_KEY` or `--signing-key`. Chancellor does not generate or ship one; without a key the command refuses to run (usage error, exit 2).
 
 `--cadence` is the agent's **signed-checkpoint interval in seconds**, not its work or segment rate; the stale threshold is `--cadence × --missed` (default 60 × 3 = 180 seconds). If a healthy agent repeatedly draws `stall_anomaly` receipts, match `--cadence` to the interval between its signed checkpoints. The supervisor emits one advisory-only `cadence_advisory` when observed checkpoint timing makes that mismatch likely. Full guidance, including the RUN-9 field case: [docs/supervision-cadence.md](docs/supervision-cadence.md).
 
@@ -133,10 +137,14 @@ The demo is the exhibit — `chancellor demo` (Quickstart above) runs the hearin
 Every governed run writes a hash-chained audit log with signed checkpoints. Verify one offline — no credentials, no network:
 
 ```bash
-python -m chancellor.verify_log .chancellor/audit-log.jsonl
+python -m chancellor.verify_log .chancellor/audit-log.jsonl --accept-dev-signer
 ```
 
+The verifier prints `SIGNER: dev-hmac (public) — tamper-evidence only` whenever it sees the built-in dev key, and exits non-zero on a dev-signed log unless `--accept-dev-signer` is passed — the flag is your acknowledgement of what that signature does and does not prove.
+
 Exit 0 means the chain is intact and the newest signed checkpoint checks out. Exit 1 names the failure — a mid-log edit, a reordering, a truncated tail, a forged checkpoint. A log with no checkpoint is never reported as verified: tail truncation is undetectable without one, and the verifier says so rather than guessing. The checkpoints are signed with the development signer whose key ships in the source — deliberately public, and labeled in the code where it sits: those signatures prove the chain is internally consistent and unaltered since signing (tamper-evidence), not who signed it (non-repudiation). Separating the signer — a production key held apart from the code — is the named hardening step before any deployment that needs attribution.
+
+Two further notes on what the checks cover. The payload-integrity check verifies a stamp that an upstream tool attached; it cannot create one, so a tool payload that carries a value but no stamp is rejected rather than passed. And the action class of a gated step comes from a policy table keyed by tool and effect — a worker's own declaration can only make the result stricter, and anything the table cannot classify is denied.
 
 A ready-made pair to try it on — one exhibit run's log and its signed checkpoint, with the exact commands — lives in [docs/evidence/sample/](docs/evidence/sample/).
 

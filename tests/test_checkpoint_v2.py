@@ -94,7 +94,7 @@ def test_v2_checkpoint_roundtrip_verifies(tmp_path):
     assert payload["head_receipt_hash"] == log.read_all()[-1]["entry_hash"]
     assert receipts.checkpoint_signature_valid(envelope, log.signer)
 
-    result = verify_log(path)
+    result = verify_log(path, accept_dev_signer=True)
     assert result.ok, result.failures
     assert result.chained_entries == 5 and result.checkpoints == 1
 
@@ -105,7 +105,7 @@ def test_v2_checkpoint_detects_tail_truncation(tmp_path):
     log.checkpoint_v2()
     rows = log.read_all()[:3]
     path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
-    result = verify_log(path)
+    result = verify_log(path, accept_dev_signer=True)
     assert not result.ok
     assert any(f.startswith("tail_truncation") for f in result.failures)
 
@@ -117,7 +117,7 @@ def test_mixed_sidecar_newest_checkpoint_rules(tmp_path):
     log = _seed_log(path, n=3)
     log.checkpoint()  # v1
     log.checkpoint_v2()  # v2, newest
-    result = verify_log(path)
+    result = verify_log(path, accept_dev_signer=True)
     assert result.ok, result.failures
     assert result.checkpoints == 2
 
@@ -131,12 +131,12 @@ def test_holder_proof_round_trip_without_log(tmp_path):
     cp_path = receipts.default_checkpoint_path(path)
     for idx in range(5):
         proof = receipts.rfc9162_proof(leaves, idx)
-        result = verify_holder_proof(cp_path, proof)
+        result = verify_holder_proof(cp_path, proof, accept_dev_signer=True)
         assert result.ok, (idx, result.failures)
     # the log file itself is never consulted: delete it and re-verify
     path.unlink()
     proof = receipts.rfc9162_proof(leaves, 2)
-    assert verify_holder_proof(cp_path, proof).ok
+    assert verify_holder_proof(cp_path, proof, accept_dev_signer=True).ok
 
 
 def test_holder_proof_count_mismatch_is_refused(tmp_path):
@@ -146,7 +146,9 @@ def test_holder_proof_count_mismatch_is_refused(tmp_path):
     leaves = [e["entry_hash"] for e in log.read_all()]
     proof = receipts.rfc9162_proof(leaves, 1)
     proof["tree_size"] = 4  # claim a larger tree than the checkpoint's
-    result = verify_holder_proof(receipts.default_checkpoint_path(path), proof)
+    result = verify_holder_proof(
+        receipts.default_checkpoint_path(path), proof, accept_dev_signer=True
+    )
     assert not result.ok
     assert any(f.startswith("proof_count_mismatch") for f in result.failures)
 
@@ -159,11 +161,11 @@ def test_holder_proof_tampering_fails(tmp_path):
     cp_path = receipts.default_checkpoint_path(path)
     proof = receipts.rfc9162_proof(leaves, 2)
     forged_leaf = dict(proof, leaf_hash=_leaf(777))
-    assert not verify_holder_proof(cp_path, forged_leaf).ok
+    assert not verify_holder_proof(cp_path, forged_leaf, accept_dev_signer=True).ok
     swapped = dict(proof, index=3)
-    assert not verify_holder_proof(cp_path, swapped).ok
+    assert not verify_holder_proof(cp_path, swapped, accept_dev_signer=True).ok
     bad_path = dict(proof, path=[_leaf(888)] + proof["path"][1:])
-    result = verify_holder_proof(cp_path, bad_path)
+    result = verify_holder_proof(cp_path, bad_path, accept_dev_signer=True)
     assert not result.ok
     assert any("inclusion_proof_invalid" in f for f in result.failures)
 
@@ -174,7 +176,9 @@ def test_holder_proof_rejects_v1_checkpoint(tmp_path):
     log.checkpoint()  # v1 only
     leaves = [e["entry_hash"] for e in log.read_all()]
     proof = receipts.rfc9162_proof(leaves, 0)
-    result = verify_holder_proof(receipts.default_checkpoint_path(path), proof)
+    result = verify_holder_proof(
+        receipts.default_checkpoint_path(path), proof, accept_dev_signer=True
+    )
     assert not result.ok
     assert any(f.startswith("checkpoint_schema") for f in result.failures)
 
@@ -186,10 +190,14 @@ def test_holder_proof_cli(tmp_path, capsys):
     leaves = [e["entry_hash"] for e in log.read_all()]
     proof_path = tmp_path / "proof.json"
     proof_path.write_text(json.dumps(receipts.rfc9162_proof(leaves, 1)))
-    assert verify_main([str(path), "--proof", str(proof_path)]) == 0
+    assert (
+        verify_main([str(path), "--proof", str(proof_path), "--accept-dev-signer"]) == 0
+    )
     assert "VERIFIED" in capsys.readouterr().out
     bad = receipts.rfc9162_proof(leaves, 1)
     bad["tree_size"] = 9
     proof_path.write_text(json.dumps(bad))
-    assert verify_main([str(path), "--proof", str(proof_path)]) == 1
+    assert (
+        verify_main([str(path), "--proof", str(proof_path), "--accept-dev-signer"]) == 1
+    )
     assert "proof_count_mismatch" in capsys.readouterr().out
