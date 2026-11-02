@@ -128,7 +128,7 @@ def _supervisor(
     emitted: list[str] | None = None,
     **overrides,
 ) -> Supervisor:
-    return Supervisor(
+    return Supervisor.with_dev_signer(
         _config(tmp_path, **overrides),
         clock=clock or (lambda: 1_000.0),
         sleeper=lambda _s: None,
@@ -326,7 +326,7 @@ def test_rebuild_supervision_state_survives_restart():
 # --------------------------------------------------------- self-proof
 def test_self_proof_refuses_unlaunchable_command(tmp_path):
     launcher = _FakeLauncher([])
-    supervisor = Supervisor(
+    supervisor = Supervisor.with_dev_signer(
         SupervisorConfig(
             agent_command=["/nonexistent/chancellor-test-binary"],
             state_dir=tmp_path,
@@ -349,7 +349,7 @@ def test_self_proof_refuses_corrupt_supervision_log(tmp_path):
     lines[0] = lines[0].replace('"segment"', '"segmenX"').replace('"x"', '"y"')
     log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     emitted: list[str] = []
-    supervisor = Supervisor(
+    supervisor = Supervisor.with_dev_signer(
         _config(tmp_path),
         launcher=_FakeLauncher([]),
         emit=emitted.append,

@@ -26,6 +26,14 @@ and a gatekeeper. The plain constructor and CrewRunner.ungoverned(...)
 are the test-only path — Suite B's ungoverned arm uses them deliberately,
 and the RunReport of an ungoverned runner says so.
 
+Tool access (broker): with a ToolBroker attached, a worker that needs
+tools is registered with brokered_worker() and receives a per-node
+NodeTools handle — the only way it reaches a registered tool, and every
+call through it is checked before the tool runs. The handle is revoked
+when the worker returns. A worker that holds a raw tool handle of its own
+is outside what the runner can see; reconcile halts a node whose
+declared tool never went through the broker.
+
 A worker that raises halts the run. A gatekeeper that raises is a DENY.
 A malformed gate request halts the run — it never crashes out of it.
 In Chancellor, surprises stop work; they never flow downstream.
@@ -41,7 +49,7 @@ test-only paths use them), and a scores-less artifact still halts.
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import cast
@@ -56,11 +64,31 @@ from .escalation import (
 )
 from .grader import Rubric, grade
 from .instruments import InstrumentPanel
-from .interception import ToolBroker
+from .interception import NodeTools, ToolBroker
 from .task_graph import AttemptCapError, NodeStatus, TaskGraph, TaskNode
 
 # A worker maps a node -> artifact dict.
 Worker = Callable[[TaskNode], dict]
+# A worker that needs tools maps (node, NodeTools) -> artifact dict. It is
+# wrapped with brokered_worker() so the runner knows to pass the handle.
+BrokeredFn = Callable[[TaskNode, NodeTools], dict]
+
+
+@dataclass(frozen=True)
+class BrokeredWorker:
+    """A worker that receives its tools only as a per-node NodeTools
+    handle from the runner's broker."""
+
+    fn: BrokeredFn
+
+    def __call__(self, node: TaskNode, tools: NodeTools) -> dict:
+        return self.fn(node, tools)
+
+
+def brokered_worker(fn: BrokeredFn) -> BrokeredWorker:
+    """Mark ``fn(node, tools)`` as a worker that takes broker-mediated
+    tool access. Usable as a decorator."""
+    return BrokeredWorker(fn)
 
 
 @dataclass
@@ -87,7 +115,7 @@ class CrewRunner:
     def __init__(
         self,
         graph: TaskGraph,
-        workers: dict[str, Worker],
+        workers: Mapping[str, Worker | BrokeredWorker],
         panel: InstrumentPanel | None = None,
         rubric: Rubric | None = None,
         gatekeeper: Gatekeeper | None = None,
@@ -118,7 +146,7 @@ class CrewRunner:
     def governed(
         cls,
         graph: TaskGraph,
-        workers: dict[str, Worker],
+        workers: Mapping[str, Worker | BrokeredWorker],
         *,
         panel: InstrumentPanel,
         rubric: Rubric,
@@ -159,7 +187,7 @@ class CrewRunner:
     def ungoverned(
         cls,
         graph: TaskGraph,
-        workers: dict[str, Worker],
+        workers: Mapping[str, Worker | BrokeredWorker],
         *,
         state_path: str | Path | None = None,
     ) -> CrewRunner:
@@ -367,12 +395,25 @@ class CrewRunner:
         worker = self.workers.get(node.worker)
         if worker is None:
             return self._fail_node(node, report, f"unknown worker '{node.worker}'")
+        tools: NodeTools | None = None
         try:
-            artifact = worker(node)
+            if isinstance(worker, BrokeredWorker):
+                if self.broker is None:
+                    raise RuntimeError(
+                        "worker requires tool access but the runner has no "
+                        "broker (fail-closed)"
+                    )
+                tools = self.broker.session(node.id)
+                artifact = worker(node, tools)
+            else:
+                artifact = worker(node)
         except Exception as exc:
             return self._fail_node(
                 node, report, f"worker error: {type(exc).__name__}: {exc}"
             )
+        finally:
+            if tools is not None:
+                tools.revoke()
 
         # Instruments — fail-closed.
         if self.panel is not None:

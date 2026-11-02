@@ -50,7 +50,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from . import receipts
 from .escalation import (
@@ -452,6 +452,10 @@ ANCHORING_DISCLOSURE = (
 
 
 # ------------------------------------------------------------ supervisor
+class SignerRequiredError(ValueError):
+    """A Supervisor was built without an explicit signer."""
+
+
 class Supervisor:
     """Tier A supervisor: launches the agent as its child, watches its
     signed checkpoints, verifies before every resume, receipts every
@@ -476,7 +480,13 @@ class Supervisor:
         snapshot_fn: Callable[[], CheckpointSnapshot | None] | None = None,
     ):
         self.config = config
-        self._signer = signer if signer is not None else receipts.default_signer()
+        if signer is None:
+            raise SignerRequiredError(
+                "Supervisor requires an explicit signer: pass signer=<Signer>. "
+                "For demos, exhibits and tests that intend the public dev "
+                "signer, say so with Supervisor.with_dev_signer(config, ...)."
+            )
+        self._signer = signer
         self._clock = clock
         self._sleeper = sleeper
         self._launcher = launcher if launcher is not None else _default_launcher
@@ -505,6 +515,13 @@ class Supervisor:
         self._cadence_checkpoint_written_at: float | None = None
         self._cadence_fresh_start = False
         self._cadence_initial_launch = True
+
+    @classmethod
+    def with_dev_signer(cls, config: SupervisorConfig, **kwargs: Any) -> Supervisor:
+        """Explicit opt-in to the public development signer, for demos,
+        exhibits and tests. Its signatures prove consistency only — see
+        the receipts module's signer note. Never the implicit default."""
+        return cls(config, signer=receipts.DevHmacSigner(), **kwargs)
 
     # ------------------------------------------------------------ text
     def anchoring_disclosure(self) -> str:

@@ -19,9 +19,11 @@ from .escalation import (
 )
 from .grader import Criterion, GradeResult, Rubric, grade
 from .instruments import CheckResult, InstrumentPanel, default_panel
+from .interception import NodeTools, ToolBroker, ToolDenied
 from .judge import Judge, JudgeError
-from .orchestrator import CrewRunner, RunReport
+from .orchestrator import BrokeredWorker, CrewRunner, RunReport, brokered_worker
 from .supervise import (
+    SignerRequiredError,
     SupervisionState,
     Supervisor,
     SupervisorConfig,
@@ -63,6 +65,12 @@ __all__ = [
     "Judge",
     "JudgeError",
     "Supervisor",
+    "SignerRequiredError",
+    "ToolBroker",
+    "ToolDenied",
+    "NodeTools",
+    "BrokeredWorker",
+    "brokered_worker",
     "SupervisorConfig",
     "SupervisionState",
     "verify_at_checkpoint_boundary",
