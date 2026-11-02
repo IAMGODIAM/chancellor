@@ -16,18 +16,24 @@ segment's gate decision lands in a hash-chained audit log with signed
 checkpoints; the log's snapshot is published beside this file and
 refreshed hourly by an automated backstop.
 
+**The composed display:** this same record, struck in the house
+register — the counters composed, the watch in frame —
+[iamgodiam.github.io/chancellor/live.html](https://iamgodiam.github.io/chancellor/live.html).
+It is rendered from the same state, on the same hourly cycle, by the
+same publisher; this file remains the canonical text record.
+
 ## Status
 
 <!-- STATUS:BEGIN -->
-- **Segments done:** 842 / 11,520
-- **Steps executed:** 10104
-- **Faults injected so far:** 84 (one every ten segments)
-- **Segments complete / halted (fail-closed):** 778 / 64
+- **Segments done:** 892 / 11,520
+- **Steps executed:** 10704
+- **Faults injected so far:** 89 (one every ten segments)
+- **Segments complete / halted (fail-closed):** 823 / 69
 - **Drift events:** 0
-- **Audit chain:** 817 entries under signed checkpoint in the published snapshot · 101 signed checkpoint(s) so far · the live log holds 817 entries (the tail past the newest checkpoint is not yet checkpointed — the verifier says so rather than guessing, by design)
-- **Last chain verification:** VERIFIED — the published snapshot pair was verified cold with the product's own verifier at this refresh; the soak's own in-run verifications: 101/101 ok
+- **Audit chain:** 863 entries under signed checkpoint in the published snapshot · 107 signed checkpoint(s) so far · the live log holds 863 entries (the tail past the newest checkpoint is not yet checkpointed — the verifier says so rather than guessing, by design)
+- **Last chain verification:** VERIFIED — the published snapshot pair was verified cold with the product's own verifier at this refresh; the soak's own in-run verifications: 107/107 ok
 - **Interruptions resumed from checkpoint so far:** 7 (a deliberate proof kill at segment 3, and a supervision loss at segment 49 when the platform session was torn down during an outage — in both cases the soak resumed from its checkpoint and the chain verified across the interruption)
-- **Status as of:** 2026-11-02 09:47 EST (refreshed hourly from the soak's own state)
+- **Status as of:** 2026-11-02 10:34 EST (refreshed hourly from the soak's own state)
 <!-- STATUS:END -->
 
 ## How to read a halt — the language of this page, filed before the first segment
