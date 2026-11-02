@@ -131,10 +131,59 @@ class AuditLog:
         state.leaves.append(entry["entry_hash"])
         state.prev_hash = entry["entry_hash"]
 
+    # Chain-owned fields a caller-supplied body may never set itself.
+    _RESERVED_FIELDS = frozenset({"schema", "seq", "prev_hash", "entry_hash"})
+
+    def record_entry(self, fields: dict[str, Any]) -> dict:
+        """Append a caller-shaped entry (e.g. a freeze_manifest or
+        test_run body from chancellor.receipts) under the same chain
+        discipline as record(): the log stamps schema/seq/prev_hash/
+        entry_hash, and the entry is fsynced before state advances.
+        Returns the stamped entry as written."""
+        clash = self._RESERVED_FIELDS & fields.keys()
+        if clash:
+            raise ValueError(
+                f"entry fields may not set chain-owned fields: {sorted(clash)}"
+            )
+        state = self._state
+        entry: dict[str, Any] = {
+            "schema": _receipts.SCHEMA,
+            "seq": state.total_entries,
+            **fields,
+            "prev_hash": state.prev_hash,
+        }
+        entry["entry_hash"] = _receipts.entry_hash(entry)
+        with self.path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(entry) + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        state.total_entries += 1
+        state.chained += 1
+        state.leaves.append(entry["entry_hash"])
+        state.prev_hash = entry["entry_hash"]
+        return entry
+
     def checkpoint(self) -> dict:
         """Sign a Merkle checkpoint over every chained entry so far and
         append it to the checkpoint sidecar. Returns the envelope."""
         envelope = _receipts.build_checkpoint(
+            signer=self.signer,
+            log_size=self._state.chained,
+            leaves=self._state.leaves,
+            head_hash=self._state.prev_hash,
+        )
+        with self.checkpoint_path.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(envelope) + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        return envelope
+
+    def checkpoint_v2(self) -> dict:
+        """Sign an RFC 9162 (v2) checkpoint over every chained entry so
+        far and append it to the checkpoint sidecar. Returns the
+        envelope. The verifier accepts a v2 newest checkpoint under v2
+        rules; v1 checkpoints in the same sidecar keep v1 rules."""
+        envelope = _receipts.build_checkpoint_v2(
             signer=self.signer,
             log_size=self._state.chained,
             leaves=self._state.leaves,
