@@ -6,11 +6,11 @@ Base URL and API key come from the environment:
 Both are claimed at hackathon kickoff (Mon Oct 26, 2026); until then the
 client runs against an injectable transport — the offline fake below —
 so every other component can be built and tested without live access.
-The live HTTP transport lands in Stage W5, behind this same seam: it
-will be just another transport callable, and the cost meter below
-already wraps every transport call, so live usage is metered the
-moment the body slots in. Placeholder values only; never hardcode a
-real key.
+The live HTTP transport (Stage W5 M6) has landed behind this same
+seam as `chancellor.live_transport`: a lane-agnostic OpenAI-compatible
+body — NIM is the first plugged lane — and the cost meter below wraps
+every transport call, so live usage is metered the moment the body
+slots in. Placeholder values only; never hardcode a real key.
 
 Model column discipline (Council AM-5): only exact, versioned model IDs
 live here. ``muse-wonder-full`` does not exist as an API model and is
@@ -32,6 +32,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Literal
 
 PLACEHOLDER_KEY = "REPLACE_AT_KICKOFF"
 
@@ -91,7 +92,7 @@ def lane_for_model(model: str) -> str:
     """Which budget lane a model bills against."""
     if model.endswith("-contributor"):
         return LANE_CONTRIBUTOR
-    if model == MUSE_GLIMMER or model.startswith("meta/"):
+    if model == MUSE_GLIMMER or model.startswith(("meta/", "nvidia/")):
         return LANE_NVIDIA
     return LANE_CANONICAL
 
@@ -102,7 +103,7 @@ class NotConfiguredError(RuntimeError):
 
 @dataclass
 class ChatMessage:
-    role: str  # "system" | "user" | "assistant"
+    role: Literal["system", "user", "assistant"]
     content: str
 
 
@@ -259,8 +260,10 @@ class MetaModelClient:
                 "Pass transport=fake_transport for offline development."
             )
         raise NotConfiguredError(
-            "Live HTTP transport lands in Stage W5 once the API shape "
-            "is confirmed at kickoff."
+            "No transport injected, and the Meta lane's own live shape "
+            "is not confirmed. For a plugged lane use "
+            "chancellor.live_transport (NIM first); offline, pass "
+            "transport=fake_transport."
         )
 
 
