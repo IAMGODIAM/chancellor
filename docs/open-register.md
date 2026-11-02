@@ -61,3 +61,18 @@ disposition): the API credential never sits in an environment variable,
 so the env-fed live mode cannot be exercised for a capture without
 breaking the discipline the project exists to demonstrate. The gap is
 named here so it is a decision, not an omission.
+
+## Capability install
+
+**Status: built and measured.** The ninth gated act class — an agent
+gaining a new capability as a proposed, checked, gate-decided,
+receipted, independently verified, probationary, reversible act —
+is built on this tree (frame v2, `src/chancellor/installs.py`,
+specified in docs/foundry-install-spec.md) against governed install
+machinery already running in the entrant's wider multi-agent
+programme. The pre-registered install hearing passed (claims F1–F8)
+on the doc-only Phase-0 perimeter; the full record is filed at
+docs/evidence/foundry-install-hearing/. The licence is exactly that
+perimeter: the connector and schedule kinds, executable payloads,
+cost-bearing bundles, and the Prometheus layer remain designed, not
+built, under this frame — each a separate gated build.
