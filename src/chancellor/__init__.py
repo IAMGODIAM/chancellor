@@ -7,7 +7,7 @@ Doctrine:
   * Authority escalates; capability doesn't.
 """
 
-__version__ = "0.1.0"
+__version__ = "1.1.0"
 
 from .api_client import CostMeter, MetaModelClient, NotConfiguredError
 from .escalation import (
