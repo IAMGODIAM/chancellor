@@ -1,5 +1,5 @@
 {
- "polled_at_est": "2026-11-02 15:20 EST",
+ "polled_at_est": "2026-11-02 15:26 EST",
  "label": "IN FLIGHT / UNVERIFIED",
  "boxes": [
   {
@@ -41,7 +41,7 @@
     "box": "b2",
     "cell": "B",
     "started_at": 1793615513.4087756,
-    "ts": 1793650824.2327518
+    "ts": 1793651124.240595
    },
    "soaks": [
     {
@@ -3701,12 +3701,12 @@
      "target": null,
      "checkpoint": {
       "seed": 9110,
-      "segments_done": 125,
-      "steps_done": 1500,
+      "segments_done": 130,
+      "steps_done": 1560,
       "drift_events": 0,
-      "segments_complete": 115,
-      "segments_halted": 10,
-      "faults_injected": 12,
+      "segments_complete": 119,
+      "segments_halted": 11,
+      "faults_injected": 13,
       "verifications": [
        {
         "steps": 108,
@@ -3816,26 +3816,26 @@
       ],
       "corrupted_state_files": 0,
       "started_at": 1793643549.1070297,
-      "updated_at": 1793650829.1285253
+      "updated_at": 1793651124.3637533
      },
      "supervision": {
-      "entries": 56,
+      "entries": 59,
       "events": {
        "supervision_started": 1,
-       "stall_anomaly": 15,
-       "supervisor_heartbeat": 40
+       "stall_anomaly": 16,
+       "supervisor_heartbeat": 42
       },
       "refusals": 0,
       "escalations": 0,
       "latest_event": {
-       "ts": 1793650554.3607552,
+       "ts": 1793651009.6209552,
        "event": "stall_anomaly",
        "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive"
       },
-      "last_log_size": 113,
+      "last_log_size": 121,
       "resume_activity_ts": null
      },
-     "entries_present": 121,
+     "entries_present": 127,
      "dialogue": [
       {
        "ts": 1793643549.0398886,
@@ -4564,6 +4564,45 @@
        "ok": null,
        "age_s": 378.6635568141937,
        "log_size": 113
+      },
+      {
+       "ts": 1793650932.5765615,
+       "seq": 56,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 103.45199513435364,
+       "log_size": 121
+      },
+      {
+       "ts": 1793651009.6209552,
+       "seq": 57,
+       "event": "stall_anomaly",
+       "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive",
+       "rationale": "The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).",
+       "approved": false,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 180.49632358551025,
+       "log_size": 121
+      },
+      {
+       "ts": 1793651112.6805458,
+       "seq": 58,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 283.5559792518616,
+       "log_size": 121
       }
      ]
     }
@@ -4582,17 +4621,17 @@
   }
  ],
  "totals": {
-  "segments_done": 605,
+  "segments_done": 610,
   "segments_target": 240,
-  "segments_complete": 558,
-  "segments_halted": 47,
-  "faults_injected": 60,
+  "segments_complete": 562,
+  "segments_halted": 48,
+  "faults_injected": 61,
   "drift_events": 0,
   "refusals": 2,
   "escalations": 2,
   "events": {
    "supervision_started": 3,
-   "stall_anomaly": 73,
+   "stall_anomaly": 74,
    "interruption_detected": 8,
    "chain_verification": 6,
    "resume_launched": 6,
@@ -4605,7 +4644,8 @@
  "notables": [
   "box b0 not yet reporting (lambda: absent)",
   "box b1 not yet reporting (lambda: absent)",
-  "box b3 not yet reporting (lambda: absent)"
+  "box b3 not yet reporting (lambda: absent)",
+  "stall_anomaly +1 (total 74) \u2014 diagnosed cadence background, inside the envelope (DIAGNOSIS-STALL-ANOMALY.md); filed, not paged"
  ],
  "run_complete": false
 }
