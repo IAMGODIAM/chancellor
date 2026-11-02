@@ -82,6 +82,8 @@ def _load_jsonl(path: Path, failures: list[str]) -> list[dict] | None:
     return rows
 
 
+# CC 30 (radon) — the verifier's checklist: one branch per failure
+# it must name verbatim. Splitting it would scatter the vocabulary.
 def verify_log(
     log_path: str | Path,
     checkpoint_path: str | Path | None = None,
@@ -128,7 +130,7 @@ def verify_log(
             failures.append(f"prev_hash_link_broken: seq {pos}")
         if receipts.entry_hash(entry) != entry["entry_hash"]:
             failures.append(f"entry_hash_mismatch: seq {pos} (entry edited)")
-        chained_hashes.append(entry.get("entry_hash"))
+        chained_hashes.append(entry["entry_hash"])
         prev_hash = entry.get("entry_hash")
         prev_entry = entry
 
@@ -231,6 +233,111 @@ def verify_log(
         chained_entries=len(chained_hashes),
         checkpoints=len(cp_rows),
         checkpoint_log_size=checkpoint_log_size,
+    )
+
+
+def verify_holder_proof(
+    checkpoint_path: str | Path,
+    proof: dict,
+    signer: receipts.Signer | None = None,
+) -> VerificationResult:
+    """Verify a HOLDER-PRESENTED v2 inclusion proof against the newest
+    checkpoint in a sidecar — standalone: the log itself is neither
+    needed nor consulted. The checkpoint's signature binds (root,
+    log_size, head); the proof must match the checkpoint's count
+    exactly (proof_count_mismatch REFUSES the proof outright — an
+    anchor without a count verifies nothing, as a rule), and the path
+    must fold to the checkpoint root."""
+    signer = signer if signer is not None else receipts.default_signer()
+    failures: list[str] = []
+
+    cp_rows: list[dict] = []
+    loaded = _load_jsonl(Path(checkpoint_path), failures)
+    if loaded is not None:
+        cp_rows = loaded
+    if failures:
+        return VerificationResult(ok=False, failures=failures)
+    if not cp_rows:
+        return VerificationResult(
+            ok=False,
+            failures=["no_checkpoint: sidecar holds no checkpoint"],
+        )
+    newest = cp_rows[-1]
+    try:
+        payload = receipts.checkpoint_payload(newest)
+    except Exception:
+        return VerificationResult(
+            ok=False,
+            failures=[
+                "checkpoint_malformed: newest checkpoint envelope does not decode"
+            ],
+            checkpoints=len(cp_rows),
+        )
+    if payload.get("schema") != receipts.CHECKPOINT_SCHEMA_V2:
+        failures.append(
+            f"checkpoint_schema: holder proofs require "
+            f"{receipts.CHECKPOINT_SCHEMA_V2!r}, newest checkpoint is "
+            f"{payload.get('schema')!r}"
+        )
+    if payload.get("tree") != receipts.TREE_RFC9162:
+        failures.append(
+            f"checkpoint_tree: tree={payload.get('tree')!r} != "
+            f"{receipts.TREE_RFC9162!r}"
+        )
+    if not receipts.checkpoint_signature_valid(newest, signer):
+        failures.append(
+            "checkpoint_signature_invalid: newest checkpoint signature does not verify"
+        )
+    if failures:
+        return VerificationResult(
+            ok=False,
+            failures=failures,
+            checkpoints=len(cp_rows),
+            checkpoint_log_size=payload.get("log_size"),
+        )
+
+    if not isinstance(proof, dict) or not {
+        "leaf_hash",
+        "index",
+        "tree_size",
+        "path",
+    } <= set(proof):
+        failures.append(
+            "proof_malformed: proof must carry leaf_hash, index, tree_size, path"
+        )
+        return VerificationResult(
+            ok=False,
+            failures=failures,
+            checkpoints=len(cp_rows),
+            checkpoint_log_size=payload.get("log_size"),
+        )
+    if proof["tree_size"] != payload.get("log_size"):
+        failures.append(
+            f"proof_count_mismatch: proof tree_size="
+            f"{proof['tree_size']!r} vs checkpoint log_size="
+            f"{payload.get('log_size')!r} — refused"
+        )
+        return VerificationResult(
+            ok=False,
+            failures=failures,
+            checkpoints=len(cp_rows),
+            checkpoint_log_size=payload.get("log_size"),
+        )
+    if not receipts.rfc9162_verify(
+        proof["leaf_hash"],
+        proof["index"],
+        proof["tree_size"],
+        proof["path"],
+        payload["merkle_root"],
+    ):
+        failures.append(
+            "inclusion_proof_invalid: path does not fold to the checkpoint root"
+        )
+    return VerificationResult(
+        ok=not failures,
+        failures=failures,
+        checkpoints=len(cp_rows),
+        checkpoint_log_size=payload.get("log_size"),
     )
 
 
@@ -454,111 +561,6 @@ def _resolve_main(argv: list[str]) -> int:
         return 0
     print("NOT RESOLVED")
     return 1
-
-
-def verify_holder_proof(
-    checkpoint_path: str | Path,
-    proof: dict,
-    signer: receipts.Signer | None = None,
-) -> VerificationResult:
-    """Verify a HOLDER-PRESENTED v2 inclusion proof against the newest
-    checkpoint in a sidecar — standalone: the log itself is neither
-    needed nor consulted. The checkpoint's signature binds (root,
-    log_size, head); the proof must match the checkpoint's count
-    exactly (proof_count_mismatch REFUSES the proof outright — an
-    anchor without a count verifies nothing, as a rule), and the path
-    must fold to the checkpoint root."""
-    signer = signer if signer is not None else receipts.default_signer()
-    failures: list[str] = []
-
-    cp_rows: list[dict] = []
-    loaded = _load_jsonl(Path(checkpoint_path), failures)
-    if loaded is not None:
-        cp_rows = loaded
-    if failures:
-        return VerificationResult(ok=False, failures=failures)
-    if not cp_rows:
-        return VerificationResult(
-            ok=False,
-            failures=["no_checkpoint: sidecar holds no checkpoint"],
-        )
-    newest = cp_rows[-1]
-    try:
-        payload = receipts.checkpoint_payload(newest)
-    except Exception:
-        return VerificationResult(
-            ok=False,
-            failures=[
-                "checkpoint_malformed: newest checkpoint envelope does not decode"
-            ],
-            checkpoints=len(cp_rows),
-        )
-    if payload.get("schema") != receipts.CHECKPOINT_SCHEMA_V2:
-        failures.append(
-            f"checkpoint_schema: holder proofs require "
-            f"{receipts.CHECKPOINT_SCHEMA_V2!r}, newest checkpoint is "
-            f"{payload.get('schema')!r}"
-        )
-    if payload.get("tree") != receipts.TREE_RFC9162:
-        failures.append(
-            f"checkpoint_tree: tree={payload.get('tree')!r} != "
-            f"{receipts.TREE_RFC9162!r}"
-        )
-    if not receipts.checkpoint_signature_valid(newest, signer):
-        failures.append(
-            "checkpoint_signature_invalid: newest checkpoint signature does not verify"
-        )
-    if failures:
-        return VerificationResult(
-            ok=False,
-            failures=failures,
-            checkpoints=len(cp_rows),
-            checkpoint_log_size=payload.get("log_size"),
-        )
-
-    if not isinstance(proof, dict) or not {
-        "leaf_hash",
-        "index",
-        "tree_size",
-        "path",
-    } <= set(proof):
-        failures.append(
-            "proof_malformed: proof must carry leaf_hash, index, tree_size, path"
-        )
-        return VerificationResult(
-            ok=False,
-            failures=failures,
-            checkpoints=len(cp_rows),
-            checkpoint_log_size=payload.get("log_size"),
-        )
-    if proof["tree_size"] != payload.get("log_size"):
-        failures.append(
-            f"proof_count_mismatch: proof tree_size="
-            f"{proof['tree_size']!r} vs checkpoint log_size="
-            f"{payload.get('log_size')!r} — refused"
-        )
-        return VerificationResult(
-            ok=False,
-            failures=failures,
-            checkpoints=len(cp_rows),
-            checkpoint_log_size=payload.get("log_size"),
-        )
-    if not receipts.rfc9162_verify(
-        proof["leaf_hash"],
-        proof["index"],
-        proof["tree_size"],
-        proof["path"],
-        payload["merkle_root"],
-    ):
-        failures.append(
-            "inclusion_proof_invalid: path does not fold to the checkpoint root"
-        )
-    return VerificationResult(
-        ok=not failures,
-        failures=failures,
-        checkpoints=len(cp_rows),
-        checkpoint_log_size=payload.get("log_size"),
-    )
 
 
 def main(argv: list[str] | None = None) -> int:
