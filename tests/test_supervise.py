@@ -16,6 +16,7 @@ import time
 from pathlib import Path
 
 import chancellor
+from chancellor.cli import main as cli_main
 from chancellor.escalation import (
     ActionClass,
     AuditLog,
@@ -113,21 +114,53 @@ def _config(tmp_path: Path, **overrides) -> SupervisorConfig:
     return config
 
 
-def _supervisor(tmp_path: Path, launcher, snapshot_fn, **overrides) -> Supervisor:
+def _supervisor(
+    tmp_path: Path,
+    launcher,
+    snapshot_fn,
+    *,
+    clock=None,
+    emitted: list[str] | None = None,
+    **overrides,
+) -> Supervisor:
     return Supervisor(
         _config(tmp_path, **overrides),
-        clock=lambda: 1_000.0,
+        clock=clock or (lambda: 1_000.0),
         sleeper=lambda _s: None,
         launcher=launcher,
-        emit=lambda _line: None,
+        emit=emitted.append if emitted is not None else (lambda _line: None),
         snapshot_fn=snapshot_fn,
     )
 
 
-def _snap(log_size: int, age_s: float = 1.0) -> CheckpointSnapshot:
+def _snap(
+    log_size: int, age_s: float = 1.0, written_at: float | None = None
+) -> CheckpointSnapshot:
     return CheckpointSnapshot(
-        log_size=log_size, head_hash="head", created_at=0, age_s=age_s
+        log_size=log_size,
+        head_hash="head",
+        created_at=0,
+        age_s=age_s,
+        written_at=written_at,
     )
+
+
+class _SnapshotSequence:
+    def __init__(self, snapshots: list[CheckpointSnapshot]):
+        self._snapshots = list(snapshots)
+
+    def __call__(self) -> CheckpointSnapshot:
+        if len(self._snapshots) > 1:
+            return self._snapshots.pop(0)
+        return self._snapshots[0]
+
+
+class _Clock:
+    def __init__(self, now: float = 1_000.0):
+        self.now = now
+
+    def __call__(self) -> float:
+        return self.now
 
 
 # ------------------------------------------------------- cause grading
@@ -332,6 +365,118 @@ def test_stalled_agent_is_receipted_never_relaunched(tmp_path):
     kinds = [e["event"] for e in events]
     assert "stall_anomaly" in kinds
     assert "agent_completed" in kinds
+
+
+def test_cadence_advisory_fires_once_on_slow_consecutive_checkpoints(tmp_path):
+    _agent_log(tmp_path / "audit-log.jsonl", 5)
+    handle = _FakeHandle([None, None, None, 0])
+    launcher = _FakeLauncher([handle])
+    emitted: list[str] = []
+    snapshots = _SnapshotSequence(
+        [
+            _snap(3, written_at=100.0),
+            _snap(4, written_at=105.0),
+            _snap(5, written_at=111.0),
+            _snap(5, written_at=111.0),
+        ]
+    )
+    supervisor = _supervisor(tmp_path, launcher, snapshots, emitted=emitted)
+
+    assert supervisor.run() == 0
+    assert len(launcher.calls) == 1
+    events = _events(tmp_path / "supervision-log.jsonl")
+    advisories = [e for e in events if e["event"] == "cadence_advisory"]
+    assert len(advisories) == 1
+    detail = advisories[0]["detail"]
+    assert detail["basis"] == "consecutive_checkpoints"
+    assert detail["observed_checkpoint_interval_s"] == 5.0
+    assert detail["cadence_s"] == 1.0
+    assert detail["missed"] == 3
+    assert detail["stale_threshold_s"] == 3.0
+    assert detail["advisory_only"] is True
+    assert "escalation" not in [e["event"] for e in events]
+    assert any(
+        "CADENCE ADVISORY" in line
+        and "observed signed-checkpoint interval 5.0s" in line
+        for line in emitted
+    )
+
+
+def test_cadence_advisory_fires_for_fresh_start_without_checkpoint(tmp_path):
+    handle = _FakeHandle([None, None, 0])
+    launcher = _FakeLauncher([handle])
+    emitted: list[str] = []
+    clock = _Clock()
+    calls = {"n": 0}
+
+    def snapshot() -> None:
+        calls["n"] += 1
+        clock.now = 1_003.0 if calls["n"] == 1 else 1_004.0
+        return
+
+    supervisor = _supervisor(tmp_path, launcher, snapshot, clock=clock, emitted=emitted)
+
+    assert supervisor.run() == 0
+    events = _events(tmp_path / "supervision-log.jsonl")
+    advisories = [e for e in events if e["event"] == "cadence_advisory"]
+    assert len(advisories) == 1
+    detail = advisories[0]["detail"]
+    assert detail["basis"] == "fresh_start_no_checkpoint"
+    assert detail["observed_no_checkpoint_after_s"] == 3.0
+    assert detail["agent_log_size"] is None
+    assert "escalation" not in [e["event"] for e in events]
+    assert any("no signed checkpoint after 3.0s" in line for line in emitted)
+
+
+def test_cadence_advisory_does_not_fire_on_matched_cadence(tmp_path):
+    _agent_log(tmp_path / "audit-log.jsonl", 4)
+    handle = _FakeHandle([None, None, 0])
+    launcher = _FakeLauncher([handle])
+    snapshots = _SnapshotSequence(
+        [
+            _snap(3, written_at=100.0),
+            _snap(4, written_at=102.0),
+            _snap(4, written_at=102.0),
+        ]
+    )
+    supervisor = _supervisor(tmp_path, launcher, snapshots)
+
+    assert supervisor.run() == 0
+    events = _events(tmp_path / "supervision-log.jsonl")
+    assert "cadence_advisory" not in [e["event"] for e in events]
+    assert "agent_completed" in [e["event"] for e in events]
+
+
+def test_cadence_advisory_latches_across_resume_and_resume_confirms(tmp_path):
+    _agent_log(tmp_path / "audit-log.jsonl", 3)
+    first = _FakeHandle([-9])
+    second = _FakeHandle([None, 0])
+    launcher = _FakeLauncher([first, second])
+    snapshots = _SnapshotSequence(
+        [
+            _snap(3, written_at=100.0),
+            _snap(4, written_at=105.0),
+            _snap(5, written_at=111.0),
+        ]
+    )
+    supervisor = _supervisor(tmp_path, launcher, snapshots)
+
+    assert supervisor.run() == 0
+    assert len(launcher.calls) == 2
+    events = _events(tmp_path / "supervision-log.jsonl")
+    kinds = [e["event"] for e in events]
+    assert kinds.count("cadence_advisory") == 1
+    assert "resume_launched" in kinds
+    assert "resume_confirmed" in kinds
+    assert "agent_completed" in kinds
+    assert "escalation" not in kinds
+
+
+def test_supervise_help_names_cadence_guidance(capsys):
+    assert cli_main(["supervise", "--help"]) == 0
+    captured = capsys.readouterr()
+    assert "--cadence" in captured.out
+    assert "docs/supervision-cadence.md" in captured.out
 
 
 def test_resume_budget_exhausts_and_escalates(tmp_path):
