@@ -8,6 +8,14 @@ on:
   push:
   pull_request:
 
+# In a push burst, only the newest run per branch/PR survives:
+# superseded runs cancel immediately instead of running (or
+# failing) against trees that are already obsolete. The final
+# state of every branch always gets a full gates run.
+concurrency:
+  group: gates-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   gates:
     runs-on: ubuntu-latest
