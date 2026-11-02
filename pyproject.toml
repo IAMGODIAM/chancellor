@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "chancellor"
 version = "1.1.0"
-description = "Chancellor — governance for long-running agents on the Meta Model API. Work runs as a durable task graph that survives crashes; a separate judge model (uncalibrated) grades every consequential output; and any act the worker declares as spending, sending, publishing, or using credentials stops at a human gate that leaves a hash-chained, dev-signed receipt."
+description = "Governance and eval harness for long-running AI agents: human gate on worker-declared consequential actions, hash-chained receipts (dev-signed checkpoints), measured drift. Grader uncalibrated."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Proprietary — hackathon build, see Official Rules (Oct 26) for IP terms" }

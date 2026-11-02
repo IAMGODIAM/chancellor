@@ -26,8 +26,9 @@ chancellor demo --fast --auto  # the exhibit, offline — graded work, a halted
                                # fault, a human gate, a verified receipt
 chancellor verify-log .chancellor-exhibit/audit-log.jsonl
                                # the demo's own receipt book, verified offline
-                               # (dev-signed: proves the chain is intact,
-                               # not who sealed it)
+                               # Checkpoints are dev-signed with a demo key,
+                               # so this proves the log wasn't altered, not
+                               # who sealed it.
 ```
 
 - **The evidence:** [docs/evidence/run-7/](docs/evidence/run-7/) — the 10x record (RUN-7) with its bounds printed, verified by an independent recount; the first measurement (RUN-5) stands at [docs/evidence/run-5/](docs/evidence/run-5/); a two-file sample you can verify in isolation lives in [docs/evidence/sample/](docs/evidence/sample/).
@@ -184,7 +185,7 @@ The code cites its governing amendments inline (AM-2, EA-5, …) — the key is 
 
 ## How it maps to the judging criteria
 
-- **Impact (30%)** — for anyone who runs long-running agents with real authority: every consequential act the worker declares stops at a human gate before it happens, is graded after it lands, and receipted either way — so an operator can hand an agent real work (spend, sends, publishing, irreversible acts) and prove afterward exactly what it did, what it cost, and who approved it.
+- **Impact (30%)** — for anyone who runs long-running agents with real authority: actions a worker declares as spend, external sends, publishing or irreversible stop at a human gate, and every decision is receipted — so an operator can hand an agent real work (spend, sends, publishing, irreversible acts) and prove afterward exactly what it did, what it cost, and who approved it.
 - **Tooling — creative use of Meta's tools (25%)** — the Meta Model API supplies both halves of the separation of powers: `muse-spark-1.3` does the work and `muse-wonder-1.0` grades it, so no run is scored by the model that produced it. Exact, versioned IDs only — see [ERRATA.md](ERRATA.md) E-1.
 - **Demo (25%)** — `chancellor demo --fast --auto` runs end-to-end offline today with scripted workers and a scripted judge, no live model. A `--live` mode routes the same run through the same client to the live Meta models (connection validated Oct 30); the measured runs (RUN-5, RUN-7) used scripted workers and did not exercise `--live`. (Video: see the Demo section above.)
 - **Technical Depth (20%)** — durable, crash-atomic task graphs proven under kill-resume gates (300 / 300 at 1x in RUN-5; 3,000 / 3,000 in RUN-7 as a labeled 10-box reproduction of the same 300-gate instrument at 10x), an in-product supervisor that verifies before it resumes, rubric-graded outputs from a separate judge (uncalibrated), failure-injected reliability measurement with the cost printed beside the frontier, and a hash-chained audit log verifiable offline.

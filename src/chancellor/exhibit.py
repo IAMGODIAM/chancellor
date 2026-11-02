@@ -546,7 +546,7 @@ def run_exhibit(
     if tamper_line:
         emit(tamper_line)
     emit(
-        "  measured record — RUN-7 on tree 31ea039, unpublished"
+        "  measured record — RUN-7 on tree 31ea039 (unpublished)"
         " (scripted workers, no live model):"
     )
     emit("    governed drift 0 / 18,000 vs ungoverned 3,000 / 18,000")
