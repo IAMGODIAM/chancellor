@@ -3,8 +3,7 @@
 <img src="docs/media/banner.png" alt="Chancellor — the governance-and-eval harness for long-running agents" width="880">
 
 [![gates](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml/badge.svg)](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml)
-<a href="docs/evidence/run-7/"><img src="docs/media/badge-drift.svg" alt="Suite B: drift 0 / 18,000 — bounds printed"></a>
-<a href="https://github.com/IAMGODIAM/chancellor/actions"><img src="docs/media/badge-tests.svg" alt="Tests: 242 passing — gates green"></a>
+<a href="docs/evidence/run-7/"><img src="docs/media/badge-drift.svg" alt="Suite B, RUN-7 (scripted workers): drift 0 / 18,000 — bounds printed"></a>
 <a href="#results-measured-oct-29--nov-2-2026"><img src="docs/media/badge-calibration.svg" alt="Calibration: gate not passed — verdicts labeled"></a>
 <a href="https://github.com/IAMGODIAM/chancellor/releases/tag/v1.1.0"><img src="docs/media/badge-release.svg" alt="Release: v1.1.0"></a>
 
@@ -75,7 +74,7 @@ Governance is not free, and the price is printed, not hidden: the governed arm c
 
 **Kill-resume gate (T3):** **3,000 / 3,000** gates in RUN-7 — a 10-box reproduction of the same 300-gate instrument, *not* 3,000 independent trials; the label travels with the figure in the record. The fixed harness's original 300 / 300 (6,000 trials, RUN-5) and the first harness's 290 / 300 stand in [BUILD-LOG.md](BUILD-LOG.md) — the 290 was a defect in the test harness, not the product, and the diagnosis is recorded there in full.
 
-**Tests:** 242 passing, 0 failing — which also passes its own presentation gates: Ruff format and lint at zero findings, mypy clean, identical commands in pre-commit and CI (see the badge above).
+**Tests:** the current count and result for every commit are in the [gates workflow](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml) (the gates badge above), not a fixed number here. The suite also passes its own presentation gates: Ruff format and lint at zero findings, mypy clean, identical commands in pre-commit and CI (see the badge above).
 
 **Suite A:** the calibration gate has been run twice under pre-registration and has not passed — and no Suite A score is claimed anywhere in this submission. The calibration of record measured band κ 0.667 and Spearman ρ 0.881, with precedent-consistency (κ 0.294) and reversibility (κ 0.575) below the 0.6 criterion floor. The pre-registered remedy run then failed its own completeness gate — 35 of 36 references scored, one lost to two transport failures — and an incomplete run earns no gate statistics; its diagnostics (not gate statistics) put every criterion above threshold, and the judge's blind self-agreement, measured for the first time, satisfied its gate on all four criteria. What ships is the labeled fallback: live judge verdicts carry the label *uncalibrated* until a pre-registered run passes in full. The gate catching our own judge — twice — is the method working as designed.
 
@@ -186,7 +185,7 @@ The code cites its governing amendments inline (AM-2, EA-5, …) — the key is 
 - **Impact (30%)** — for anyone who runs long-running agents with real authority: every consequential act is gated before it happens, graded after it lands, and receipted either way — so an operator can hand an agent real work (spend, sends, publishing, irreversible acts) and prove afterward exactly what it did, what it cost, and who approved it.
 - **Tooling — creative use of Meta's tools (25%)** — the Meta Model API supplies both halves of the separation of powers: `muse-spark-1.3` does the work and `muse-wonder-1.0` grades it, so no run is scored by the model that produced it. Exact, versioned IDs only — see [ERRATA.md](ERRATA.md) E-1.
 - **Demo (25%)** — `chancellor demo --fast --auto` runs end-to-end offline today with scripted workers and a scripted judge, no live model. A `--live` mode routes the same run through the same client to the live Meta models (connection validated Oct 30); the measured runs (RUN-5, RUN-7) used scripted workers and did not exercise `--live`. (Video: see the Demo section above.)
-- **Technical Depth (20%)** — durable, crash-atomic task graphs proven under kill-resume gates (300 / 300 at 1x; 3,000 / 3,000 as a labeled 10-box reproduction at 10x), an in-product supervisor that verifies before it resumes, rubric-graded outputs from a separate judge (uncalibrated), failure-injected reliability measurement with the cost printed beside the frontier, and a hash-chained audit log verifiable offline.
+- **Technical Depth (20%)** — durable, crash-atomic task graphs proven under kill-resume gates (300 / 300 at 1x in RUN-5; 3,000 / 3,000 in RUN-7 as a labeled 10-box reproduction of the same 300-gate instrument at 10x), an in-product supervisor that verifies before it resumes, rubric-graded outputs from a separate judge (uncalibrated), failure-injected reliability measurement with the cost printed beside the frontier, and a hash-chained audit log verifiable offline.
 
 ## Agent collaboration
 
