@@ -2,6 +2,15 @@
 
     python -m chancellor.verify_log <audit-log.jsonl> [--checkpoints <file>]
                                 [--allow-legacy-prefix] [--allow-uncheckpointed]
+    python -m chancellor.verify_log resolve <audit-log.jsonl> <manifest_sha256>
+                                [--checkpoints <file>]
+
+The ``resolve`` verb walks freeze provenance (receipts.freeze_manifest /
+test_run entries): given a manifest hash it prints the freeze_manifest
+entry, every test_run entry bound to that manifest, and the checkpoint
+that seals them — failing closed on any gap (no such manifest, a
+manifest with no covering test run, a test run bound to a manifest that
+appears nowhere in the log, or no checkpoint sealing the entries).
 
 Re-walks the log trusting nothing from the runtime: every chained
 entry's hash is recomputed, every prev-hash link re-checked, and the
@@ -23,6 +32,14 @@ construction* — the verifier refuses to call such a log verified
 unless --allow-uncheckpointed is passed. A pre-chain legacy prefix
 (plain JSONL written before the chain existed) is reported as
 ``unchained_legacy_entries`` unless --allow-legacy-prefix is passed.
+
+Checkpoints may be v1 (``e5.receipt_checkpoint.v1``, duplication tree)
+or v2 (``e5.receipt_checkpoint.v2``, RFC 9162 tree); the newest
+checkpoint is checked under its own schema's rules (dual-verify).
+With ``--proof <file>`` the verifier instead checks a holder-presented
+v2 inclusion proof against the newest checkpoint — standalone, the
+log is not consulted, and a proof whose tree_size disagrees with the
+checkpoint's log_size is refused (``proof_count_mismatch``).
 """
 
 from __future__ import annotations
@@ -150,13 +167,28 @@ def verify_log(
             )
             payload = None
         if payload is not None:
-            if payload.get("schema") != receipts.CHECKPOINT_SCHEMA:
+            is_v2 = payload.get("schema") == receipts.CHECKPOINT_SCHEMA_V2
+            if payload.get("schema") not in (
+                receipts.CHECKPOINT_SCHEMA,
+                receipts.CHECKPOINT_SCHEMA_V2,
+            ):
                 failures.append(
                     f"checkpoint_schema: {payload.get('schema')!r} != "
                     f"{receipts.CHECKPOINT_SCHEMA!r}"
                 )
-            if newest.get("payloadType") != receipts.CHECKPOINT_PAYLOAD_TYPE:
+            expected_pt = (
+                receipts.CHECKPOINT_PAYLOAD_TYPE_V2
+                if is_v2
+                else receipts.CHECKPOINT_PAYLOAD_TYPE
+            )
+            if newest.get("payloadType") != expected_pt:
                 failures.append("checkpoint_payload_type: unexpected payloadType")
+            if is_v2 and payload.get("tree") != receipts.TREE_RFC9162:
+                failures.append(
+                    f"checkpoint_tree: v2 checkpoint claims "
+                    f"tree={payload.get('tree')!r}, expected "
+                    f"{receipts.TREE_RFC9162!r}"
+                )
             if not receipts.checkpoint_signature_valid(newest, signer):
                 failures.append(
                     "checkpoint_signature_invalid: newest "
@@ -186,7 +218,8 @@ def verify_log(
                 failures.append(
                     "head_hash_mismatch: checkpoint head != last entry hash in log"
                 )
-            if payload.get("merkle_root") != receipts.merkle_root(chained_hashes):
+            root_fn = receipts.rfc9162_root if is_v2 else receipts.merkle_root
+            if payload.get("merkle_root") != root_fn(chained_hashes):
                 failures.append(
                     "checkpoint_root_mismatch: Merkle root over the "
                     "log's entry hashes != checkpoint root"
@@ -203,8 +236,338 @@ def verify_log(
     )
 
 
+def verify_holder_proof(
+    checkpoint_path: str | Path,
+    proof: dict,
+    signer: receipts.Signer | None = None,
+) -> VerificationResult:
+    """Verify a HOLDER-PRESENTED v2 inclusion proof against the newest
+    checkpoint in a sidecar — standalone: the log itself is neither
+    needed nor consulted. The checkpoint's signature binds (root,
+    log_size, head); the proof must match the checkpoint's count
+    exactly (proof_count_mismatch REFUSES the proof outright — an
+    anchor without a count verifies nothing, as a rule), and the path
+    must fold to the checkpoint root."""
+    signer = signer if signer is not None else receipts.default_signer()
+    failures: list[str] = []
+
+    cp_rows: list[dict] = []
+    loaded = _load_jsonl(Path(checkpoint_path), failures)
+    if loaded is not None:
+        cp_rows = loaded
+    if failures:
+        return VerificationResult(ok=False, failures=failures)
+    if not cp_rows:
+        return VerificationResult(
+            ok=False,
+            failures=["no_checkpoint: sidecar holds no checkpoint"],
+        )
+    newest = cp_rows[-1]
+    try:
+        payload = receipts.checkpoint_payload(newest)
+    except Exception:
+        return VerificationResult(
+            ok=False,
+            failures=[
+                "checkpoint_malformed: newest checkpoint envelope does not decode"
+            ],
+            checkpoints=len(cp_rows),
+        )
+    if payload.get("schema") != receipts.CHECKPOINT_SCHEMA_V2:
+        failures.append(
+            f"checkpoint_schema: holder proofs require "
+            f"{receipts.CHECKPOINT_SCHEMA_V2!r}, newest checkpoint is "
+            f"{payload.get('schema')!r}"
+        )
+    if payload.get("tree") != receipts.TREE_RFC9162:
+        failures.append(
+            f"checkpoint_tree: tree={payload.get('tree')!r} != "
+            f"{receipts.TREE_RFC9162!r}"
+        )
+    if not receipts.checkpoint_signature_valid(newest, signer):
+        failures.append(
+            "checkpoint_signature_invalid: newest checkpoint signature does not verify"
+        )
+    if failures:
+        return VerificationResult(
+            ok=False,
+            failures=failures,
+            checkpoints=len(cp_rows),
+            checkpoint_log_size=payload.get("log_size"),
+        )
+
+    if not isinstance(proof, dict) or not {
+        "leaf_hash",
+        "index",
+        "tree_size",
+        "path",
+    } <= set(proof):
+        failures.append(
+            "proof_malformed: proof must carry leaf_hash, index, tree_size, path"
+        )
+        return VerificationResult(
+            ok=False,
+            failures=failures,
+            checkpoints=len(cp_rows),
+            checkpoint_log_size=payload.get("log_size"),
+        )
+    if proof["tree_size"] != payload.get("log_size"):
+        failures.append(
+            f"proof_count_mismatch: proof tree_size="
+            f"{proof['tree_size']!r} vs checkpoint log_size="
+            f"{payload.get('log_size')!r} — refused"
+        )
+        return VerificationResult(
+            ok=False,
+            failures=failures,
+            checkpoints=len(cp_rows),
+            checkpoint_log_size=payload.get("log_size"),
+        )
+    if not receipts.rfc9162_verify(
+        proof["leaf_hash"],
+        proof["index"],
+        proof["tree_size"],
+        proof["path"],
+        payload["merkle_root"],
+    ):
+        failures.append(
+            "inclusion_proof_invalid: path does not fold to the checkpoint root"
+        )
+    return VerificationResult(
+        ok=not failures,
+        failures=failures,
+        checkpoints=len(cp_rows),
+        checkpoint_log_size=payload.get("log_size"),
+    )
+
+
+@dataclass
+class ResolveResult:
+    ok: bool
+    failures: list[str] = field(default_factory=list)
+    manifest_entry: dict | None = None  # the freeze_manifest entry
+    test_runs: list[dict] = field(default_factory=list)  # covering test_run entries
+    checkpoint: dict | None = None  # payload of the sealing checkpoint
+
+
+# CC 24 (radon) — one branch per gap resolve must fail closed on.
+def resolve_manifest(
+    log_path: str | Path,
+    manifest_sha256: str,
+    checkpoint_path: str | Path | None = None,
+    signer: receipts.Signer | None = None,
+) -> ResolveResult:
+    """Resolve a freeze manifest hash to its covering test_run receipts
+    and the checkpoint that seals them. Fail-closed: a broken chain, an
+    absent manifest, a manifest with no covering test run, ANY test run
+    bound to a manifest that appears nowhere in the log, or the absence
+    of a sealing checkpoint each fail the resolution by name."""
+    signer = signer if signer is not None else receipts.default_signer()
+    failures: list[str] = []
+
+    rows = _load_jsonl(Path(log_path), failures)
+    if rows is None:
+        return ResolveResult(ok=False, failures=failures)
+
+    # ---- chain walk (same discipline as verify_log: named failures)
+    chained: list[dict] = []
+    prev_hash: str | None = None
+    prev_entry: dict | None = None
+    legacy = 0
+    chain_started = False
+    for pos, entry in enumerate(rows):
+        if "entry_hash" not in entry:
+            if chain_started:
+                failures.append(f"unchained_entry_after_chain_start: position {pos}")
+            else:
+                legacy += 1
+            prev_entry = entry
+            continue
+        chain_started = True
+        expected_prev = (
+            receipts.legacy_anchor(prev_entry)
+            if not chained and prev_entry is not None and legacy
+            else prev_hash
+        )
+        if entry.get("seq") != pos:
+            failures.append(
+                f"seq_mismatch: position {pos} carries seq={entry.get('seq')!r}"
+            )
+        if entry.get("prev_hash") != expected_prev:
+            failures.append(f"prev_hash_link_broken: seq {pos}")
+        if receipts.entry_hash(entry) != entry["entry_hash"]:
+            failures.append(f"entry_hash_mismatch: seq {pos} (entry edited)")
+        chained.append(entry)
+        prev_hash = entry.get("entry_hash")
+        prev_entry = entry
+    if failures:
+        return ResolveResult(ok=False, failures=failures)
+
+    chained_pos = {id(e): i for i, e in enumerate(chained)}
+
+    # ---- the manifest and its covering runs
+    manifests = {
+        e.get("manifest_sha256"): e
+        for e in chained
+        if e.get("entry_type") == receipts.ENTRY_TYPE_FREEZE_MANIFEST
+    }
+    manifest_entry = manifests.get(manifest_sha256)
+    if manifest_entry is None:
+        failures.append(
+            f"manifest_not_found: no freeze_manifest entry carries "
+            f"manifest_sha256={manifest_sha256}"
+        )
+        return ResolveResult(ok=False, failures=failures)
+
+    test_runs = [
+        e for e in chained if e.get("entry_type") == receipts.ENTRY_TYPE_TEST_RUN
+    ]
+    for run in test_runs:
+        if run.get("manifest_sha256") not in manifests:
+            failures.append(
+                f"test_run_unknown_manifest: test_run at seq {run.get('seq')} "
+                f"binds manifest_sha256={run.get('manifest_sha256')!r}, "
+                f"which no freeze_manifest entry in this log carries"
+            )
+    covering = [r for r in test_runs if r.get("manifest_sha256") == manifest_sha256]
+    if not covering:
+        failures.append(
+            f"manifest_without_test_run: manifest {manifest_sha256} has "
+            f"no covering test_run entry"
+        )
+
+    # ---- the sealing checkpoint: earliest valid checkpoint whose
+    # committed size covers the manifest entry and every covering run.
+    needed = (
+        max([chained_pos[id(manifest_entry)]] + [chained_pos[id(r)] for r in covering])
+        + 1
+        if covering
+        else chained_pos[id(manifest_entry)] + 1
+    )
+    cp_path = (
+        Path(checkpoint_path)
+        if checkpoint_path is not None
+        else receipts.default_checkpoint_path(log_path)
+    )
+    cp_rows: list[dict] = []
+    if cp_path.exists():
+        loaded = _load_jsonl(cp_path, failures)
+        if loaded is not None:
+            cp_rows = loaded
+    sealing: dict | None = None
+    if not cp_rows:
+        failures.append(
+            "no_checkpoint: no signed checkpoint found — the entries are unsealed"
+        )
+    else:
+        leaves = [e["entry_hash"] for e in chained]
+        for envelope in cp_rows:
+            try:
+                payload = receipts.checkpoint_payload(envelope)
+            except Exception:
+                failures.append(
+                    "checkpoint_malformed: a checkpoint envelope does not decode"
+                )
+                continue
+            if payload.get("schema") != receipts.CHECKPOINT_SCHEMA:
+                failures.append(
+                    f"checkpoint_schema: {payload.get('schema')!r} != "
+                    f"{receipts.CHECKPOINT_SCHEMA!r}"
+                )
+                continue
+            if not receipts.checkpoint_signature_valid(envelope, signer):
+                failures.append(
+                    "checkpoint_signature_invalid: a checkpoint signature "
+                    "does not verify"
+                )
+                continue
+            size = payload.get("log_size")
+            if not isinstance(size, int) or size < needed or size > len(leaves):
+                continue  # valid, but does not seal these entries (yet)
+            if payload.get("merkle_root") != receipts.merkle_root(leaves[:size]):
+                failures.append(
+                    "checkpoint_root_mismatch: checkpoint root does not "
+                    "recompute over the entries it claims to seal"
+                )
+                continue
+            if payload.get("head_receipt_hash") != leaves[size - 1]:
+                failures.append(
+                    "head_hash_mismatch: checkpoint head != entry hash at "
+                    "the seal boundary"
+                )
+                continue
+            sealing = payload
+            break
+        if sealing is None and not failures:
+            failures.append(
+                f"checkpoint_not_covering: no checkpoint seals the "
+                f"manifest and its covering test runs (needs log_size "
+                f">= {needed})"
+            )
+
+    return ResolveResult(
+        ok=not failures,
+        failures=failures,
+        manifest_entry=manifest_entry,
+        test_runs=covering,
+        checkpoint=sealing,
+    )
+
+
+def _resolve_main(argv: list[str]) -> int:
+    """Console entry for the resolve verb."""
+    parser = argparse.ArgumentParser(
+        prog="chancellor-verify-log resolve",
+        description="Resolve a freeze manifest hash to its covering "
+        "test_run receipts and sealing checkpoint.",
+    )
+    parser.add_argument("log", help="path to the audit log JSONL")
+    parser.add_argument("manifest", help="manifest_sha256 to resolve")
+    parser.add_argument(
+        "--checkpoints",
+        default=None,
+        help="checkpoint sidecar path (default: <log>.checkpoints.jsonl)",
+    )
+    args = parser.parse_args(argv)
+
+    if not Path(args.log).exists():
+        print(f"error: log not found: {args.log}", file=sys.stderr)
+        return 2
+    result = resolve_manifest(args.log, args.manifest, checkpoint_path=args.checkpoints)
+    if result.manifest_entry is not None:
+        m = result.manifest_entry
+        print(
+            f"manifest: seq {m.get('seq')} entry {m.get('entry_hash')} "
+            f"({m.get('file_count')} files, suite {m.get('suite_id')!r}, "
+            f"head {m.get('head')!r}, recorded_by {m.get('recorded_by')!r})"
+        )
+    for run in result.test_runs:
+        print(
+            f"test_run: seq {run.get('seq')} suite {run.get('suite')!r} "
+            f"passed={run.get('passed')} failed={run.get('failed')} "
+            f"report {run.get('report_sha256')} seat {run.get('seat')!r}"
+        )
+    if result.checkpoint is not None:
+        cp = result.checkpoint
+        print(
+            f"sealed_by: checkpoint log_size={cp.get('log_size')} "
+            f"merkle_root={cp.get('merkle_root')} "
+            f"head={cp.get('head_receipt_hash')}"
+        )
+    for failure in result.failures:
+        print(f"FAIL: {failure}")
+    if result.ok:
+        print("RESOLVED: manifest, covering test runs, and sealing checkpoint")
+        return 0
+    print("NOT RESOLVED")
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     """Console entry point for the offline verifier (chancellor-verify-log)."""
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "resolve":
+        return _resolve_main(argv[1:])
     parser = argparse.ArgumentParser(
         prog="chancellor-verify-log",
         description="Verify a Chancellor hash-chained audit log offline.",
@@ -225,7 +588,41 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="accept a log with no checkpoint (tail truncation then undetectable)",
     )
+    parser.add_argument(
+        "--proof",
+        default=None,
+        help="verify a holder-presented v2 inclusion proof (JSON file) "
+        "against the newest checkpoint in the sidecar — standalone: "
+        "the log is not consulted",
+    )
     args = parser.parse_args(argv)
+
+    if args.proof is not None:
+        cp_path = (
+            Path(args.checkpoints)
+            if args.checkpoints is not None
+            else receipts.default_checkpoint_path(args.log)
+        )
+        if not cp_path.exists():
+            print(f"error: checkpoints not found: {cp_path}", file=sys.stderr)
+            return 2
+        try:
+            proof = json.loads(Path(args.proof).read_text(encoding="utf-8"))
+        except Exception as exc:
+            print(f"error: proof file unreadable: {exc}", file=sys.stderr)
+            return 2
+        result = verify_holder_proof(cp_path, proof)
+        print(
+            f"checkpoints: {result.checkpoints}, "
+            f"checkpoint log_size: {result.checkpoint_log_size}"
+        )
+        if result.ok:
+            print("VERIFIED: holder proof folds to the checkpoint root")
+            return 0
+        for failure in result.failures:
+            print(f"FAIL: {failure}")
+        print("NOT VERIFIED")
+        return 1
 
     if not Path(args.log).exists():
         print(f"error: log not found: {args.log}", file=sys.stderr)
