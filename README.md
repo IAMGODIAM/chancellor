@@ -30,6 +30,8 @@ python -m chancellor.verify_log .chancellor-exhibit/audit-log.jsonl
 ```
 
 - **The evidence:** [docs/evidence/run-7/](docs/evidence/run-7/) — the 10x record (RUN-7) with its bounds printed, verified by an independent recount; the first measurement (RUN-5) stands at [docs/evidence/run-5/](docs/evidence/run-5/); a two-file sample you can verify in isolation lives in [docs/evidence/sample/](docs/evidence/sample/).
+- **Live — the judging-week soak:** [The Long Watch](https://iamgodiam.github.io/chancellor/live.html) — the frozen submission tree's soak, composed live: 11,520 governed segments across judging week, running through finals on Nov 9, rendered from the same state on the same hourly cycle. The canonical text record is [LIVE-SOAK.md](https://github.com/IAMGODIAM/chancellor/blob/judging-soak/LIVE-SOAK.md) on the `judging-soak` branch.
+- **Live — the supervisor's own evidence run (IN FLIGHT, UNVERIFIED):** [the RUN-9 board](https://github.com/IAMGODIAM/chancellor/blob/run9-live/LIVE-KEEP.md) — the KEEP office on trial in the open: scheduled kills, corruption offered live, refusals receipted, an escalation budget spent to its last unit, and the anchoring boundary itself — a machine-loss cell whose pre-registered expectation is that no recovery is claimed. Every figure stays off this README until the run's verified recount is filed.
 - **The film:** the [Demo](#demo) section below — three minutes, a capture of this exact run.
 
 One term, defined once: **drift**, here, means a run claiming success for work whose final state failed its check — not model drift. Every drift figure in this README uses that sense.
@@ -181,7 +183,7 @@ The code cites its governing amendments inline (AM-2, EA-5, …) — the key is 
 
 ## How it maps to the judging criteria
 
-- **Impact (30%)** — for anyone who runs long-running agents with real authority: every consequential act is gated before it happens, graded after it lands, and receipted either way — so an operator can hand an agent real work (spend, sends, publishing, irreversible acts) and prove afterward exactly what it did, what it cost, and who approved it.
+- **Impact (30%)** — for anyone who runs long-running agents with real authority: every consequential act is gated before it happens, graded after it lands, and receipted either way — and the run itself is kept by the fourth element, a supervisor that verifies the chain before it resumes anything — so an operator can hand an agent real work (spend, sends, publishing, irreversible acts) and prove afterward exactly what it did, what it cost, and who approved it.
 - **Tooling — creative use of Meta's tools (25%)** — the Meta Model API supplies both halves of the separation of powers: `muse-spark-1.3` does the work and `muse-wonder-1.0` grades it, so no run is scored by the model that produced it. Exact, versioned IDs only — see [ERRATA.md](ERRATA.md) E-1.
 - **Demo (25%)** — `chancellor demo` runs end-to-end offline today; the identical run executes on the live Meta models through the same client (connection validated Oct 30), so the demo cannot drift from the product. (Video: see the Demo section above.)
 - **Technical Depth (20%)** — durable, crash-atomic task graphs proven under kill-resume gates (300 / 300 at 1x; 3,000 / 3,000 as a labeled 10-box reproduction at 10x), an in-product supervisor that verifies before it resumes, rubric-graded outputs from an independent judge, failure-injected reliability measurement with the cost printed beside the frontier, and a hash-chained audit log verifiable offline.
