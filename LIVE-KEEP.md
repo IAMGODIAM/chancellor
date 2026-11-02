@@ -52,27 +52,24 @@ receipts as they land.
 ## Status
 
 <!-- STATUS:BEGIN -->
-- **Standing:** IN FLIGHT — every figure UNVERIFIED, republished from the boxes’ own state files.
-- **As of:** 2026-11-02 16:01 EST (five-minute cadence)
-- **Boxes reporting:** 1 / 4
-- **Segments:** 646 / 240 across the watches polled · complete 595 · halted fail-closed 51 · faults injected 64
+- **Standing:** COMPLETE — the run has finished; the verified recount governs.
+- **As of:** 2026-11-02 17:39 EST (final publish — the publisher stands down after this cycle)
+- **Boxes reporting:** 0 / 4 — every instance terminated
+- **Completion evidence:** all four instances confirmed terminated — absent from a successful fleet-wide instance list this cycle (the lane reports an empty fleet), matching the collection's post-termination confirmation in results/VERIFIED-RESULTS.md; the recount is filed and governs.
 - **Drift events:** 0
-- **The watch's receipts so far:** refusals 2 · escalations 2 · budget_exhausted 2 · chain_verification 6 · escalation 2 · interruption_detected 8 · resume_failed 6 · resume_launched 6 · stall_anomaly 78 · supervision_started 3
+- **The watch's receipts (final in-flight tallies, held from the last poll at 2026-11-02 16:01 EST):** refusals 2 · escalations 2 · budget_exhausted 2 · chain_verification 6 · escalation 2 · interruption_detected 8 · resume_failed 6 · resume_launched 6 · stall_anomaly 78 · supervision_started 3
 
 ### Box b0 — Cell A — kill cycle · us-east-1
-- Not yet reported — not present in lambda list. The cadence catches up; nothing is filled in by assumption.
+- **Instance terminated** — collected and recounted; this cell's final figures stand in the verified recount (results/VERIFIED-RESULTS.md), which governs over every in-flight tally this board published.
 
 ### Box b1 — Cell A — kill cycle (replication) · us-west-1
-- Not yet reported — not present in lambda list. The cadence catches up; nothing is filled in by assumption.
+- **Instance terminated** — collected and recounted; this cell's final figures stand in the verified recount (results/VERIFIED-RESULTS.md), which governs over every in-flight tally this board published.
 
 ### Box b2 — Cell B — supervisor death + refusal · us-east-1
-- **Phase:** RUN · **Step:** seed-9110 · *supervised run starting (B-corrupt-kill)*
-- **Watch 9105:** segments 240 / 240 · complete 222 · halted 18 · faults 24 · drift 0 · corrupted state files 0 · in-run chain verifications 28/28 ok · supervision receipts 122 (refusals 1, escalations 1) · latest watch event: *supervisor escalation: resume budget exhausted*
-- **Watch 9109:** segments 240  · complete 221 · halted 19 · faults 24 · drift 0 · corrupted state files 0 · in-run chain verifications 28/28 ok · supervision receipts 122 (refusals 1, escalations 1) · latest watch event: *supervisor escalation: resume budget exhausted*
-- **Watch 9110:** segments 166  · complete 152 · halted 14 · faults 16 · drift 0 · corrupted state files 0 · in-run chain verifications 19/19 ok · supervision receipts 75 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
+- **Instance terminated** — collected and recounted; this cell's final figures stand in the verified recount (results/VERIFIED-RESULTS.md), which governs over every in-flight tally this board published.
 
 ### Box b3 — Cell C — stall vs death, then D — machine loss (staged) · us-west-1
-- Not yet reported — not present in lambda list. The cadence catches up; nothing is filled in by assumption.
+- **Instance terminated** — collected and recounted; this cell's final figures stand in the verified recount (results/VERIFIED-RESULTS.md), which governs over every in-flight tally this board published.
 
 <!-- STATUS:END -->
 
