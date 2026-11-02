@@ -19,10 +19,15 @@ Gates (Scout 3 §A4):
 from __future__ import annotations
 
 import itertools
+from collections.abc import Callable
 
 from ..grader import Rubric, grade
 from .suite_a import NORMATIVE_RUBRIC
 from .suite_a_bank import Scenario
+
+# The scorer contract (module docstring): any callable that grades a
+# proposal per criterion.
+Scorer = Callable[[Scenario, str], dict[str, float]]
 
 STYLE_TWIN_GATE = 5.0
 PADDING_GATE = 3.0
@@ -37,12 +42,12 @@ FILLER = (
 )
 
 
-def _total(scorer, scenario: Scenario, proposal: str, rubric: Rubric) -> float:
+def _total(scorer: Scorer, scenario: Scenario, proposal: str, rubric: Rubric) -> float:
     return grade(rubric, scorer(scenario, proposal)).total
 
 
 def style_twin_probe(
-    scorer,
+    scorer: Scorer,
     scenario: Scenario,
     plain: str,
     flowery: str,
@@ -62,7 +67,7 @@ def style_twin_probe(
 
 
 def padding_probe(
-    scorer,
+    scorer: Scorer,
     scenario: Scenario,
     proposal: str,
     filler: str = FILLER,
@@ -82,7 +87,7 @@ def padding_probe(
 
 
 def permutation_probe(
-    scorer,
+    scorer: Scorer,
     scenario: Scenario,
     proposal: str,
     rubric: Rubric = NORMATIVE_RUBRIC,
@@ -112,7 +117,7 @@ def permutation_probe(
 
 
 def hedge_probe(
-    scorer,
+    scorer: Scorer,
     scenario: Scenario,
     verify_first: str,
     maximal: str,
