@@ -8,6 +8,7 @@ docs/evidence/foundry-install-hearing/."""
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -571,7 +572,16 @@ def _bridge_entries(tmp_path):
     return log.read_all(), arc
 
 
-def _bridge_journal(arc, *, seq=None, entry_hash=None, at="2026-11-02T20:00:00Z"):
+def _bridge_journal(arc, *, seq=None, entry_hash=None, at=None):
+    if at is None:
+        # The pre-flight must not pre-date the decision it follows, so
+        # derive its time from the decision entry itself (+1h). A fixed
+        # wall-clock date here time-bombed the clean-pair test: it only
+        # passed until that date (2026-11-02T20:00Z) was reached, then
+        # failed deterministically on every later run.
+        at = datetime.fromtimestamp(
+            float(arc.decision_entry["ts"]) + 3600, tz=UTC
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
     return {
         arc.act.act_id: {
             "preflight": {"at": at, "verdict": "PASS"},
