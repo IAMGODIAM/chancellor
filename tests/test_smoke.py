@@ -50,3 +50,39 @@ def test_cli_eval_suites_run(capsys):
     assert cli_main(["eval-b"]) == 0
     out = capsys.readouterr().out
     assert "normative" in out and "reliability" in out
+
+
+def test_cli_help_and_version(capsys):
+    for argv in ([], ["--help"], ["-h"], ["help"]):
+        assert cli_main(argv) == 0
+        assert "usage: chancellor" in capsys.readouterr().out
+    assert cli_main(["--version"]) == 0
+    assert capsys.readouterr().out.startswith("chancellor ")
+    assert cli_main(["demo", "--help"]) == 0
+    assert "--auto" in capsys.readouterr().out
+    assert cli_main(["eval-a", "--help"]) == 0
+    assert "usage: chancellor eval-a" in capsys.readouterr().out
+
+
+def test_cli_unknown_command_points_to_help(capsys):
+    assert cli_main(["nope"]) == 2
+    assert "chancellor --help" in capsys.readouterr().err
+
+
+def test_cli_verify_log_matches_module(tmp_path, monkeypatch, capsys):
+    """`chancellor verify-log` passes on a clean demo log and fails
+    (non-zero) on an altered copy, like `python -m chancellor.verify_log`."""
+    import json
+
+    monkeypatch.chdir(tmp_path)
+    assert cli_main(["demo", "--fast", "--auto"]) == 0
+    log = tmp_path / ".chancellor-exhibit" / "audit-log.jsonl"
+    assert cli_main(["verify-log", str(log)]) == 0
+    lines = log.read_text().splitlines()
+    entry = json.loads(lines[1])
+    entry["altered"] = True
+    lines[1] = json.dumps(entry)
+    altered = tmp_path / "altered.jsonl"
+    altered.write_text("\n".join(lines) + "\n")
+    assert cli_main(["verify-log", str(altered)]) != 0
+    capsys.readouterr()

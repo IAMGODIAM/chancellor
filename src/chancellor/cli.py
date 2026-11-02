@@ -252,10 +252,61 @@ def run_demo(state_dir: str = ".chancellor") -> int:
     return 0 if report.ok else 1
 
 
+USAGE = """usage: chancellor <command> [options]
+
+commands:
+  demo        the exhibit, offline: graded work, a halted fault, a human
+              gate, a verified receipt chain (about two minutes; --fast)
+  supervise   run an agent under supervision: chancellor supervise -- <cmd>
+  eval-a      run Eval Suite A (normative judgment), JSON to stdout
+  eval-b      run Eval Suite B (long-horizon reliability), JSON to stdout
+  verify-log  verify an audit log offline: chancellor verify-log <audit-log.jsonl>
+
+options:
+  -h, --help     show this help (also: chancellor <command> --help)
+  --version      show the installed version
+"""
+
+DEMO_USAGE = """usage: chancellor demo [--fast] [--auto] [--tamper] [--live] [--seed N]
+                       [--classic]
+
+  --fast     compress the stage pauses (chosen automatically when output
+             is not a terminal)
+  --auto     unattended run: the human gate approves itself after a
+             visible pause; without it the gate waits for Enter, and with
+             no terminal attached it denies (fail-closed, exit 1)
+  --tamper   finally show the verifier an altered copy of the log
+  --live     use the real models (needs CHANCELLOR_META_API_BASE and
+             CHANCELLOR_META_API_KEY)
+  --seed N   integer seed for the scripted run
+  --classic  the original scripted governed run (state in ./.chancellor)
+
+exit code: 0 only on the full, honest path (drift 0, chain verified);
+1 when the run did not complete that path; 2 on a usage error."""
+
+EVAL_USAGE = (
+    "usage: chancellor {name}\n\n  runs the suite offline and prints its JSON report"
+)
+
+
+def _version() -> str:
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+    except ImportError:  # pragma: no cover - stdlib on 3.11+
+        return "unknown"
+    try:
+        return version("chancellor")
+    except PackageNotFoundError:
+        return "unknown (not installed)"
+
+
 def _demo_command(args: list[str]) -> int:
     """`chancellor demo` is the exhibit (chancellor.exhibit): the
     hearing, live in the terminal. The original scripted run remains
     available as `chancellor demo --classic`."""
+    if any(a in {"-h", "--help"} for a in args):
+        print(DEMO_USAGE)
+        return 0
     if "--classic" in args:
         return run_demo()
     known = {"--fast", "--auto", "--tamper", "--live", "--seed"}
@@ -270,9 +321,15 @@ def _demo_command(args: list[str]) -> int:
         except (IndexError, ValueError):
             print("--seed needs an integer value", file=sys.stderr)
             return 2
+    fast = "--fast" in args
+    if not fast and not sys.stdout.isatty():
+        # Stage pacing is for a live audience; piped or logged output
+        # gets the same run, compressed.
+        print("output is not a terminal: running with --fast", file=sys.stderr)
+        fast = True
     try:
         return run_exhibit(
-            fast="--fast" in args,
+            fast=fast,
             auto="--auto" in args,
             tamper="--tamper" in args,
             live="--live" in args,
@@ -332,12 +389,31 @@ def _supervise_command(args: list[str]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Console entry point: dispatch the demo, supervise, verify-log,
-    and eval subcommands."""
+    """Console entry point: dispatch the demo, supervise, and eval
+    subcommands, the offline log verifier (verify-log), plus --help
+    and --version."""
     argv = list(sys.argv[1:] if argv is None else argv)
-    cmd = argv[0] if argv else "demo"
+    if not argv:
+        print(USAGE)
+        return 0
+    cmd = argv[0]
+    if cmd in {"-h", "--help", "help"}:
+        print(USAGE)
+        return 0
+    if cmd in {"--version", "-V", "version"}:
+        print(f"chancellor {_version()}")
+        return 0
+    if cmd in {"eval-a", "eval-b"} and any(a in {"-h", "--help"} for a in argv[1:]):
+        print(EVAL_USAGE.format(name=cmd))
+        return 0
     if cmd == "demo":
         return _demo_command(argv[1:])
+    if cmd == "verify-log":
+        from .verify_log import main as verify_log_main
+
+        # Same arguments, output and exit codes as
+        # `python -m chancellor.verify_log`: non-zero on any failure.
+        return verify_log_main(argv[1:])
     if cmd == "supervise":
         return _supervise_command(argv[1:])
     if cmd == "eval-a":
@@ -347,9 +423,11 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(suite_b.run_suite().to_dict(), indent=2))
         return 0
     print(
-        f"unknown command: {cmd} (expected demo | supervise | eval-a | eval-b)",
+        f"unknown command: {cmd} "
+        "(expected demo | supervise | eval-a | eval-b | verify-log)",
         file=sys.stderr,
     )
+    print("run `chancellor --help` for usage", file=sys.stderr)
     return 2
 
 
