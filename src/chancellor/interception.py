@@ -13,9 +13,18 @@ disagreement between what was approved and what ran, or between what a
 worker says it did and what went through the broker, is a mismatch, and
 the runner halts on it.
 
+Workers reach the broker through a per-node ``NodeTools`` handle, which
+the runner creates, binds to the node, and revokes when the node's worker
+returns. The handle offers ``call`` and ``has_tool`` only; it carries no
+tool callables, and the node id on every call is the runner's.
+
 Scope, stated plainly: the broker can only see calls made through it. A
 worker that holds a direct handle to a gate-capable tool is outside this
-layer; keep such handles out of workers and give them the broker.
+layer, and Python cannot stop a worker from importing or closing over
+one. The runner enforces what it controls: it hands workers the
+``NodeTools`` handle and nothing else, and reconcile halts a node that
+declares a brokered tool the ledger did not see. Keep raw tool handles
+out of worker code.
 """
 
 from __future__ import annotations
@@ -66,7 +75,9 @@ class InterceptRecord:
 @dataclass
 class ToolBroker:
     gatekeeper: Gatekeeper
-    tools: dict[str, Tool] = field(default_factory=dict)
+    # Registered callables are held privately: nothing outside the broker
+    # is handed a raw tool by name. Use register() and call().
+    _tools: dict[str, Tool] = field(default_factory=dict, init=False, repr=False)
     effects: dict[str, tuple[str, ...]] = field(default_factory=dict)
     ledger: list[InterceptRecord] = field(default_factory=list)
 
@@ -74,8 +85,13 @@ class ToolBroker:
         """Make a tool available through the broker. ``effects`` adds
         effect axes on top of whatever the policy table says for the
         tool's name; they can only make the decided class stricter."""
-        self.tools[name.strip().lower()] = fn
+        self._tools[name.strip().lower()] = fn
         self.effects[name.strip().lower()] = tuple(effects)
+
+    def session(self, node_id: str) -> NodeTools:
+        """The only tool access a worker is given: a handle bound to one
+        node, valid until the runner revokes it."""
+        return NodeTools(self, node_id)
 
     def mark(self) -> int:
         """A position in the ledger; pass it to reconcile to look only at
@@ -83,7 +99,7 @@ class ToolBroker:
         return len(self.ledger)
 
     def has_tool(self, name: object) -> bool:
-        return isinstance(name, str) and name.strip().lower() in self.tools
+        return isinstance(name, str) and name.strip().lower() in self._tools
 
     def call(
         self,
@@ -109,7 +125,7 @@ class ToolBroker:
             effects=self.effects.get(key, ()),
             args_sha256=args_digest,
         )
-        fn = self.tools.get(key)
+        fn = self._tools.get(key)
         if fn is None:
             decision = self.gatekeeper.note(
                 node_id=node_id,
@@ -193,3 +209,50 @@ class ToolBroker:
                     f"{tool}: declared arguments differ from the approved call"
                 )
         return mismatches
+
+
+class NodeTools:
+    """A worker's view of the broker for ONE node. It can call registered
+    tools through the broker's check and ask whether a tool is registered;
+    it exposes no tool callables and cannot name another node. The runner
+    revokes it when the node's worker returns, after which every call is
+    refused."""
+
+    __slots__ = ("_broker", "_node_id", "_active")
+
+    def __init__(self, broker: ToolBroker, node_id: str) -> None:
+        self._broker = broker
+        self._node_id = node_id
+        self._active = True
+
+    @property
+    def node_id(self) -> str:
+        return self._node_id
+
+    def has_tool(self, name: object) -> bool:
+        return self._active and self._broker.has_tool(name)
+
+    def call(
+        self,
+        tool: str,
+        args: Mapping[str, Any] | None = None,
+        *,
+        action: str | None = None,
+        detail: str = "",
+        cost_usd: float | None = None,
+    ) -> Any:
+        """Check, then run — through the broker. Raises ToolDenied when
+        refused, or when this handle has been revoked."""
+        if not self._active:
+            raise ToolDenied("tool access for this node has ended — denied")
+        return self._broker.call(
+            self._node_id,
+            tool,
+            args,
+            action=action,
+            detail=detail,
+            cost_usd=cost_usd,
+        )
+
+    def revoke(self) -> None:
+        self._active = False
