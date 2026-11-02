@@ -202,13 +202,9 @@ class AuditLog:
         # any request-side axes the caller computed (install governor:
         # from the bundle's declared permissions). Requests that do
         # not set the field get the floor alone — unchanged bytes.
-        effect_axes = _receipts.effect_axes_for(
-            decision.request.action_class.value
-        )
+        effect_axes = _receipts.effect_axes_for(decision.request.action_class.value)
         if decision.request.effect_axes is not None:
-            effect_axes = sorted(
-                set(effect_axes) | set(decision.request.effect_axes)
-            )
+            effect_axes = sorted(set(effect_axes) | set(decision.request.effect_axes))
         entry: dict[str, Any] = {
             "schema": _receipts.SCHEMA,
             **_receipts.current_frame_fields(),

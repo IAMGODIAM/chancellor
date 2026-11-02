@@ -669,9 +669,7 @@ def audit_install_bridge(
         ):
             seq = citation.get("seq")
             target = by_seq.get(seq) if isinstance(seq, int) else None
-            if target is None or target.get("entry_hash") != citation.get(
-                "entry_hash"
-            ):
+            if target is None or target.get("entry_hash") != citation.get("entry_hash"):
                 failures.append(
                     f"bridge_citation_unresolved: act {act_id} cites "
                     f"Chancellor seq {seq}, not found in the chain"
@@ -691,9 +689,9 @@ def audit_install_bridge(
                     parsed = json.loads(detail)
                 except json.JSONDecodeError:
                     parsed = {}
-            if parsed.get("bundle_id") != bundle_id or parsed.get(
+            if parsed.get("bundle_id") != bundle_id or parsed.get("verb") != record.get(
                 "verb"
-            ) != record.get("verb"):
+            ):
                 failures.append(
                     f"bridge_citation_mismatch: act {act_id} vs the "
                     f"decision at seq {seq} (bundle/verb disagree)"
@@ -733,11 +731,7 @@ def audit_install_bridge(
             continue
         cited_seq = _opening_seq(cited_opening)
         act_seq = record.get("receipt_seq")
-        if (
-            cited_seq is not None
-            and isinstance(act_seq, int)
-            and cited_seq >= act_seq
-        ):
+        if cited_seq is not None and isinstance(act_seq, int) and cited_seq >= act_seq:
             failures.append(
                 f"bridge_precedence_late: act {act_id}'s cited "
                 f"decision sits at issuer index {cited_seq}, not "
@@ -811,9 +805,7 @@ def _load_act_journals(acts_dir: Path) -> tuple[list[dict], dict[str, dict]]:
                 f = child / name
                 if f.exists():
                     try:
-                        journal[key] = json.loads(
-                            f.read_text(encoding="utf-8")
-                        )
+                        journal[key] = json.loads(f.read_text(encoding="utf-8"))
                     except json.JSONDecodeError:
                         journal[key] = None
             journals[child.name] = journal
@@ -885,8 +877,9 @@ def _bridge_main(argv: list[str]) -> int:
     for failure in result.failures:
         print(f"FAIL: {failure}")
     if result.ok:
-        print("BRIDGE VERIFIED: every citation resolves, every "
-              "decision pre-dates its act")
+        print(
+            "BRIDGE VERIFIED: every citation resolves, every decision pre-dates its act"
+        )
         return 0
     print("BRIDGE NOT VERIFIED")
     return 1

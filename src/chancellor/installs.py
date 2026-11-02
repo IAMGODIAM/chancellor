@@ -196,9 +196,7 @@ class ManagerGateway(Protocol):
     its pre-flight, its verbs, its §4.5 restore path — never a
     re-implementation of them."""
 
-    def preflight(
-        self, proposal: BundleProposal, verb: str
-    ) -> PreflightOutcome: ...
+    def preflight(self, proposal: BundleProposal, verb: str) -> PreflightOutcome: ...
 
     def run_act(
         self,
@@ -271,9 +269,7 @@ class FoundryManagerGateway:
         self.extra_pythonpath = extra_pythonpath
         ws = self.manager_home / "workspace"
         self.foundry_state = ws / "foundry"
-        self.manager_py = (
-            ws / "custom-skills/local-foundry-manager/bin/foundry.py"
-        )
+        self.manager_py = ws / "custom-skills/local-foundry-manager/bin/foundry.py"
         self.acts_dir = self.foundry_state / "acts"
         self.acts_log = self.acts_dir / "acts.jsonl"
 
@@ -317,8 +313,15 @@ class FoundryManagerGateway:
 
     def _run_driver(self, op: str, *args: str) -> dict[str, Any]:
         proc = self._run(
-            [self.python, "-m", "chancellor.installs", "_driver", op,
-             str(self.manager_py), *args]
+            [
+                self.python,
+                "-m",
+                "chancellor.installs",
+                "_driver",
+                op,
+                str(self.manager_py),
+                *args,
+            ]
         )
         if proc.returncode != 0:
             raise InstallError(
@@ -330,9 +333,7 @@ class FoundryManagerGateway:
     def _journal_dir(self, act_id: str) -> Path:
         return self.acts_dir / act_id
 
-    def _file_citation(
-        self, act_id: str, citation: dict[str, Any]
-    ) -> None:
+    def _file_citation(self, act_id: str, citation: dict[str, Any]) -> None:
         journal = self._journal_dir(act_id)
         journal.mkdir(parents=True, exist_ok=True)
         (journal / "chancellor-decision.json").write_text(
@@ -340,24 +341,22 @@ class FoundryManagerGateway:
         )
 
     # -- the seam
-    def preflight(
-        self, proposal: BundleProposal, verb: str
-    ) -> PreflightOutcome:
-        act_id = (
-            f"preflight-{proposal.bundle_id}-"
-            + time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    def preflight(self, proposal: BundleProposal, verb: str) -> PreflightOutcome:
+        act_id = f"preflight-{proposal.bundle_id}-" + time.strftime(
+            "%Y%m%dT%H%M%SZ", time.gmtime()
         )
         out = self._run_driver(
-            "preflight", proposal.bundle_id, verb, act_id,
+            "preflight",
+            proposal.bundle_id,
+            verb,
+            act_id,
             str(proposal.source_dir),
         )
         journal = self._journal_dir(act_id)
         if out.get("ok"):
             record = out["record"]
             filed = journal / "preflight.json"
-            record_hash = (
-                _sha256_hex(filed.read_bytes()) if filed.exists() else None
-            )
+            record_hash = _sha256_hex(filed.read_bytes()) if filed.exists() else None
             return PreflightOutcome(
                 ok=True,
                 bundle_id=proposal.bundle_id,
@@ -408,9 +407,7 @@ class FoundryManagerGateway:
     ) -> ActOutcome:
         out = self._run_driver("rollback-install", bundle_id, install_act_id)
         if not out.get("ok"):
-            raise InstallError(
-                f"install rollback refused: {out.get('reason')}"
-            )
+            raise InstallError(f"install rollback refused: {out.get('reason')}")
         result = out["result"]
         act_id = str(result["act_id"])
         self._file_citation(act_id, decision_citation)
@@ -442,9 +439,7 @@ class FoundryManagerGateway:
 
 # ----------------------------------------------------- manager driver (subprocess)
 def _load_manager(manager_py: str):
-    spec = importlib.util.spec_from_file_location(
-        "foundry_manager", manager_py
-    )
+    spec = importlib.util.spec_from_file_location("foundry_manager", manager_py)
     if spec is None or spec.loader is None:
         raise InstallError(f"cannot load manager at {manager_py}")
     module = importlib.util.module_from_spec(spec)
@@ -478,22 +473,24 @@ def _driver_main(argv: list[str]) -> int:
                     if not line.strip():
                         continue
                     rec = json.loads(line)
-                    if (
-                        rec.get("type") == "refusal"
-                        and rec.get("act_id") == act_id
-                    ):
+                    if rec.get("type") == "refusal" and rec.get("act_id") == act_id:
                         refusal_hash = rec.get("record_hash")
                         detail = rec.get("detail", "")
-            print(json.dumps({
-                "ok": False, "reason": reason,
-                "refusal_record_hash": refusal_hash, "detail": detail,
-            }))
+            print(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "reason": reason,
+                        "refusal_record_hash": refusal_hash,
+                        "detail": detail,
+                    }
+                )
+            )
         return 0
 
     if op == "rollback-install":
         bundle_id, install_act_id = args
-        print(json.dumps(_driver_rollback_install(m, bundle_id,
-                                                  install_act_id)))
+        print(json.dumps(_driver_rollback_install(m, bundle_id, install_act_id)))
         return 0
 
     if op == "disable":
@@ -501,19 +498,22 @@ def _driver_main(argv: list[str]) -> int:
         state, _, _ = m.fold_registry()
         loc = m.bundle_location(bundle_id, state)
         if loc is None or not loc.is_dir():
-            print(json.dumps({"ok": False,
-                              "reason": "no live tree to disable"}))
+            print(json.dumps({"ok": False, "reason": "no live tree to disable"}))
             return 0
         dest = m.DISABLED / bundle_id
         if dest.exists():
-            print(json.dumps({"ok": False,
-                              "reason": "disabled copy already exists"}))
+            print(json.dumps({"ok": False, "reason": "disabled copy already exists"}))
             return 0
         shutil.move(str(loc), str(dest))
-        print(json.dumps({
-            "ok": True, "moved_to": str(dest),
-            "library_present": (m.SKILLS_ROOT / bundle_id).exists(),
-        }))
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "moved_to": str(dest),
+                    "library_present": (m.SKILLS_ROOT / bundle_id).exists(),
+                }
+            )
+        )
         return 0
 
     if op == "enable":
@@ -524,12 +524,18 @@ def _driver_main(argv: list[str]) -> int:
         root = m.KIND_ROOTS.get(kind, m.SKILLS_ROOT)
         dest = root / bundle_id
         if not src.is_dir() or dest.exists():
-            print(json.dumps({"ok": False,
-                              "reason": "no disabled tree / target occupied"}))
+            print(
+                json.dumps(
+                    {"ok": False, "reason": "no disabled tree / target occupied"}
+                )
+            )
             return 0
         shutil.move(str(src), str(dest))
-        print(json.dumps({"ok": True, "restored_to": str(dest),
-                          "library_present": dest.exists()}))
+        print(
+            json.dumps(
+                {"ok": True, "restored_to": str(dest), "library_present": dest.exists()}
+            )
+        )
         return 0
 
     if op == "live-pin":
@@ -549,8 +555,9 @@ def _driver_main(argv: list[str]) -> int:
     return 0
 
 
-def _driver_rollback_install(m: Any, bundle_id: str,
-                             install_act_id: str) -> dict[str, Any]:
+def _driver_rollback_install(
+    m: Any, bundle_id: str, install_act_id: str
+) -> dict[str, Any]:
     """DESIGN-SPEC §4.5's restore path applied to an INSTALL act,
     whose snapshot is the pre-install ABSENT marker — composed from
     the manager's own functions, in cmd_rollback's order: verify the
@@ -566,78 +573,126 @@ def _driver_rollback_install(m: Any, bundle_id: str,
         state, _, _ = m.fold_registry()
         st = state.get(bundle_id)
         if not st or st.get("status") != "active":
-            m.refusal_record(act_id, "rollback", bundle_id, "evidence",
-                             "undeclared", "no active binding to roll back")
+            m.refusal_record(
+                act_id,
+                "rollback",
+                bundle_id,
+                "evidence",
+                "undeclared",
+                "no active binding to roll back",
+            )
             return {"ok": False, "reason": "undeclared"}
         kind = m.bundle_kind(bundle_id, state)
         target = m.KIND_ROOTS.get(kind, m.SKILLS_ROOT) / bundle_id
         installed_pin = orig["statement"]["content_hash"]
         if not target.is_dir():
-            m.refusal_record(act_id, "rollback", bundle_id, "evidence",
-                             "undeclared",
-                             "installed tree absent — nothing to restore from")
+            m.refusal_record(
+                act_id,
+                "rollback",
+                bundle_id,
+                "evidence",
+                "undeclared",
+                "installed tree absent — nothing to restore from",
+            )
             return {"ok": False, "reason": "undeclared"}
         live_pin, _, _ = m.tree_pin(target)
         if live_pin != installed_pin:
-            m.refusal_record(act_id, "rollback", bundle_id, "evidence",
-                             "undeclared",
-                             "installed tree != the install act's pin — "
-                             "the state to roll back is not the state "
-                             "the act produced")
+            m.refusal_record(
+                act_id,
+                "rollback",
+                bundle_id,
+                "evidence",
+                "undeclared",
+                "installed tree != the install act's pin — "
+                "the state to roll back is not the state "
+                "the act produced",
+            )
             return {"ok": False, "reason": "undeclared"}
         chk = m.verify_snapshot(install_act_id)
         if chk["rotten"]:
-            m.refusal_record(act_id, "rollback", bundle_id, "preflight",
-                             "preflight.snapshot-failed",
-                             f"snapshot rotten at {chk['rotten']} — "
-                             "rollback refuses rather than improvising")
+            m.refusal_record(
+                act_id,
+                "rollback",
+                bundle_id,
+                "preflight",
+                "preflight.snapshot-failed",
+                f"snapshot rotten at {chk['rotten']} — "
+                "rollback refuses rather than improvising",
+            )
             return {"ok": False, "reason": "preflight.snapshot-failed"}
         restored = m.restore_from_snapshot(install_act_id, target)
         if target.exists() or not restored["hash_equal"]:
-            m.refusal_record(act_id, "rollback", bundle_id, "preflight",
-                             "preflight.snapshot-failed",
-                             "restore did not reproduce the pre-install "
-                             "ABSENT state")
+            m.refusal_record(
+                act_id,
+                "rollback",
+                bundle_id,
+                "preflight",
+                "preflight.snapshot-failed",
+                "restore did not reproduce the pre-install ABSENT state",
+            )
             return {"ok": False, "reason": "preflight.snapshot-failed"}
         store = m._load_store()
         cache = m.rw.DiscoveryCache(store)
         ev = m.rw.make_signed(
             m.rw.event_body(
-                "BindingDeprecated", bundle_id, m.BINDER,
+                "BindingDeprecated",
+                bundle_id,
+                m.BINDER,
                 content_hash=installed_pin,
                 reason=f"rollback of {install_act_id}: pre-install "
-                       "ABSENT state restored from the act snapshot "
-                       "(governed rollback — frame v2, clause 6)"),
-            m._fixture)
+                "ABSENT state restored from the act snapshot "
+                "(governed rollback — frame v2, clause 6)",
+            ),
+            m._fixture,
+        )
         applied = cache.handle_event(ev)
         _, count, head = m.fold_registry()
         snap_hash = m.sha256_hex(m.canonical(chk["manifest"]))
-        effects = [{
-            "effect": "discovery/doc-surface window",
-            "detail": f"the installed tree (pin {installed_pin}) was "
-                      f"the live, discoverable state between act "
-                      f"{install_act_id} and this rollback; its "
-                      "receipted uses stand in the Chancellor chain "
-                      "and are not recalled",
-            "mark": "residual-accepted",
-            "reason": "G-3.3 (ratified): reads during the window are "
-                      "not recalled; the window is named, not erased. "
-                      "For a doc-only bundle there are no other "
-                      "effects to reconcile — the reconciliation is "
-                      "honestly vacuous beyond this named window.",
-        }]
+        effects = [
+            {
+                "effect": "discovery/doc-surface window",
+                "detail": f"the installed tree (pin {installed_pin}) was "
+                f"the live, discoverable state between act "
+                f"{install_act_id} and this rollback; its "
+                "receipted uses stand in the Chancellor chain "
+                "and are not recalled",
+                "mark": "residual-accepted",
+                "reason": "G-3.3 (ratified): reads during the window are "
+                "not recalled; the window is named, not erased. "
+                "For a doc-only bundle there are no other "
+                "effects to reconcile — the reconciliation is "
+                "honestly vacuous beyond this named window.",
+            }
+        ]
         rm_rec, in_rec = m._rollback_pair(
-            act_id, bundle_id, install_act_id, installed_pin, None,
-            snap_hash, effects,
-            {"registry_events_after": count, "registry_head_after": head,
-             "restore": restored, "deprecation_event_applied": applied})
-        result = {"act_id": act_id, "verb": "rollback",
-                  "rollback_of": install_act_id, "bundle_id": bundle_id,
-                  "removed_pin": installed_pin, "restored_pin": None,
-                  "restore": restored,
-                  "receipts": {"remove": rm_rec["receipt_id"],
-                               "install": in_rec["receipt_id"]},
-                  "effects": effects}
+            act_id,
+            bundle_id,
+            install_act_id,
+            installed_pin,
+            None,
+            snap_hash,
+            effects,
+            {
+                "registry_events_after": count,
+                "registry_head_after": head,
+                "restore": restored,
+                "deprecation_event_applied": applied,
+            },
+        )
+        result = {
+            "act_id": act_id,
+            "verb": "rollback",
+            "rollback_of": install_act_id,
+            "bundle_id": bundle_id,
+            "removed_pin": installed_pin,
+            "restored_pin": None,
+            "restore": restored,
+            "receipts": {
+                "remove": rm_rec["receipt_id"],
+                "install": in_rec["receipt_id"],
+            },
+            "effects": effects,
+        }
         (journal / "result.json").write_text(json.dumps(result, indent=2))
         return {"ok": True, "result": result}
 
@@ -685,9 +740,7 @@ def _is_strike_use(entry: dict[str, Any], *, gated: bool) -> bool:
     )
 
 
-def fold_probation(
-    entries: list[dict[str, Any]], capability_id: str
-) -> ProbationState:
+def fold_probation(entries: list[dict[str, Any]], capability_id: str) -> ProbationState:
     """Fold one capability's probation state from chain entries, in
     seq order. Entry-literal: standing changes only where an entry
     changes it. Uses count only inside an open window — auto uses
@@ -706,9 +759,7 @@ def fold_probation(
             state.uses = 0
             state.strikes = 0
             state.strike_seqs = []
-            state.window_uses = int(
-                entry.get("window_uses", PROBATION_WINDOW_USES)
-            )
+            state.window_uses = int(entry.get("window_uses", PROBATION_WINDOW_USES))
             state.opened_seq = entry.get("seq")
         elif etype == _receipts.ENTRY_TYPE_CAPABILITY_USE:
             if entry.get("capability_id") != capability_id:
@@ -862,9 +913,7 @@ class InstallGovernor:
             "frame_hash": _receipts.FRAME_HASH,
         }
 
-    def _permissions_union(
-        self, proposal: BundleProposal
-    ) -> tuple[str, ...]:
+    def _permissions_union(self, proposal: BundleProposal) -> tuple[str, ...]:
         axes = {
             PERMISSION_AXIS_MAP[p]
             for p in proposal.permissions_requested
@@ -906,8 +955,7 @@ class InstallGovernor:
             verb=verb,
             foundry_state=None,
             refusal_state=REFUSAL_INSTALL_OUT_OF_SCOPE,
-            record={"governor_scope_check": why,
-                    "decision_seq": entry["seq"]},
+            record={"governor_scope_check": why, "decision_seq": entry["seq"]},
             record_hash=entry["entry_hash"],
             detail=why,
         )
@@ -930,8 +978,7 @@ class InstallGovernor:
             return self._scope_refusal(
                 proposal,
                 verb,
-                f"verb {verb} is not enumerated in the frozen scope "
-                "artifact",
+                f"verb {verb} is not enumerated in the frozen scope artifact",
             )
         outcome = self._manager.preflight(proposal, verb)
         if outcome.ok:
@@ -1005,9 +1052,7 @@ class InstallGovernor:
             "risk_row": {
                 "effect_class": proposal.effect_class,
                 "cost_surface": proposal.cost_surface,
-                "permissions_requested": list(
-                    proposal.permissions_requested
-                ),
+                "permissions_requested": list(proposal.permissions_requested),
                 "capability_classes_novel": (
                     outcome.record.get("novelty_diff") or {}
                 ).get("capability_classes_novel", []),
@@ -1096,9 +1141,7 @@ class InstallGovernor:
         try:
             if verb == "rollback":
                 if rollback_of_act_id is None:
-                    raise InstallError(
-                        "rollback arc requires rollback_of_act_id"
-                    )
+                    raise InstallError("rollback arc requires rollback_of_act_id")
                 act = self._manager.rollback_install(
                     proposal.bundle_id,
                     rollback_of_act_id,
@@ -1134,9 +1177,7 @@ class InstallGovernor:
         return ArcResult(
             verb=verb,
             bundle_id=proposal.bundle_id,
-            stage_reached=(
-                "installed-unverified" if verb == "install" else "executed"
-            ),
+            stage_reached=("installed-unverified" if verb == "install" else "executed"),
             preflight=outcome,
             decision_entry=entry,
             act=act,
@@ -1275,9 +1316,7 @@ class InstallGovernor:
         self._after_use(capability_id, entry)
         return decision
 
-    def _after_use(
-        self, capability_id: str, use_entry: dict[str, Any]
-    ) -> None:
+    def _after_use(self, capability_id: str, use_entry: dict[str, Any]) -> None:
         state = fold_probation(self._log.read_all(), capability_id)
         if state.standing != "probation":
             return
@@ -1333,8 +1372,7 @@ class InstallGovernor:
         state = fold_probation(self._log.read_all(), capability_id)
         if state.manifest_pin is None:
             raise InstallError(
-                f"capability {capability_id} has no probation record "
-                "to suspend"
+                f"capability {capability_id} has no probation record to suspend"
             )
         entry = self._log.record_entry(
             _receipts.capability_suspension_fields(
@@ -1347,8 +1385,7 @@ class InstallGovernor:
         enforcement = self._manager.disable(capability_id)
         if not enforcement.get("ok") or enforcement.get("library_present"):
             raise InstallError(
-                f"suspension enforcement failed for {capability_id}: "
-                f"{enforcement}"
+                f"suspension enforcement failed for {capability_id}: {enforcement}"
             )
         self._escalate(
             f"capability suspension: {capability_id}",
@@ -1361,9 +1398,7 @@ class InstallGovernor:
         )
         return entry
 
-    def _escalate(
-        self, reason: str, detail: dict[str, Any]
-    ) -> Decision:
+    def _escalate(self, reason: str, detail: dict[str, Any]) -> Decision:
         """The supervisor's escalation receipt shape (supervise.py's
         _escalate): an IRREVERSIBLE-class Decision through a
         Gatekeeper over the same log, human_id 'supervisor-human',
@@ -1378,9 +1413,7 @@ class InstallGovernor:
         request = EscalationRequest(
             action=f"supervisor escalation: {reason}",
             action_class=ActionClass.IRREVERSIBLE,
-            detail=json.dumps(
-                {"event": "escalation", **detail}, sort_keys=True
-            ),
+            detail=json.dumps({"event": "escalation", **detail}, sort_keys=True),
         )
         decision = gatekeeper.authorize(request)
         self._log.checkpoint()
@@ -1413,6 +1446,8 @@ def format_status_lines(
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "_driver":
         raise SystemExit(_driver_main(sys.argv[2:]))
-    print("chancellor.installs: the governed capability-install arc "
-          "(frame v2, clause 6). See docs/foundry-install-spec.md.")
+    print(
+        "chancellor.installs: the governed capability-install arc "
+        "(frame v2, clause 6). See docs/foundry-install-spec.md."
+    )
     raise SystemExit(2)

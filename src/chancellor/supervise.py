@@ -530,10 +530,7 @@ class Supervisor:
         head = entries[-1].get("entry_hash")
         head_ts = entries[-1].get("ts")
         for line in format_status_lines(states, head=head):
-            self._emit(
-                f"[supervise] probation: {line} "
-                f"(head ts {head_ts})"
-            )
+            self._emit(f"[supervise] probation: {line} (head ts {head_ts})")
 
     # -------------------------------------------------- cadence advice
     def _snapshot_written_at(self, snap: CheckpointSnapshot, now: float) -> float:

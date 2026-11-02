@@ -13,6 +13,7 @@ the fold directly from SPEC-FOUNDRY-CHANCELLOR §2's text:
 - capability_suspension ends it as suspended.
 Prints one JSON object: {capability_id: {standing, uses, strikes}}.
 """
+
 import json
 import sys
 
@@ -23,9 +24,12 @@ def fold(entries):
         et = e.get("entry_type")
         cid = e.get("capability_id")
         if et == "capability_probation_opened" and cid:
-            state[cid] = {"standing": "probation", "uses": 0,
-                          "strikes": 0,
-                          "window": int(e.get("window_uses") or 10)}
+            state[cid] = {
+                "standing": "probation",
+                "uses": 0,
+                "strikes": 0,
+                "window": int(e.get("window_uses") or 10),
+            }
             continue
         cur = state.get(cid) if cid else None
         if cur is None or cur["standing"] != "probation":
@@ -34,8 +38,11 @@ def fold(entries):
             continue
         if et == "capability_use":
             cur["uses"] += 1
-            if (e.get("grade") == "fail" or e.get("out_of_permission")
-                    or e.get("pin_drift")):
+            if (
+                e.get("grade") == "fail"
+                or e.get("out_of_permission")
+                or e.get("pin_drift")
+            ):
                 cur["strikes"] += 1
         elif et == "decision":
             detail = e.get("detail")
@@ -52,10 +59,13 @@ def fold(entries):
             cur["standing"] = "standing"
         elif et == "capability_suspension":
             cur["standing"] = "suspended"
-    return {cid: {"standing": s["standing"], "uses": s["uses"],
-                  "strikes": s["strikes"]} for cid, s in state.items()}
+    return {
+        cid: {"standing": s["standing"], "uses": s["uses"], "strikes": s["strikes"]}
+        for cid, s in state.items()
+    }
 
 
 if __name__ == "__main__":
-    entries = [json.loads(ln) for ln in open(sys.argv[1]) if ln.strip()]
+    with open(sys.argv[1], encoding="utf-8") as fh:
+        entries = [json.loads(ln) for ln in fh if ln.strip()]
     print(json.dumps(fold(entries), indent=2, sort_keys=True))

@@ -655,12 +655,8 @@ def capability_probation_opened_fields(
         "decision_entry_hash": _require_sha256(
             decision_entry_hash, "decision_entry_hash"
         ),
-        "install_receipt_id": _require_sha256(
-            install_receipt_id, "install_receipt_id"
-        ),
-        "beat2_report_hash": _require_sha256(
-            beat2_report_hash, "beat2_report_hash"
-        ),
+        "install_receipt_id": _require_sha256(install_receipt_id, "install_receipt_id"),
+        "beat2_report_hash": _require_sha256(beat2_report_hash, "beat2_report_hash"),
         "commission_receipt_id": _require_sha256(
             commission_receipt_id, "commission_receipt_id"
         ),
@@ -712,9 +708,7 @@ def capability_suspension_fields(
         "ts": time.time() if ts is None else ts,
         "capability_id": _require_id(capability_id, "capability_id"),
         "manifest_pin": _require_pin(manifest_pin, "manifest_pin"),
-        "strike_seqs": [
-            _require_count(s, "strike_seqs[]") for s in strike_seqs
-        ],
+        "strike_seqs": [_require_count(s, "strike_seqs[]") for s in strike_seqs],
         "reason": reason,
     }
 

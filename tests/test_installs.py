@@ -275,8 +275,9 @@ def test_cost_surface_refuses_before_the_gate(tmp_path):
 
     governor, log, _ = _governor(tmp_path, approver=approver, gateway=gateway)
     proposal = _proposal()
-    object.__setattr__(proposal, "manifest",
-                       {**proposal.manifest, "cost_surface": "metered"})
+    object.__setattr__(
+        proposal, "manifest", {**proposal.manifest, "cost_surface": "metered"}
+    )
     result = governor.run_arc(proposal)
     assert result.refusal_state == REFUSAL_INSTALL_COST_REFUSED
 
@@ -325,9 +326,7 @@ def test_beat2_failure_rolls_back_and_counts_an_attempt(tmp_path):
     # The supervision fold reads the simultaneous escalation.
     sup = rebuild_supervision_state(entries)
     assert sup.escalations == 1
-    assert (
-        count_consecutive_failed_attempts(entries, COMMISSION_ID) == 1
-    )
+    assert count_consecutive_failed_attempts(entries, COMMISSION_ID) == 1
     assert governor.status("local-fake").standing == "unknown"
 
 
@@ -338,17 +337,13 @@ def test_budget_exhausted_after_three_failed_attempts(tmp_path):
         prop = _proposal(bundle_id=bundle)
         arc = governor.run_arc(prop)
         assert arc.stage_reached == "installed-unverified"
-        governor.verify_live(
-            prop, arc, beat2_report=b"no", beat2_passed=False
-        )
+        governor.verify_live(prop, arc, beat2_report=b"no", beat2_passed=False)
     calls_before = len(gateway.calls)
     result = governor.run_arc(_proposal())
     assert result.stage_reached == "budget-exhausted"
     assert result.refusal_state == REFUSAL_INSTALL_BUDGET_EXHAUSTED
     # The refusal never reached the manager or the gate's act path.
-    assert not [
-        c for c in gateway.calls[calls_before:] if c[0] == "run_act"
-    ]
+    assert not [c for c in gateway.calls[calls_before:] if c[0] == "run_act"]
 
 
 # ------------------------------------------------------------- probation
@@ -356,9 +351,7 @@ def _open_probation(tmp_path, gateway=None):
     gateway = gateway or FakeGateway()
     governor, log, gateway = _governor(tmp_path, gateway=gateway)
     arc = governor.run_arc(_proposal())
-    governor.verify_live(
-        _proposal(), arc, beat2_report=b"ok", beat2_passed=True
-    )
+    governor.verify_live(_proposal(), arc, beat2_report=b"ok", beat2_passed=True)
     return governor, log, gateway
 
 
@@ -397,11 +390,7 @@ def test_suspension_at_exactly_strike_two(tmp_path):
     assert state.strikes == 2 and state.uses == 3
     assert gateway.disabled == ["local-fake"]
     entries = log.read_all()
-    suspensions = [
-        e
-        for e in entries
-        if e.get("entry_type") == "capability_suspension"
-    ]
+    suspensions = [e for e in entries if e.get("entry_type") == "capability_suspension"]
     assert len(suspensions) == 1
     assert suspensions[0]["reason"] == "two-strikes"
     assert suspensions[0]["strike_seqs"] == state.strike_seqs
@@ -426,9 +415,7 @@ def test_pin_drift_suspends_at_strike_one(tmp_path):
     state = governor.status("local-fake")
     assert state.standing == "suspended"
     suspensions = [
-        e
-        for e in log.read_all()
-        if e.get("entry_type") == "capability_suspension"
+        e for e in log.read_all() if e.get("entry_type") == "capability_suspension"
     ]
     assert suspensions[0]["reason"] == "pin-drift"
     assert len(suspensions[0]["strike_seqs"]) == 1
@@ -465,9 +452,7 @@ def test_gated_uses_count_and_refusals_strike(tmp_path):
         approver=lambda req: (False, "no"),
         human_id="test-human",
         manager=FakeGateway(),
-        commission=Commission(
-            receipt_id=COMMISSION_ID, scope_artifact_sha256="e" * 64
-        ),
+        commission=Commission(receipt_id=COMMISSION_ID, scope_artifact_sha256="e" * 64),
         scope_bundles={"local-fake": {"kind": "skill"}},
         scope_verbs={"install"},
     )
@@ -487,9 +472,7 @@ def test_am2_union_rides_the_gate_receipt(tmp_path):
     """The bundle's declared permissions union over the class's empty
     static floor through the request-side seam (§1.4 AM-2)."""
     governor, log, _ = _governor(tmp_path)
-    arc = governor.run_arc(
-        _proposal(permissions_requested=("money", "send"))
-    )
+    arc = governor.run_arc(_proposal(permissions_requested=("money", "send")))
     entry = arc.decision_entry
     assert entry["effect_axes"] == [
         "external_visibility",
@@ -508,10 +491,7 @@ def test_eight_class_receipts_byte_identical_outside_the_frame(tmp_path):
     rotation is the intended visible change; the AM-2 seam moves
     nothing for classes that never set its fields."""
     fixture = (
-        Path(__file__).parent
-        / "fixtures"
-        / "installs"
-        / "eight-class-golden.jsonl"
+        Path(__file__).parent / "fixtures" / "installs" / "eight-class-golden.jsonl"
     )
     golden = [json.loads(ln) for ln in fixture.read_text().splitlines() if ln.strip()]
     log = AuditLog(tmp_path / "regen.jsonl")
@@ -587,9 +567,7 @@ def _bridge_entries(tmp_path):
     """A chain with one approved install decision + probation opened."""
     governor, log, _ = _governor(tmp_path)
     arc = governor.run_arc(_proposal())
-    governor.verify_live(
-        _proposal(), arc, beat2_report=b"ok", beat2_passed=True
-    )
+    governor.verify_live(_proposal(), arc, beat2_report=b"ok", beat2_passed=True)
     return log.read_all(), arc
 
 
@@ -629,9 +607,7 @@ def _bridge_records(arc):
 
 def test_bridge_audit_resolves_a_clean_pair(tmp_path):
     entries, arc = _bridge_entries(tmp_path)
-    result = audit_install_bridge(
-        entries, _bridge_records(arc), _bridge_journal(arc)
-    )
+    result = audit_install_bridge(entries, _bridge_records(arc), _bridge_journal(arc))
     assert result.ok, result.failures
     assert result.acts_checked == 1 and result.citations_resolved == 1
 
@@ -653,9 +629,7 @@ def test_bridge_audit_late_decision_is_no_decision(tmp_path):
     journals = _bridge_journal(arc, at="2000-01-01T00:00:00Z")
     result = audit_install_bridge(entries, _bridge_records(arc), journals)
     assert not result.ok
-    assert any(
-        "bridge_precedence_late" in f for f in result.failures
-    )
+    assert any("bridge_precedence_late" in f for f in result.failures)
 
 
 def test_bridge_audit_pairs_refusals(tmp_path):
@@ -682,9 +656,7 @@ def test_bridge_audit_pairs_refusals(tmp_path):
     records[0] = {**records[0], "record_hash": "8" * 64}
     result2 = audit_install_bridge(log.read_all(), records, {})
     assert not result2.ok
-    assert any(
-        "bridge_refusal_unpaired" in f for f in result2.failures
-    )
+    assert any("bridge_refusal_unpaired" in f for f in result2.failures)
 
 
 def test_installs_status_fold_matches_governor(tmp_path):
@@ -692,9 +664,7 @@ def test_installs_status_fold_matches_governor(tmp_path):
     governor, log, _ = _open_probation(tmp_path)
     governor.record_use("local-fake", invocation="q", grade="fail")
     states = installs.fold_all_probation(log.read_all())
-    lines = installs.format_status_lines(
-        states, head=log.read_all()[-1]["entry_hash"]
-    )
+    lines = installs.format_status_lines(states, head=log.read_all()[-1]["entry_hash"])
     assert len(lines) == 1
     assert "standing=probation" in lines[0]
     assert "uses=1/10" in lines[0] and "strikes=1" in lines[0]

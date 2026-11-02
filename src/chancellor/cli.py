@@ -344,8 +344,7 @@ def _installs_command(args: list[str]) -> int:
     window, strikes, and the chain head the fold was taken at. A read
     surface only; the governed arc itself lives in chancellor.installs."""
     if not args or args[0] != "status":
-        print("usage: chancellor installs status [--log PATH]",
-              file=sys.stderr)
+        print("usage: chancellor installs status [--log PATH]", file=sys.stderr)
         return 2
     log_path = Path(".chancellor/audit-log.jsonl")
     rest = args[1:]
