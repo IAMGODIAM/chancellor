@@ -33,6 +33,7 @@ import copy
 import hashlib
 import json
 from dataclasses import dataclass
+from typing import Literal, cast
 
 from ..api_client import ChatMessage, ChatResponse, MetaModelClient
 from .suite_b_tasks import StepSpec, TaskSpec
@@ -40,11 +41,11 @@ from .suite_b_tasks import StepSpec, TaskSpec
 # Fault classes (Council AM-3): crash / omission / value. Timing is an
 # omission SUBSPECIES with its own denominator. "Cost" is not a fault
 # class — it is tested by the instrument tests, not injected here.
-FAULT_CRASH = "crash"
-FAULT_OMISSION = "omission"
-FAULT_VALUE = "value"
-SUB_PLAIN = "plain"
-SUB_TIMING = "timing"
+FAULT_CRASH: Literal["crash"] = "crash"
+FAULT_OMISSION: Literal["omission"] = "omission"
+FAULT_VALUE: Literal["value"] = "value"
+SUB_PLAIN: Literal["plain"] = "plain"
+SUB_TIMING: Literal["timing"] = "timing"
 
 
 class ToolCrash(Exception):
@@ -71,8 +72,8 @@ class FaultEntry:
     manifest_id: str
     step: str
     call: int
-    fault: str  # crash | omission | value
-    subspecies: str | None = None  # omission only: plain | timing
+    fault: Literal["crash", "omission", "value"]
+    subspecies: Literal["plain", "timing"] | None = None  # omission only
     transform: str | None = None  # value only: scale10 | replace
     replacement: object = None  # value/replace payload
     direct_keys: tuple[str, ...] = ()  # world keys the fault itself writes
@@ -127,7 +128,7 @@ class World:
 
 @dataclass
 class FetchResult:
-    status: str  # ok | empty | late
+    status: Literal["ok", "empty", "late"]
     value: object = None
     checksum: str | None = None
 
@@ -224,10 +225,13 @@ class ScriptedAgent:
 
     def _fetch_required(self, step: StepSpec) -> FetchResult:
         """Required-fetch policy: one retry on empty/late, then abort."""
-        result = self.belt.fetch(step.name, step.source)
+        # The task builder only emits fetch steps carrying a source;
+        # the casts in these handlers state that construction guarantee.
+        source = cast(str, step.source)
+        result = self.belt.fetch(step.name, source)
         if result.status == "ok":
             return result
-        result = self.belt.fetch(step.name, step.source)
+        result = self.belt.fetch(step.name, source)
         if result.status == "ok":
             return result
         raise StepAborted(
@@ -236,19 +240,20 @@ class ScriptedAgent:
         )
 
     def _step_fetch(self, step: StepSpec) -> dict:
+        slot = cast(str, step.scratch)
         if step.required:
             result = self._fetch_required(step)
         else:
-            result = self.belt.fetch(step.name, step.source)
+            result = self.belt.fetch(step.name, cast(str, step.source))
             if result.status != "ok":
                 self.degraded.append(step.name)
-                self.scratch[step.scratch] = _MISSING
+                self.scratch[slot] = _MISSING
                 return {
                     "text": f"{step.name}: no data ({result.status}) "
                     "— optional step skipped",
                     "data": {"skipped": True},
                 }
-        self.scratch[step.scratch] = result.value
+        self.scratch[slot] = result.value
         return {
             "text": f"{step.name}: fetched {step.source} = {result.value!r}",
             "data": {"value": result.value, "checksum": result.checksum},
@@ -256,18 +261,18 @@ class ScriptedAgent:
 
     def _step_compute(self, step: StepSpec) -> dict:
         self.belt._meter(step.name, f"compute {step.op}")
-        vals = [self.scratch[name] for name in step.inputs]
+        vals = [cast(float, self.scratch[name]) for name in step.inputs]
         result = {
             "add": vals[0] + vals[1],
             "sub": vals[0] - vals[1],
             "mul": vals[0] * vals[1],
-        }[step.op]
-        self.scratch[step.scratch] = result
+        }[cast(str, step.op)]
+        self.scratch[cast(str, step.scratch)] = result
         return {"text": f"{step.name}: {step.op}{tuple(vals)} = {result}"}
 
     def _step_store(self, step: StepSpec) -> dict:
         self.belt._meter(step.name, f"store {step.target}")
-        value = self.scratch[step.scratch]
+        value = self.scratch[cast(str, step.scratch)]
         self.world.state[step.target] = value
         return {
             "text": f"{step.name}: stored {step.target} = {value!r}",
@@ -275,7 +280,7 @@ class ScriptedAgent:
         }
 
     def _step_enrich(self, step: StepSpec) -> dict:
-        result = self.belt.fetch(step.name, step.source)
+        result = self.belt.fetch(step.name, cast(str, step.source))
         if result.status != "ok":
             self.degraded.append(step.name)
             return {
@@ -286,7 +291,7 @@ class ScriptedAgent:
         stored = (
             result.value
             if step.mode == "copy"
-            else self.scratch["result"] * result.value
+            else cast(float, self.scratch["result"]) * cast(float, result.value)
         )
         self.world.state[step.target] = stored
         return {
