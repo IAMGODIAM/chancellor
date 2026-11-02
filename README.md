@@ -24,7 +24,7 @@ pip install chancellor
 
 chancellor demo --fast --auto  # the exhibit, offline — graded work, a halted
                                # fault, a human gate, a verified receipt
-python -m chancellor.verify_log .chancellor-exhibit/audit-log.jsonl
+chancellor verify-log .chancellor-exhibit/audit-log.jsonl
                                # the demo's own receipt book, verified cold
 ```
 

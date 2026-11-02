@@ -260,12 +260,12 @@ commands:
   supervise   run an agent under supervision: chancellor supervise -- <cmd>
   eval-a      run Eval Suite A (normative judgment), JSON to stdout
   eval-b      run Eval Suite B (long-horizon reliability), JSON to stdout
+  verify-log  verify an audit log offline: chancellor verify-log <audit-log.jsonl>
 
 options:
   -h, --help     show this help (also: chancellor <command> --help)
   --version      show the installed version
-
-verify a receipt log offline: python -m chancellor.verify_log <audit-log.jsonl>"""
+"""
 
 DEMO_USAGE = """usage: chancellor demo [--fast] [--auto] [--tamper] [--live] [--seed N]
                        [--classic]
@@ -389,8 +389,9 @@ def _supervise_command(args: list[str]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Console entry point: dispatch the demo, supervise, verify-log,
-    and eval subcommands."""
+    """Console entry point: dispatch the demo, supervise, and eval
+    subcommands, the offline log verifier (verify-log), plus --help
+    and --version."""
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv:
         print(USAGE)
@@ -407,6 +408,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if cmd == "demo":
         return _demo_command(argv[1:])
+    if cmd == "verify-log":
+        from .verify_log import main as verify_log_main
+
+        # Same arguments, output and exit codes as
+        # `python -m chancellor.verify_log`: non-zero on any failure.
+        return verify_log_main(argv[1:])
     if cmd == "supervise":
         return _supervise_command(argv[1:])
     if cmd == "eval-a":
@@ -416,7 +423,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(suite_b.run_suite().to_dict(), indent=2))
         return 0
     print(
-        f"unknown command: {cmd} (expected demo | supervise | eval-a | eval-b)",
+        f"unknown command: {cmd} "
+        "(expected demo | supervise | eval-a | eval-b | verify-log)",
         file=sys.stderr,
     )
     print("run `chancellor --help` for usage", file=sys.stderr)

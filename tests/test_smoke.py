@@ -67,3 +67,22 @@ def test_cli_help_and_version(capsys):
 def test_cli_unknown_command_points_to_help(capsys):
     assert cli_main(["nope"]) == 2
     assert "chancellor --help" in capsys.readouterr().err
+
+
+def test_cli_verify_log_matches_module(tmp_path, monkeypatch, capsys):
+    """`chancellor verify-log` passes on a clean demo log and fails
+    (non-zero) on an altered copy, like `python -m chancellor.verify_log`."""
+    import json
+
+    monkeypatch.chdir(tmp_path)
+    assert cli_main(["demo", "--fast", "--auto"]) == 0
+    log = tmp_path / ".chancellor-exhibit" / "audit-log.jsonl"
+    assert cli_main(["verify-log", str(log)]) == 0
+    lines = log.read_text().splitlines()
+    entry = json.loads(lines[1])
+    entry["altered"] = True
+    lines[1] = json.dumps(entry)
+    altered = tmp_path / "altered.jsonl"
+    altered.write_text("\n".join(lines) + "\n")
+    assert cli_main(["verify-log", str(altered)]) != 0
+    capsys.readouterr()
