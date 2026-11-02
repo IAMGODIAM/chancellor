@@ -6,7 +6,7 @@ title: "Chancellor — governance and evaluation for long-running AI agents"
 authors:
   - family-names: "Armstead"
     given-names: "Israel Lee"
-version: "1.1.0"
+version: "1.2.0"
 date-released: 2026-11-02
 url: "https://github.com/IAMGODIAM/chancellor"
 repository-code: "https://github.com/IAMGODIAM/chancellor"
