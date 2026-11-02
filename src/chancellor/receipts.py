@@ -22,6 +22,13 @@ and the Merkle root over all entry hashes. The verifier in
 ``chancellor.verify_log`` re-walks everything offline and names the exact
 failure.
 
+Checkpoint **v2** (``e5.receipt_checkpoint.v2``) repairs the v1 tree's
+anchor-layer defect — odd-leaf duplication makes root([a,b,c]) equal
+root([a,b,c,c]), so a bare anchored root never committed to the count —
+with the RFC 9162 construction (domain-separated, no duplication), a
+count-binding anchor digest, and standalone holder-presented inclusion
+proofs. v1 checkpoints keep verifying under v1 rules (dual-verify).
+
 SIGNER HONESTY: Python's stdlib has no Ed25519, so the default signer
 here is :class:`DevHmacSigner` — HMAC-SHA256 with a clearly-marked,
 well-known dev secret. Dev checkpoints prove internal consistency for
@@ -44,8 +51,11 @@ from typing import Protocol
 
 SCHEMA = "e5.decision_receipt.v1"
 CHECKPOINT_SCHEMA = "e5.receipt_checkpoint.v1"
+CHECKPOINT_SCHEMA_V2 = "e5.receipt_checkpoint.v2"
 PAYLOAD_TYPE = "application/vnd.e5.decision-receipt.v1+json"
 CHECKPOINT_PAYLOAD_TYPE = "application/vnd.e5.receipt-checkpoint.v1+json"
+CHECKPOINT_PAYLOAD_TYPE_V2 = "application/vnd.e5.receipt-checkpoint.v2+json"
+TREE_RFC9162 = "rfc9162"
 
 # --------------------------------------------------------------------- AM-2
 # Effect axes (Council AM-2): an action carries every axis it truly has;
@@ -117,6 +127,139 @@ def merkle_root(leaf_hashes: list[str]) -> str:
             nxt.append(hashlib.sha256(left + right).digest())
         level = nxt
     return level[0].hex()
+
+
+# ------------------------------------------------------- Merkle, v2
+# Checkpoint v2 (mirrors the issuer's e5.receipt_checkpoint.v2): the v1
+# tree promotes an odd leaf by duplication, so root([a,b,c]) ==
+# root([a,b,c,c]) — a bare root does not commit to the log size. The v2
+# construction is RFC 9162: domain-separated hashing (leaves
+# SHA256(0x00 || leaf), inner SHA256(0x01 || left || right)), split at
+# the largest power of two below n, NO duplication — every tree size
+# has a distinct root, and the anchor digest binds the count with it.
+
+
+def _largest_pow2_below(n: int) -> int:
+    """Largest power of two strictly below n (n >= 2)."""
+    k = 1
+    while k * 2 < n:
+        k *= 2
+    return k
+
+
+def _rfc9162_leaf(data: bytes) -> bytes:
+    return hashlib.sha256(b"\x00" + data).digest()
+
+
+def _rfc9162_inner(left: bytes, right: bytes) -> bytes:
+    return hashlib.sha256(b"\x01" + left + right).digest()
+
+
+def _rfc9162_mth(leaves: list[bytes]) -> bytes:
+    """Merkle Tree Hash over raw leaf bytes (RFC 9162 §2.1)."""
+    n = len(leaves)
+    if n == 0:
+        return hashlib.sha256(b"").digest()
+    if n == 1:
+        return _rfc9162_leaf(leaves[0])
+    k = _largest_pow2_below(n)
+    return _rfc9162_inner(_rfc9162_mth(leaves[:k]), _rfc9162_mth(leaves[k:]))
+
+
+def rfc9162_root(leaf_hashes: list[str]) -> str:
+    """RFC 9162 Merkle root over hex leaf hashes. No duplication:
+    roots for different sizes never collide by construction."""
+    return _rfc9162_mth([bytes.fromhex(h) for h in leaf_hashes]).hex()
+
+
+def _rfc9162_path(leaves: list[bytes], index: int) -> list[bytes]:
+    """Inclusion path for `index` (RFC 9162 §2.1.1 PATH), bottom-up."""
+    n = len(leaves)
+    if n == 1:
+        return []
+    k = _largest_pow2_below(n)
+    if index < k:
+        return _rfc9162_path(leaves[:k], index) + [_rfc9162_mth(leaves[k:])]
+    return _rfc9162_path(leaves[k:], index - k) + [_rfc9162_mth(leaves[:k])]
+
+
+def rfc9162_proof(leaf_hashes: list[str], index: int) -> dict:
+    """A standalone, holder-presentable inclusion proof:
+    {leaf_hash, index, tree_size, path: [hex, ...]} — carries the tree
+    size a verifier needs, without the log."""
+    leaves = [bytes.fromhex(h) for h in leaf_hashes]
+    if not 0 <= index < len(leaves):
+        raise ValueError(f"index {index} outside tree of {len(leaves)}")
+    return {
+        "leaf_hash": leaf_hashes[index],
+        "index": index,
+        "tree_size": len(leaves),
+        "path": [p.hex() for p in _rfc9162_path(leaves, index)],
+    }
+
+
+def _rfc9162_root_from_proof(
+    leaf: bytes, index: int, tree_size: int, path: list[bytes]
+) -> bytes | None:
+    """Fold a proof back to a candidate root, mirroring _rfc9162_path's
+    recursion exactly. None if the path length mismatches the shape."""
+    pos = 0
+
+    def fold(idx: int, n: int) -> bytes | None:
+        nonlocal pos
+        if n == 1:
+            return _rfc9162_leaf(leaf)
+        k = _largest_pow2_below(n)
+        if idx < k:
+            sub = fold(idx, k)
+            if sub is None or pos >= len(path):
+                return None
+            sib = path[pos]
+            pos += 1
+            return _rfc9162_inner(sub, sib)
+        sub = fold(idx - k, n - k)
+        if sub is None or pos >= len(path):
+            return None
+        sib = path[pos]
+        pos += 1
+        return _rfc9162_inner(sib, sub)
+
+    root = fold(index, tree_size)
+    if root is None or pos != len(path):
+        return None
+    return root
+
+
+def rfc9162_verify(
+    leaf_hex: str,
+    index: int,
+    tree_size: int,
+    path: list[str],
+    root_hex: str,
+) -> bool:
+    """Verify a holder-presented inclusion proof against a root using
+    ONLY the proof object — never the full log. Fail-closed."""
+    try:
+        leaf = bytes.fromhex(leaf_hex)
+        path_b = [bytes.fromhex(p) for p in path]
+        root = bytes.fromhex(root_hex)
+    except (ValueError, TypeError):
+        return False
+    if len(leaf) != 32 or len(root) != 32:
+        return False
+    if any(len(p) != 32 for p in path_b):
+        return False
+    if tree_size < 1 or not 0 <= index < tree_size:
+        return False
+    got = _rfc9162_root_from_proof(leaf, index, tree_size, path_b)
+    return got is not None and got == root
+
+
+def checkpoint_anchor_digest(payload: dict) -> str:
+    """The v2 external-anchor digest: sha256 over the canonical
+    checkpoint payload — one digest committing to merkle_root +
+    log_size + head_receipt_hash together (count-in-anchor)."""
+    return sha256_hex(canonical(payload))
 
 
 def pae(payload_type: str, payload: bytes) -> bytes:
@@ -219,6 +362,37 @@ def build_checkpoint(
     }
 
 
+def build_checkpoint_v2(
+    *,
+    signer: Signer,
+    log_size: int,
+    leaves: list[str],
+    head_hash: str | None,
+    created_at: int | None = None,
+) -> dict:
+    """A signed checkpoint under ``e5.receipt_checkpoint.v2``: payload
+    shaped like v1 plus ``tree: "rfc9162"``, root computed by the
+    RFC 9162 construction. The digest meant for external anchoring is
+    :func:`checkpoint_anchor_digest` over this payload — count and
+    root committed together, where v1's bare root committed to neither
+    the count nor (by duplication) even the size."""
+    payload = {
+        "schema": CHECKPOINT_SCHEMA_V2,
+        "issuer": signer.key_id,
+        "created_at": int(time.time()) if created_at is None else created_at,
+        "log_size": log_size,
+        "merkle_root": rfc9162_root(leaves),
+        "head_receipt_hash": head_hash,
+        "tree": TREE_RFC9162,
+    }
+    sig = signer.sign(pae(CHECKPOINT_PAYLOAD_TYPE_V2, canonical(payload)))
+    return {
+        "payloadType": CHECKPOINT_PAYLOAD_TYPE_V2,
+        "payload": _b64(canonical(payload)),
+        "signatures": [{"keyid": signer.key_id, "sig": _b64(sig)}],
+    }
+
+
 def checkpoint_payload(envelope: dict) -> dict:
     """Decode a checkpoint envelope's payload back to its dict."""
     return json.loads(_unb64(envelope["payload"]).decode("utf-8"))
@@ -237,6 +411,109 @@ def checkpoint_signature_valid(envelope: dict, signer: Signer) -> bool:
         )
     except Exception:
         return False
+
+
+# ------------------------------------------------- freeze / test-run entries
+# RepoZ-shaped provenance records (CAPPZ delta REA §4.3, pattern-level):
+# a freeze manifest and the test runs that vouch for it are entries in
+# this same chain, not sidecar documents — so a reader can RESOLVE from
+# a manifest hash to its covering test runs and the checkpoint that
+# seals them (see chancellor.verify_log.resolve_manifest) instead of
+# trusting a filing cabinet of separate reports.
+ENTRY_TYPE_FREEZE_MANIFEST = "freeze_manifest"
+ENTRY_TYPE_TEST_RUN = "test_run"
+
+_HEX64 = frozenset("0123456789abcdef")
+
+
+def _require_sha256(value: object, field_name: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(c not in _HEX64 for c in value)
+    ):
+        raise ValueError(f"{field_name} must be a lowercase sha256 hex digest")
+    return value
+
+
+def compute_manifest_sha256(files: dict[str, str]) -> str:
+    """The manifest hash: sha256 over the canonical JSON of the sealed
+    file list itself ({relpath: sha256}). The list IS the manifest; its
+    hash is the identity every test_run binds to."""
+    if not isinstance(files, dict) or not files:
+        raise ValueError("files must be a non-empty {relpath: sha256} mapping")
+    for relpath, digest in files.items():
+        if not isinstance(relpath, str) or not relpath:
+            raise ValueError("manifest relpaths must be non-empty strings")
+        _require_sha256(digest, f"files[{relpath!r}]")
+    return sha256_hex(canonical({"files": files}))
+
+
+def freeze_manifest_fields(
+    *,
+    files: dict[str, str],
+    suite_id: str,
+    head: str | None,
+    recorded_by: str,
+    ts: float | None = None,
+) -> dict:
+    """Field body for a freeze_manifest entry (chain fields — schema,
+    seq, prev_hash, entry_hash — are stamped by the appending log).
+    Carries the sealed file list itself plus its hash, the suite the
+    freeze belongs to, and the repo head it seals."""
+    if not isinstance(suite_id, str) or not suite_id:
+        raise ValueError("suite_id must be a non-empty string")
+    if not isinstance(recorded_by, str) or not recorded_by:
+        raise ValueError("recorded_by must be a non-empty string")
+    return {
+        "entry_type": ENTRY_TYPE_FREEZE_MANIFEST,
+        "ts": time.time() if ts is None else ts,
+        "manifest_sha256": compute_manifest_sha256(files),
+        "files": dict(files),
+        "file_count": len(files),
+        "suite_id": suite_id,
+        "head": head,
+        "recorded_by": recorded_by,
+    }
+
+
+def test_run_fields(
+    *,
+    suite: str,
+    command: str,
+    manifest_sha256: str,
+    report_sha256: str,
+    passed: int,
+    failed: int,
+    seat: str,
+    report_path: str | None = None,
+    ts: float | None = None,
+) -> dict:
+    """Field body for a test_run entry: the run binds the manifest hash
+    it ran against, the suite/command, the report's sha256, the
+    pass/fail counts, and the seat that ran it."""
+    for name, value in (("suite", suite), ("command", command), ("seat", seat)):
+        if not isinstance(value, str) or not value:
+            raise ValueError(f"{name} must be a non-empty string")
+    for name, count_value in (("passed", passed), ("failed", failed)):
+        if (
+            not isinstance(count_value, int)
+            or isinstance(count_value, bool)
+            or count_value < 0
+        ):
+            raise ValueError(f"{name} must be a non-negative int")
+    return {
+        "entry_type": ENTRY_TYPE_TEST_RUN,
+        "ts": time.time() if ts is None else ts,
+        "suite": suite,
+        "command": command,
+        "manifest_sha256": _require_sha256(manifest_sha256, "manifest_sha256"),
+        "report_sha256": _require_sha256(report_sha256, "report_sha256"),
+        "report_path": report_path,
+        "passed": passed,
+        "failed": failed,
+        "seat": seat,
+    }
 
 
 # --------------------------------------------------------------------- chain errors
