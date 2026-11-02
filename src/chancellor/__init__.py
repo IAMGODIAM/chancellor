@@ -21,6 +21,12 @@ from .grader import Criterion, GradeResult, Rubric, grade
 from .instruments import CheckResult, InstrumentPanel, default_panel
 from .judge import Judge, JudgeError
 from .orchestrator import CrewRunner, RunReport
+from .supervise import (
+    SupervisionState,
+    Supervisor,
+    SupervisorConfig,
+    verify_at_checkpoint_boundary,
+)
 from .task_graph import (
     SCHEMA_VERSION,
     AttemptCapError,
@@ -56,4 +62,8 @@ __all__ = [
     "RunReport",
     "Judge",
     "JudgeError",
+    "Supervisor",
+    "SupervisorConfig",
+    "SupervisionState",
+    "verify_at_checkpoint_boundary",
 ]
