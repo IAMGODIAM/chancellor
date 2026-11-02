@@ -79,11 +79,19 @@ TREE_RFC9162 = "rfc9162"
 # Amending the frame is a visible act: new version, new hash — and the
 # OLD pair stays in KNOWN_FRAMES forever (an appended act, never an
 # erasure), so receipts issued under a superseded frame still verify.
-FRAME_ID = "e5.chancellor_frame.v1"
-FRAME_HASH = "2c57e4e50af380eceb8c4256be71221fca1c1e2814e3d5e623b1a5a177458749"
+FRAME_ID = "e5.chancellor_frame.v2"
+FRAME_HASH = "3510dd4536e28c109269e627d467d3e6fdb829992733095156d305edd634409e"
 FRAME_DOCUMENT = "docs/governance-frame.md"
 
-KNOWN_FRAMES: dict[str, str] = {FRAME_ID: FRAME_HASH}
+# The v1 pair is retained verbatim forever: receipts issued under v1
+# keep citing it and remain verifiable (the frame's own amendment
+# rule — an appended act, never an erasure).
+KNOWN_FRAMES: dict[str, str] = {
+    "e5.chancellor_frame.v1": (
+        "2c57e4e50af380eceb8c4256be71221fca1c1e2814e3d5e623b1a5a177458749"
+    ),
+    FRAME_ID: FRAME_HASH,
+}
 
 
 def current_frame_fields() -> dict[str, str]:
@@ -119,6 +127,11 @@ EFFECT_AXES: dict[str, tuple[str, ...]] = {
     "publish": (AXIS_EXTERNAL_VISIBILITY, AXIS_IRREVERSIBILITY),
     "irreversible": (AXIS_IRREVERSIBILITY,),
     "credential": (AXIS_CREDENTIAL_EXPOSURE,),
+    # Capability install (frame v2, clause 6): no axis of its own on
+    # the static floor — a governed bundle's own permissions enter
+    # through the AM-2 request-side seam (chancellor.escalation),
+    # unioned over this empty floor at record time.
+    "capability_install": (),
 }
 
 
@@ -557,6 +570,182 @@ def test_run_fields(
         "passed": passed,
         "failed": failed,
         "seat": seat,
+    }
+
+
+# ------------------------------------------------- capability-install entries
+# Frame v2, clause 6 (growth is governed): the install arc's own
+# entries in this same chain — probation opened on Beat-2 passage,
+# probation closed at the window's end, suspension on strikes, and a
+# use record for every auto-approved invocation of a probationary
+# capability (gated-class uses are their gate Decisions; see
+# chancellor.installs). The fold over these entries IS the probation
+# state: nothing about a capability's standing lives anywhere else.
+ENTRY_TYPE_CAPABILITY_PROBATION_OPENED = "capability_probation_opened"
+ENTRY_TYPE_CAPABILITY_PROBATION_CLOSED = "capability_probation_closed"
+ENTRY_TYPE_CAPABILITY_SUSPENSION = "capability_suspension"
+ENTRY_TYPE_CAPABILITY_USE = "capability_use"
+
+# The probationary window (spec §2 P1): counted in receipted uses.
+PROBATION_WINDOW_USES = 10
+
+# The closed suspension-reason vocabulary: two graded strikes inside
+# the window, or a single one-strike event (pin drift at fold time,
+# an out-of-permission action).
+SUSPENSION_REASON_TWO_STRIKES = "two-strikes"
+SUSPENSION_REASON_PIN_DRIFT = "pin-drift"
+SUSPENSION_REASON_OUT_OF_PERMISSION = "out-of-permission"
+CAPABILITY_SUSPENSION_REASONS: frozenset[str] = frozenset(
+    {
+        SUSPENSION_REASON_TWO_STRIKES,
+        SUSPENSION_REASON_PIN_DRIFT,
+        SUSPENSION_REASON_OUT_OF_PERMISSION,
+    }
+)
+
+CAPABILITY_GRADES: frozenset[str] = frozenset({"pass", "fail"})
+
+
+def _require_pin(value: object, field_name: str) -> str:
+    """A Foundry whole-tree manifest pin: 'sha256:' + 64 lowercase hex
+    (the manager's pin format — cited verbatim across the bridge,
+    never translated)."""
+    if not isinstance(value, str) or not value.startswith("sha256:"):
+        raise ValueError(f"{field_name} must be a 'sha256:'-prefixed pin")
+    _require_sha256(value[len("sha256:") :], field_name)
+    return value
+
+
+def _require_id(value: object, field_name: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{field_name} must be a non-empty string")
+    return value
+
+
+def _require_count(value: object, field_name: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"{field_name} must be a non-negative int")
+    return value
+
+
+def capability_probation_opened_fields(
+    *,
+    capability_id: str,
+    manifest_pin: str,
+    decision_seq: int,
+    decision_entry_hash: str,
+    install_receipt_id: str,
+    beat2_report_hash: str,
+    commission_receipt_id: str,
+    window_uses: int = PROBATION_WINDOW_USES,
+    ts: float | None = None,
+) -> dict:
+    """Field body for a capability_probation_opened entry: written
+    when Beat 2 (verified-live, by a reader who did not install)
+    passes. Cites the Step-3 gate decision by chain seq + entry
+    hash, the issuer install receipt, the Beat-2 report's hash, and
+    the commission the arc runs under — the whole correspondence a
+    bridge audit needs, by hash and id, never by paraphrase."""
+    return {
+        "entry_type": ENTRY_TYPE_CAPABILITY_PROBATION_OPENED,
+        "ts": time.time() if ts is None else ts,
+        "capability_id": _require_id(capability_id, "capability_id"),
+        "manifest_pin": _require_pin(manifest_pin, "manifest_pin"),
+        "decision_seq": _require_count(decision_seq, "decision_seq"),
+        "decision_entry_hash": _require_sha256(
+            decision_entry_hash, "decision_entry_hash"
+        ),
+        "install_receipt_id": _require_sha256(
+            install_receipt_id, "install_receipt_id"
+        ),
+        "beat2_report_hash": _require_sha256(
+            beat2_report_hash, "beat2_report_hash"
+        ),
+        "commission_receipt_id": _require_sha256(
+            commission_receipt_id, "commission_receipt_id"
+        ),
+        "window_uses": _require_count(window_uses, "window_uses"),
+    }
+
+
+def capability_probation_closed_fields(
+    *,
+    capability_id: str,
+    manifest_pin: str,
+    uses: int,
+    strikes: int,
+    ts: float | None = None,
+) -> dict:
+    """Field body for a capability_probation_closed entry: standing
+    earned at the window's end. The strike count is printed —
+    standing is not amnesia."""
+    return {
+        "entry_type": ENTRY_TYPE_CAPABILITY_PROBATION_CLOSED,
+        "ts": time.time() if ts is None else ts,
+        "capability_id": _require_id(capability_id, "capability_id"),
+        "manifest_pin": _require_pin(manifest_pin, "manifest_pin"),
+        "uses": _require_count(uses, "uses"),
+        "strikes": _require_count(strikes, "strikes"),
+    }
+
+
+def capability_suspension_fields(
+    *,
+    capability_id: str,
+    manifest_pin: str,
+    strike_seqs: list[int],
+    reason: str,
+    ts: float | None = None,
+) -> dict:
+    """Field body for a capability_suspension entry: the first of the
+    suspension's three same-motion records (suspension entry →
+    Foundry disable enforcement → escalation Decision). The strikes
+    are cited by chain seq."""
+    if reason not in CAPABILITY_SUSPENSION_REASONS:
+        raise ValueError(
+            f"reason must be one of {sorted(CAPABILITY_SUSPENSION_REASONS)}"
+        )
+    if not strike_seqs:
+        raise ValueError("strike_seqs must name at least one strike")
+    return {
+        "entry_type": ENTRY_TYPE_CAPABILITY_SUSPENSION,
+        "ts": time.time() if ts is None else ts,
+        "capability_id": _require_id(capability_id, "capability_id"),
+        "manifest_pin": _require_pin(manifest_pin, "manifest_pin"),
+        "strike_seqs": [
+            _require_count(s, "strike_seqs[]") for s in strike_seqs
+        ],
+        "reason": reason,
+    }
+
+
+def capability_use_fields(
+    *,
+    capability_id: str,
+    manifest_pin: str,
+    invocation: str,
+    grade: str | None = None,
+    out_of_permission: bool = False,
+    pin_drift: bool = False,
+    ts: float | None = None,
+) -> dict:
+    """Field body for a capability_use entry: one receipted use of a
+    probationary capability through the auto-approved path (read /
+    draft / compute invocations via the authoring loop or the
+    manager's query path). The grade rides the record where a grader
+    graded the use; pin_drift is stamped when the fold-time census
+    pin disagreed with the probation pin at this use."""
+    if grade is not None and grade not in CAPABILITY_GRADES:
+        raise ValueError(f"grade must be one of {sorted(CAPABILITY_GRADES)}")
+    return {
+        "entry_type": ENTRY_TYPE_CAPABILITY_USE,
+        "ts": time.time() if ts is None else ts,
+        "capability_id": _require_id(capability_id, "capability_id"),
+        "manifest_pin": _require_pin(manifest_pin, "manifest_pin"),
+        "invocation": _require_id(invocation, "invocation"),
+        "grade": grade,
+        "out_of_permission": bool(out_of_permission),
+        "pin_drift": bool(pin_drift),
     }
 
 

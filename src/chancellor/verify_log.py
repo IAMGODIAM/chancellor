@@ -536,6 +536,362 @@ def resolve_manifest(
     )
 
 
+# ------------------------------------------------- the install bridge audit
+# Frame v2's bridge (SPEC-FOUNDRY-CHANCELLOR §1.5): the Chancellor
+# chain and the Foundry's act journal are separate chains; neither
+# validates the other. This audit — the ONE check class the install
+# build adds to the verifier — checks CORRESPONDENCE only: every
+# governed act's citation resolves, every decision pre-dates the act
+# it authorized (a late decision is no decision), every Foundry
+# refusal record pairs with the Chancellor refusal Decision that
+# recorded it, and every probation opening's citations resolve.
+# Citations are hashes and ids, never paraphrase.
+
+
+@dataclass
+class BridgeAuditResult:
+    ok: bool
+    failures: list[str] = field(default_factory=list)
+    acts_checked: int = 0
+    citations_resolved: int = 0
+    refusals_paired: int = 0
+
+
+def _iso_to_epoch(text: object) -> float | None:
+    if not isinstance(text, str):
+        return None
+    try:
+        from datetime import datetime
+
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def _opening_seq(opening: dict) -> int | None:
+    """The issuer log index of a holder opening, decoded from its
+    envelope payload with the stdlib only (the payload is the
+    issuer's canonical JSON; reading it is not importing it)."""
+    import base64
+
+    try:
+        payload = json.loads(
+            base64.b64decode(opening["envelope"]["payload"]).decode("utf-8")
+        )
+        seq = payload.get("seq")
+        return int(seq) if isinstance(seq, int) else None
+    except Exception:
+        return None
+
+
+def audit_install_bridge(
+    entries: list[dict],
+    act_records: list[dict],
+    journals: dict[str, dict],
+    *,
+    scope_bundle_ids: set[str] | None = None,
+    issuer_openings: list[dict] | None = None,
+) -> BridgeAuditResult:
+    """Correspondence audit over a paired Chancellor chain + Foundry
+    act journal. ``journals`` maps act_id → {"preflight": dict|None,
+    "chancellor_decision": dict|None}. ``scope_bundle_ids`` restricts
+    the audit to the frozen scope enumeration (None = every act
+    present). Receipt-kind citations (a commission receipt — the
+    Foundry-side standing citation) resolve against
+    ``issuer_openings`` when supplied."""
+    failures: list[str] = []
+    acts_checked = 0
+    citations_resolved = 0
+    refusals_paired = 0
+
+    by_seq: dict[int, dict] = {}
+    for entry in entries:
+        if isinstance(entry.get("seq"), int):
+            by_seq[entry["seq"]] = entry
+    openings_by_id: dict[str, dict] = {}
+    for opening in issuer_openings or []:
+        rid = opening.get("receipt_id")
+        if isinstance(rid, str):
+            openings_by_id[rid] = opening
+
+    def in_scope(bundle_id: object) -> bool:
+        return scope_bundle_ids is None or bundle_id in scope_bundle_ids
+
+    for record in act_records:
+        bundle_id = record.get("bundle_id")
+        if not in_scope(bundle_id):
+            continue
+        if record.get("type") == "refusal":
+            # Pairing: a Chancellor refusal Decision whose detail
+            # cites this record's hash and whose rationale names the
+            # Foundry state verbatim.
+            record_hash = record.get("record_hash")
+            reason = record.get("reason")
+            paired = False
+            for entry in entries:
+                if entry.get("action_class") != "capability_install":
+                    continue
+                if entry.get("approved") is not False:
+                    continue
+                detail = entry.get("detail")
+                parsed: dict = {}
+                if isinstance(detail, str):
+                    try:
+                        parsed = json.loads(detail)
+                    except json.JSONDecodeError:
+                        parsed = {}
+                if (
+                    parsed.get("foundry_refusal_record_hash") == record_hash
+                    and isinstance(reason, str)
+                    and reason in str(entry.get("rationale", ""))
+                ):
+                    paired = True
+                    break
+            if paired:
+                refusals_paired += 1
+            else:
+                failures.append(
+                    f"bridge_refusal_unpaired: refusal record "
+                    f"{record_hash} ({reason}) for {bundle_id} has no "
+                    "Chancellor refusal Decision"
+                )
+            continue
+        if record.get("type") != "act":
+            continue
+        acts_checked += 1
+        act_id = str(record.get("act_id"))
+        journal = journals.get(act_id, {})
+        preflight = journal.get("preflight") or {}
+        preflight_epoch = _iso_to_epoch(preflight.get("at"))
+        citation = journal.get("chancellor_decision")
+        if isinstance(citation, dict) and citation.get("kind") == (
+            "chancellor-decision"
+        ):
+            seq = citation.get("seq")
+            target = by_seq.get(seq) if isinstance(seq, int) else None
+            if target is None or target.get("entry_hash") != citation.get(
+                "entry_hash"
+            ):
+                failures.append(
+                    f"bridge_citation_unresolved: act {act_id} cites "
+                    f"Chancellor seq {seq}, not found in the chain"
+                )
+                continue
+            if target.get("action_class") != "capability_install":
+                failures.append(
+                    f"bridge_citation_wrong_class: act {act_id} cites "
+                    f"seq {seq} (action_class "
+                    f"{target.get('action_class')!r})"
+                )
+                continue
+            detail = target.get("detail")
+            parsed = {}
+            if isinstance(detail, str):
+                try:
+                    parsed = json.loads(detail)
+                except json.JSONDecodeError:
+                    parsed = {}
+            if parsed.get("bundle_id") != bundle_id or parsed.get(
+                "verb"
+            ) != record.get("verb"):
+                failures.append(
+                    f"bridge_citation_mismatch: act {act_id} vs the "
+                    f"decision at seq {seq} (bundle/verb disagree)"
+                )
+                continue
+            if target.get("approved") is not True:
+                failures.append(
+                    f"bridge_act_without_approval: act {act_id} cites "
+                    f"a decision at seq {seq} that did not approve it"
+                )
+                continue
+            decision_ts = target.get("ts")
+            if (
+                isinstance(decision_ts, (int, float))
+                and preflight_epoch is not None
+                and float(decision_ts) > preflight_epoch
+            ):
+                failures.append(
+                    f"bridge_precedence_late: act {act_id}'s decision "
+                    f"at seq {seq} post-dates the act's pre-flight — "
+                    "a late decision is no decision"
+                )
+                continue
+            citations_resolved += 1
+            continue
+        # Receipt-kind citation: the act statement's commission block.
+        statement: dict = record.get("statement") or {}
+        citation_block: dict = statement.get("citation") or {}
+        auth: dict = citation_block.get("authorizing_decision") or {}
+        receipt_id = auth.get("receipt_id")
+        cited_opening = openings_by_id.get(receipt_id) if receipt_id else None
+        if cited_opening is None:
+            failures.append(
+                f"bridge_citation_unresolved: act {act_id} cites "
+                f"receipt {receipt_id}, not among the issuer openings"
+            )
+            continue
+        cited_seq = _opening_seq(cited_opening)
+        act_seq = record.get("receipt_seq")
+        if (
+            cited_seq is not None
+            and isinstance(act_seq, int)
+            and cited_seq >= act_seq
+        ):
+            failures.append(
+                f"bridge_precedence_late: act {act_id}'s cited "
+                f"decision sits at issuer index {cited_seq}, not "
+                f"strictly before the act's own index {act_seq} — "
+                "a late decision is no decision"
+            )
+            continue
+        citations_resolved += 1
+
+    # Probation openings: both citations must resolve.
+    act_receipt_ids = {
+        r.get("receipt_id")
+        for r in act_records
+        if r.get("type") == "act" and in_scope(r.get("bundle_id"))
+    }
+    for entry in entries:
+        if entry.get("entry_type") != "capability_probation_opened":
+            continue
+        seq = entry.get("decision_seq")
+        target = by_seq.get(seq) if isinstance(seq, int) else None
+        if (
+            target is None
+            or target.get("entry_hash") != entry.get("decision_entry_hash")
+            or target.get("action_class") != "capability_install"
+            or target.get("approved") is not True
+        ):
+            failures.append(
+                f"bridge_probation_citation_unresolved: probation "
+                f"opened at seq {entry.get('seq')} cites decision seq "
+                f"{seq}, which does not resolve to its approval"
+            )
+        if entry.get("install_receipt_id") not in act_receipt_ids and (
+            entry.get("install_receipt_id") not in openings_by_id
+        ):
+            failures.append(
+                f"bridge_probation_citation_unresolved: probation "
+                f"opened at seq {entry.get('seq')} cites install "
+                f"receipt {entry.get('install_receipt_id')}, found in "
+                "neither the act journal nor the issuer openings"
+            )
+
+    return BridgeAuditResult(
+        ok=not failures,
+        failures=failures,
+        acts_checked=acts_checked,
+        citations_resolved=citations_resolved,
+        refusals_paired=refusals_paired,
+    )
+
+
+def _load_act_journals(acts_dir: Path) -> tuple[list[dict], dict[str, dict]]:
+    records: list[dict] = []
+    log_path = acts_dir / "acts.jsonl"
+    if log_path.exists():
+        for line in log_path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                records.append(json.loads(line))
+    journals: dict[str, dict] = {}
+    if acts_dir.is_dir():
+        for child in sorted(acts_dir.iterdir()):
+            if not child.is_dir():
+                continue
+            journal: dict[str, dict | None] = {
+                "preflight": None,
+                "chancellor_decision": None,
+            }
+            for name, key in (
+                ("preflight.json", "preflight"),
+                ("chancellor-decision.json", "chancellor_decision"),
+            ):
+                f = child / name
+                if f.exists():
+                    try:
+                        journal[key] = json.loads(
+                            f.read_text(encoding="utf-8")
+                        )
+                    except json.JSONDecodeError:
+                        journal[key] = None
+            journals[child.name] = journal
+    return records, journals
+
+
+def _bridge_main(argv: list[str]) -> int:
+    """Console entry for the bridge verb: audit correspondence
+    between a Chancellor chain and a paired Foundry act journal."""
+    parser = argparse.ArgumentParser(
+        prog="chancellor-verify-log bridge",
+        description="Audit citation correspondence between a "
+        "Chancellor audit log and a Foundry act journal (frame v2 "
+        "bridge — correspondence only; neither chain validates the "
+        "other).",
+    )
+    parser.add_argument("log", help="path to the Chancellor audit log JSONL")
+    parser.add_argument(
+        "--foundry-acts-dir",
+        required=True,
+        help="the Foundry acts directory (acts.jsonl + per-act journals)",
+    )
+    parser.add_argument(
+        "--issuer-openings",
+        default=None,
+        help="holder openings JSONL for receipt-kind citations",
+    )
+    parser.add_argument(
+        "--scope-bundles",
+        default=None,
+        help="comma-separated bundle ids forming the frozen scope "
+        "enumeration (default: every act present)",
+    )
+    args = parser.parse_args(argv)
+
+    failures: list[str] = []
+    entries = _load_jsonl(Path(args.log), failures)
+    if entries is None:
+        for failure in failures:
+            print(f"FAIL: {failure}")
+        return 1
+    records, journals = _load_act_journals(Path(args.foundry_acts_dir))
+    openings: list[dict] = []
+    if args.issuer_openings:
+        openings = [
+            json.loads(line)
+            for line in Path(args.issuer_openings)
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if line.strip()
+        ]
+    scope = (
+        {b.strip() for b in args.scope_bundles.split(",") if b.strip()}
+        if args.scope_bundles
+        else None
+    )
+    result = audit_install_bridge(
+        entries,
+        records,
+        journals,
+        scope_bundle_ids=scope,
+        issuer_openings=openings,
+    )
+    print(
+        f"acts checked: {result.acts_checked}, citations resolved: "
+        f"{result.citations_resolved}, refusals paired: "
+        f"{result.refusals_paired}"
+    )
+    for failure in result.failures:
+        print(f"FAIL: {failure}")
+    if result.ok:
+        print("BRIDGE VERIFIED: every citation resolves, every "
+              "decision pre-dates its act")
+        return 0
+    print("BRIDGE NOT VERIFIED")
+    return 1
+
+
 def _resolve_main(argv: list[str]) -> int:
     """Console entry for the resolve verb."""
     parser = argparse.ArgumentParser(
@@ -590,6 +946,8 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "resolve":
         return _resolve_main(argv[1:])
+    if argv and argv[0] == "bridge":
+        return _bridge_main(argv[1:])
     parser = argparse.ArgumentParser(
         prog="chancellor-verify-log",
         description="Verify a Chancellor hash-chained audit log offline.",

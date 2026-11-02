@@ -34,6 +34,11 @@ class ActionClass(StrEnum):
     PUBLISH = "publish"
     IRREVERSIBLE = "irreversible"
     CREDENTIAL = "credential"
+    # The ninth class (frame v2, clause 6): an agent gaining a new
+    # capability is a gated act — proposed, checked, decided,
+    # receipted, verified live, reversible. Governed end to end by
+    # chancellor.installs.
+    CAPABILITY_INSTALL = "capability_install"
 
 
 HUMAN_GATES: frozenset[ActionClass] = frozenset(
@@ -43,6 +48,7 @@ HUMAN_GATES: frozenset[ActionClass] = frozenset(
         ActionClass.PUBLISH,
         ActionClass.IRREVERSIBLE,
         ActionClass.CREDENTIAL,
+        ActionClass.CAPABILITY_INSTALL,
     }
 )
 
@@ -70,6 +76,22 @@ REFUSAL_CAP_COMMAND_UNAVAILABLE = "cap-command-unavailable"
 REFUSAL_FRAME_MISMATCH = "frame-mismatch"
 REFUSAL_VERIFICATION_FAILED = "verification-failed"
 
+# The install register (frame v2, clause 6): the Foundry manager's
+# pre-flight states, the scope check, and the budget fold, mapped
+# once, here, to Chancellor-side names (the mapping table is the
+# contract — chancellor.installs records refusals under these states
+# and names the Foundry state verbatim in the rationale). Wired in
+# chancellor.installs, where the arc runs.
+REFUSAL_INSTALL_INCOMPATIBLE = "install-incompatible"
+REFUSAL_INSTALL_UNLICENSED = "install-unlicensed"
+REFUSAL_INSTALL_PIN_MISMATCH = "install-pin-mismatch"
+REFUSAL_INSTALL_PAYLOAD_ESCAPE = "install-payload-escape"
+REFUSAL_INSTALL_UNCONSENTED_BUILD = "install-unconsented-build"
+REFUSAL_INSTALL_SNAPSHOT_FAILED = "install-snapshot-failed"
+REFUSAL_INSTALL_OUT_OF_SCOPE = "install-out-of-scope"
+REFUSAL_INSTALL_COST_REFUSED = "install-cost-refused"
+REFUSAL_INSTALL_BUDGET_EXHAUSTED = "install-budget-exhausted"
+
 REFUSAL_STATES: frozenset[str] = frozenset(
     {
         REFUSAL_NO_APPROVER,
@@ -81,6 +103,15 @@ REFUSAL_STATES: frozenset[str] = frozenset(
         REFUSAL_CAP_COMMAND_UNAVAILABLE,
         REFUSAL_FRAME_MISMATCH,
         REFUSAL_VERIFICATION_FAILED,
+        REFUSAL_INSTALL_INCOMPATIBLE,
+        REFUSAL_INSTALL_UNLICENSED,
+        REFUSAL_INSTALL_PIN_MISMATCH,
+        REFUSAL_INSTALL_PAYLOAD_ESCAPE,
+        REFUSAL_INSTALL_UNCONSENTED_BUILD,
+        REFUSAL_INSTALL_SNAPSHOT_FAILED,
+        REFUSAL_INSTALL_OUT_OF_SCOPE,
+        REFUSAL_INSTALL_COST_REFUSED,
+        REFUSAL_INSTALL_BUDGET_EXHAUSTED,
     }
 )
 
@@ -92,6 +123,19 @@ class EscalationRequest:
     detail: str = ""
     cost_usd: float | None = None
     node_id: str | None = None
+    # The capability this request belongs to, when it does (frame v2:
+    # a probationary capability's gated uses, and the install arc's
+    # own requests). Trailing + defaulted; AuditLog.record() stamps it
+    # into the entry ONLY when set — requests of the existing classes
+    # never set it, so their receipts stay byte-identical.
+    capability_id: str | None = None
+    # AM-2 request-side seam: axes the REQUEST carries beyond the
+    # action class's static floor (e.g. computed by the install
+    # governor from a bundle's declared permissions). AuditLog.record
+    # unions it over the floor when present. Request-side only —
+    # never part of the entry body beyond the recorded union. The
+    # existing classes never set it; their receipts are unchanged.
+    effect_axes: tuple[str, ...] | None = None
 
 
 @dataclass
@@ -154,6 +198,17 @@ class AuditLog:
 
     def record(self, decision: Decision) -> None:
         state = self._state
+        # AM-2 seam: axes are the class's static floor, unioned with
+        # any request-side axes the caller computed (install governor:
+        # from the bundle's declared permissions). Requests that do
+        # not set the field get the floor alone — unchanged bytes.
+        effect_axes = _receipts.effect_axes_for(
+            decision.request.action_class.value
+        )
+        if decision.request.effect_axes is not None:
+            effect_axes = sorted(
+                set(effect_axes) | set(decision.request.effect_axes)
+            )
         entry: dict[str, Any] = {
             "schema": _receipts.SCHEMA,
             **_receipts.current_frame_fields(),
@@ -161,9 +216,7 @@ class AuditLog:
             "ts": decision.ts,
             "action": decision.request.action,
             "action_class": decision.request.action_class.value,
-            "effect_axes": _receipts.effect_axes_for(
-                decision.request.action_class.value
-            ),
+            "effect_axes": effect_axes,
             "detail": decision.request.detail,
             "cost_usd": decision.request.cost_usd,
             "node_id": decision.request.node_id,
@@ -173,6 +226,8 @@ class AuditLog:
             "rationale": decision.rationale,
             "prev_hash": state.prev_hash,
         }
+        if decision.request.capability_id is not None:
+            entry["capability_id"] = decision.request.capability_id
         entry["entry_hash"] = _receipts.entry_hash(entry)
         with self.path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(entry) + "\n")

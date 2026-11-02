@@ -1,0 +1,14 @@
+{
+  "act_id": "install-local-install-hearing-probation-20261102T185945Z",
+  "verb": "install",
+  "bundle_id": "local-install-hearing-probation",
+  "pin": "sha256:98d7c346c4bd55374560bab55d0d16713c8fc7dd6217fa8718d01dd8adc9d3a6",
+  "beat1": {
+    "catalog_applied": true,
+    "readback_pin": "sha256:98d7c346c4bd55374560bab55d0d16713c8fc7dd6217fa8718d01dd8adc9d3a6",
+    "registry_events": 26,
+    "registry_head": "708556387f3a74bd93d0c9d069ebe1401bd861149f109241c90dcdd92d359f3c",
+    "receipt_id": "e59483ec145676b2a546a55b0d769fd39687e966b40559ee50fba0669099a1c6",
+    "receipt_seq": 26
+  }
+}
