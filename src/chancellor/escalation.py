@@ -5,7 +5,10 @@ money, sends externally, publishes, acts irreversibly, or uses a
 credential is a HUMAN gate. Everything else is auto-approved by policy.
 A gate with no human attached DENIES by default: unattended authority
 is not authority. Every decision — approve or deny, human or policy —
-is written to an append-only audit log as a receipt.
+is written to an append-only audit log as a receipt. A refusal is a
+first-class receipted outcome, not an absence: every denial carries a
+named refusal state (see REFUSAL_STATES), and every receipt names the
+governing frame it was decided under (chancellor.receipts, FRAME).
 """
 
 from __future__ import annotations
@@ -44,6 +47,44 @@ HUMAN_GATES: frozenset[ActionClass] = frozenset(
 )
 
 
+# --------------------------------------------------------------- refusals
+# Receipts-on-refusal (Council M10, ADAPT — pattern after LaSalle/CAPPZ
+# KeyZ Gate): a refusal is not an absence, it is a record with a reason.
+# Every refusal this gate issues is receipted carrying one of these
+# named states, issuable by the gate alone, without the refused party's
+# cooperation. The vocabulary is Chancellor's own, enumerated from this
+# gate and the approved specs (benefits-realization memo §M10). The
+# states this gate can reach today are wired where they occur; the cap
+# states await the cap object's build (its spec is Button 4's),
+# frame-mismatch is the verifier's named failure, and
+# verification-failed is the supervisor's R3 state — its receipts carry
+# the frame through AuditLog, and stamping that state is the
+# supervisor lane's follow-up.
+REFUSAL_NO_APPROVER = "no-approver-attached"
+REFUSAL_APPROVER_DECLINED = "approver-declined"
+REFUSAL_APPROVER_ERROR = "approver-error"
+REFUSAL_CAP_MODE_OFF = "cap-mode-off"
+REFUSAL_CAP_WINDOW_EXCEEDED = "cap-window-exceeded"
+REFUSAL_CAP_CEILING_EXCEEDED = "cap-ceiling-exceeded"
+REFUSAL_CAP_COMMAND_UNAVAILABLE = "cap-command-unavailable"
+REFUSAL_FRAME_MISMATCH = "frame-mismatch"
+REFUSAL_VERIFICATION_FAILED = "verification-failed"
+
+REFUSAL_STATES: frozenset[str] = frozenset(
+    {
+        REFUSAL_NO_APPROVER,
+        REFUSAL_APPROVER_DECLINED,
+        REFUSAL_APPROVER_ERROR,
+        REFUSAL_CAP_MODE_OFF,
+        REFUSAL_CAP_WINDOW_EXCEEDED,
+        REFUSAL_CAP_CEILING_EXCEEDED,
+        REFUSAL_CAP_COMMAND_UNAVAILABLE,
+        REFUSAL_FRAME_MISMATCH,
+        REFUSAL_VERIFICATION_FAILED,
+    }
+)
+
+
 @dataclass
 class EscalationRequest:
     action: str  # human-readable: what is being asked
@@ -60,6 +101,10 @@ class Decision:
     decider: str  # "policy" or the human's identifier
     rationale: str
     ts: float
+    # Named refusal state (REFUSAL_STATES) when this decision is a
+    # refusal; None on approvals. Trailing + defaulted: existing
+    # positional constructions (the supervisor's) are unaffected.
+    refusal_state: str | None = None
 
 
 # An approver takes a request and returns (approved, rationale).
@@ -72,7 +117,12 @@ class AuditLog:
     Every entry is hash-chained (see chancellor.receipts): it carries a
     sequence number, the previous entry's hash, its own entry hash, the
     receipt schema, and the action's AM-2 effect axes alongside the
-    legacy action class. Opening an existing log re-verifies the chain
+    legacy action class. Entries written since the frame's adoption
+    carry receipt schema v2: the governing frame's identifier and hash
+    inside the committed body, and — on verdict records — a
+    ``refusal_state`` naming why a refusal was issued (null on
+    approvals, so both sides of every decision are countable).
+    Opening an existing log re-verifies the chain
     and raises ChainIntegrityError on any break — a tampered log
     accepts no new receipts. Pre-chain legacy lines (plain JSONL from
     before the chain existed) are tolerated as a prefix: the first
@@ -106,6 +156,7 @@ class AuditLog:
         state = self._state
         entry: dict[str, Any] = {
             "schema": _receipts.SCHEMA,
+            **_receipts.current_frame_fields(),
             "seq": state.total_entries,
             "ts": decision.ts,
             "action": decision.request.action,
@@ -117,6 +168,7 @@ class AuditLog:
             "cost_usd": decision.request.cost_usd,
             "node_id": decision.request.node_id,
             "approved": decision.approved,
+            "refusal_state": decision.refusal_state,
             "decider": decision.decider,
             "rationale": decision.rationale,
             "prev_hash": state.prev_hash,
@@ -132,14 +184,19 @@ class AuditLog:
         state.prev_hash = entry["entry_hash"]
 
     # Chain-owned fields a caller-supplied body may never set itself.
-    _RESERVED_FIELDS = frozenset({"schema", "seq", "prev_hash", "entry_hash"})
+    # The frame citation is chain-owned for the same reason the schema
+    # is: a record does not get to choose the frame it claims.
+    _RESERVED_FIELDS = frozenset(
+        {"schema", "seq", "prev_hash", "entry_hash", "frame_id", "frame_hash"}
+    )
 
     def record_entry(self, fields: dict[str, Any]) -> dict:
         """Append a caller-shaped entry (e.g. a freeze_manifest or
         test_run body from chancellor.receipts) under the same chain
         discipline as record(): the log stamps schema/seq/prev_hash/
-        entry_hash, and the entry is fsynced before state advances.
-        Returns the stamped entry as written."""
+        entry_hash and the governing frame's citation, and the entry
+        is fsynced before state advances. Returns the stamped entry
+        as written."""
         clash = self._RESERVED_FIELDS & fields.keys()
         if clash:
             raise ValueError(
@@ -150,6 +207,7 @@ class AuditLog:
             "schema": _receipts.SCHEMA,
             "seq": state.total_entries,
             **fields,
+            **_receipts.current_frame_fields(),
             "prev_hash": state.prev_hash,
         }
         entry["entry_hash"] = _receipts.entry_hash(entry)
@@ -245,6 +303,7 @@ class Gatekeeper:
                 "policy",
                 f"approver error — denied (fail-closed): {type(exc).__name__}: {exc}",
                 time.time(),
+                refusal_state=REFUSAL_APPROVER_ERROR,
             )
         if self.audit_log is not None:
             try:
@@ -274,6 +333,14 @@ class Gatekeeper:
                 "policy",
                 "human gate with no approver attached — denied (fail-closed)",
                 time.time(),
+                refusal_state=REFUSAL_NO_APPROVER,
             )
         approved, rationale = self.approver(request)
-        return Decision(request, bool(approved), self.human_id, rationale, time.time())
+        return Decision(
+            request,
+            bool(approved),
+            self.human_id,
+            rationale,
+            time.time(),
+            refusal_state=None if approved else REFUSAL_APPROVER_DECLINED,
+        )
