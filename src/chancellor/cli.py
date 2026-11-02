@@ -3,6 +3,11 @@
     chancellor demo    the exhibit: graded work, a halted fault, a human
                        gate, a verified receipt chain (offline; --classic
                        runs the original scripted governed run)
+    chancellor supervise -- <agent command>
+                       the KEEP office (Tier A): run an agent under
+                       built-in supervision — checkpoint heartbeat,
+                       verify-before-resume, interruption receipts,
+                       escalation to the human gate
     chancellor eval-a  run Eval Suite A (normative judgment) with stub agents
     chancellor eval-b  run Eval Suite B (long-horizon reliability)
 
@@ -41,6 +46,7 @@ from .instruments import default_panel
 from .judge import Exemplar, Judge
 from .orchestrator import CrewRunner
 from .receipts import checkpoint_payload
+from .supervise import Supervisor, SupervisorConfig
 from .task_graph import TaskGraph, TaskNode
 
 # Anchored exemplars for the demo judge, two per OUTPUT_RUBRIC criterion:
@@ -264,20 +270,72 @@ def _demo_command(args: list[str]) -> int:
         return 2
 
 
+def _supervise_command(args: list[str]) -> int:
+    """`chancellor supervise [options] -- <agent command...>`: the
+    KEEP office (Tier A, chancellor.supervise). One command between
+    "run my agent" and "my agent is kept" — no cron, no systemd, no
+    user-authored scripting. Exit codes: 0 the agent completed;
+    1 halted and escalated to the human gate; 2 usage error or a
+    launch-time self-proof refusal."""
+    if "--" not in args:
+        print(
+            "usage: chancellor supervise [--state-dir DIR] "
+            "[--agent-log PATH] [--cadence SECONDS] [--missed N] "
+            "[--budget N] [--poll SECONDS] -- <agent command...>",
+            file=sys.stderr,
+        )
+        return 2
+    split = args.index("--")
+    opts, command = args[:split], args[split + 1 :]
+    if not command:
+        print("supervise: no agent command after --", file=sys.stderr)
+        return 2
+    config = SupervisorConfig(agent_command=command)
+    value_opts = {
+        "--state-dir": ("state_dir", Path),
+        "--agent-log": ("agent_log", Path),
+        "--cadence": ("cadence_s", float),
+        "--missed": ("missed", int),
+        "--budget": ("budget", int),
+        "--poll": ("poll_s", float),
+        "--heartbeat": ("heartbeat_s", float),
+    }
+    i = 0
+    while i < len(opts):
+        flag = opts[i]
+        if flag not in value_opts:
+            print(f"unknown supervise flag: {flag}", file=sys.stderr)
+            return 2
+        field_name, convert = value_opts[flag]
+        try:
+            value = convert(opts[i + 1])
+        except (IndexError, ValueError):
+            print(f"{flag} needs a value", file=sys.stderr)
+            return 2
+        setattr(config, field_name, value)
+        i += 2
+    return Supervisor(config).run()
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Console entry point: dispatch the demo, demo-api, verify-log,
+    """Console entry point: dispatch the demo, supervise, verify-log,
     and eval subcommands."""
     argv = list(sys.argv[1:] if argv is None else argv)
     cmd = argv[0] if argv else "demo"
     if cmd == "demo":
         return _demo_command(argv[1:])
+    if cmd == "supervise":
+        return _supervise_command(argv[1:])
     if cmd == "eval-a":
         print(json.dumps(suite_a.run_suite().to_dict(), indent=2))
         return 0
     if cmd == "eval-b":
         print(json.dumps(suite_b.run_suite().to_dict(), indent=2))
         return 0
-    print(f"unknown command: {cmd} (expected demo | eval-a | eval-b)", file=sys.stderr)
+    print(
+        f"unknown command: {cmd} (expected demo | supervise | eval-a | eval-b)",
+        file=sys.stderr,
+    )
     return 2
 
 
