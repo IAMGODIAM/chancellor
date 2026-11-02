@@ -1,6 +1,13 @@
 """Chancellor CLI — the demo entry point.
 
-    chancellor demo    run the scripted 3-agent governed run, offline
+    chancellor demo    the exhibit: graded work, a halted fault, a human
+                       gate, a verified receipt chain (offline; --classic
+                       runs the original scripted governed run)
+    chancellor supervise -- <agent command>
+                       the KEEP office (Tier A): run an agent under
+                       built-in supervision — checkpoint heartbeat,
+                       verify-before-resume, interruption receipts,
+                       escalation to the human gate
     chancellor eval-a  run Eval Suite A (normative judgment) with stub agents
     chancellor eval-b  run Eval Suite B (long-horizon reliability)
 
@@ -22,16 +29,25 @@ import json
 import re
 import sys
 from pathlib import Path
+from typing import Any
 
-from .api_client import MUSE_SPARK, MUSE_WONDER, ChatResponse, MetaModelClient
+from .api_client import (
+    MUSE_SPARK,
+    MUSE_WONDER,
+    ChatMessage,
+    ChatResponse,
+    MetaModelClient,
+)
 from .escalation import ActionClass, AuditLog, EscalationRequest, Gatekeeper
 from .evals import suite_a, suite_b
+from .exhibit import DEFAULT_SEED, run_exhibit
 from .grader import OUTPUT_RUBRIC
 from .instruments import default_panel
 from .judge import Exemplar, Judge
 from .orchestrator import CrewRunner
 from .receipts import checkpoint_payload
-from .task_graph import TaskGraph
+from .supervise import Supervisor, SupervisorConfig
+from .task_graph import TaskGraph, TaskNode
 
 # Anchored exemplars for the demo judge, two per OUTPUT_RUBRIC criterion:
 # what a weak and a strong worker output look like, and the grade each earns.
@@ -98,7 +114,11 @@ _DEMO_JUDGE_GRADES = {
 }
 
 
-def _demo_judge_transport(model, messages, **kwargs) -> ChatResponse:  # noqa: ARG001
+def _demo_judge_transport(
+    model: str,
+    messages: list[ChatMessage],
+    **kwargs: Any,  # noqa: ARG001
+) -> ChatResponse:
     """Offline stand-in for the judge model. Answers the Judge's
     one-criterion prompt in its required form — a justification sentence,
     then the grade line — from the deterministic table above."""
@@ -148,13 +168,13 @@ def run_demo(state_dir: str = ".chancellor") -> int:
 
     # The crew produces work — text and cost. It does not grade itself:
     # no artifact below carries a grade of any kind.
-    def researcher(_node):
+    def researcher(_node: TaskNode) -> dict[str, Any]:
         return {
             "text": "Findings: harm confirmed; three remedy families identified.",
             "cost_usd": 0.01,
         }
 
-    def drafter(node):
+    def drafter(node: TaskNode) -> dict[str, Any]:
         return {
             "text": "Draft remedy proposal, ready for review.",
             "cost_usd": 0.02,
@@ -166,7 +186,7 @@ def run_demo(state_dir: str = ".chancellor") -> int:
             ),
         }
 
-    def reviewer(_node):
+    def reviewer(_node: TaskNode) -> dict[str, Any]:
         return {
             "text": "Review complete: proposal proportionate, reversible, "
             "stakeholders covered.",
@@ -184,7 +204,7 @@ def run_demo(state_dir: str = ".chancellor") -> int:
     )
     judge = _demo_judge()
 
-    def judge_scores(node, artifact):
+    def judge_scores(node: TaskNode, artifact: dict[str, Any]) -> dict[str, float]:
         # The provenance cut, wired: grades for a node come from the
         # judge scoring the artifact's text — from nowhere else.
         text = artifact.get("text", "") if isinstance(artifact, dict) else ""
@@ -219,20 +239,103 @@ def run_demo(state_dir: str = ".chancellor") -> int:
     return 0 if report.ok else 1
 
 
+def _demo_command(args: list[str]) -> int:
+    """`chancellor demo` is the exhibit (chancellor.exhibit): the
+    hearing, live in the terminal. The original scripted run remains
+    available as `chancellor demo --classic`."""
+    if "--classic" in args:
+        return run_demo()
+    known = {"--fast", "--auto", "--tamper", "--live", "--seed"}
+    unknown = [a for a in args if a.startswith("--") and a not in known]
+    if unknown:
+        print(f"unknown demo flag(s): {', '.join(unknown)}", file=sys.stderr)
+        return 2
+    seed = DEFAULT_SEED
+    if "--seed" in args:
+        try:
+            seed = int(args[args.index("--seed") + 1])
+        except (IndexError, ValueError):
+            print("--seed needs an integer value", file=sys.stderr)
+            return 2
+    try:
+        return run_exhibit(
+            fast="--fast" in args,
+            auto="--auto" in args,
+            tamper="--tamper" in args,
+            live="--live" in args,
+            seed=seed,
+        )
+    except RuntimeError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
+
+def _supervise_command(args: list[str]) -> int:
+    """`chancellor supervise [options] -- <agent command...>`: the
+    KEEP office (Tier A, chancellor.supervise). One command between
+    "run my agent" and "my agent is kept" — no cron, no systemd, no
+    user-authored scripting. Exit codes: 0 the agent completed;
+    1 halted and escalated to the human gate; 2 usage error or a
+    launch-time self-proof refusal."""
+    if "--" not in args:
+        print(
+            "usage: chancellor supervise [--state-dir DIR] "
+            "[--agent-log PATH] [--cadence SECONDS] [--missed N] "
+            "[--budget N] [--poll SECONDS] -- <agent command...>",
+            file=sys.stderr,
+        )
+        return 2
+    split = args.index("--")
+    opts, command = args[:split], args[split + 1 :]
+    if not command:
+        print("supervise: no agent command after --", file=sys.stderr)
+        return 2
+    config = SupervisorConfig(agent_command=command)
+    value_opts = {
+        "--state-dir": ("state_dir", Path),
+        "--agent-log": ("agent_log", Path),
+        "--cadence": ("cadence_s", float),
+        "--missed": ("missed", int),
+        "--budget": ("budget", int),
+        "--poll": ("poll_s", float),
+        "--heartbeat": ("heartbeat_s", float),
+    }
+    i = 0
+    while i < len(opts):
+        flag = opts[i]
+        if flag not in value_opts:
+            print(f"unknown supervise flag: {flag}", file=sys.stderr)
+            return 2
+        field_name, convert = value_opts[flag]
+        try:
+            value = convert(opts[i + 1])
+        except (IndexError, ValueError):
+            print(f"{flag} needs a value", file=sys.stderr)
+            return 2
+        setattr(config, field_name, value)
+        i += 2
+    return Supervisor(config).run()
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Console entry point: dispatch the demo, demo-api, verify-log,
+    """Console entry point: dispatch the demo, supervise, verify-log,
     and eval subcommands."""
     argv = list(sys.argv[1:] if argv is None else argv)
     cmd = argv[0] if argv else "demo"
     if cmd == "demo":
-        return run_demo()
+        return _demo_command(argv[1:])
+    if cmd == "supervise":
+        return _supervise_command(argv[1:])
     if cmd == "eval-a":
         print(json.dumps(suite_a.run_suite().to_dict(), indent=2))
         return 0
     if cmd == "eval-b":
         print(json.dumps(suite_b.run_suite().to_dict(), indent=2))
         return 0
-    print(f"unknown command: {cmd} (expected demo | eval-a | eval-b)", file=sys.stderr)
+    print(
+        f"unknown command: {cmd} (expected demo | supervise | eval-a | eval-b)",
+        file=sys.stderr,
+    )
     return 2
 
 
