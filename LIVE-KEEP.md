@@ -53,11 +53,11 @@ receipts as they land.
 
 <!-- STATUS:BEGIN -->
 - **Standing:** IN FLIGHT — every figure UNVERIFIED, republished from the boxes’ own state files.
-- **As of:** 2026-11-02 14:27 EST (five-minute cadence)
+- **As of:** 2026-11-02 14:31 EST (five-minute cadence)
 - **Boxes reporting:** 4 / 4
-- **Segments:** 1724 / 1440 across the watches polled · complete 1581 · halted fail-closed 143 · faults injected 171
+- **Segments:** 1732 / 1440 across the watches polled · complete 1588 · halted fail-closed 144 · faults injected 172
 - **Drift events:** 0
-- **The watch's receipts so far:** refusals 3 · escalations 3 · agent_completed 4 · budget_exhausted 3 · chain_verification 27 · escalation 3 · interruption_detected 30 · resume_confirmed 12 · resume_failed 15 · resume_launched 27 · stall_anomaly 223 · supervision_started 8
+- **The watch's receipts so far:** refusals 4 · escalations 4 · agent_completed 4 · budget_exhausted 3 · chain_verification 28 · escalation 4 · interruption_detected 31 · resume_confirmed 12 · resume_failed 15 · resume_launched 27 · stall_anomaly 225 · supervision_started 10
 
 ### Box b0 — Cell A — kill cycle · us-east-1
 - **Phase:** DONE · **Step:** all · *all supervised runs finished*
@@ -73,12 +73,14 @@ receipts as they land.
 - **Phase:** RUN · **Step:** seed-9110 · *supervised run starting (B-corrupt-kill)*
 - **Watch 9105:** segments 240 / 240 · complete 222 · halted 18 · faults 24 · drift 0 · corrupted state files 0 · in-run chain verifications 28/28 ok · supervision receipts 122 (refusals 1, escalations 1) · latest watch event: *supervisor escalation: resume budget exhausted*
 - **Watch 9109:** segments 240  · complete 221 · halted 19 · faults 24 · drift 0 · corrupted state files 0 · in-run chain verifications 28/28 ok · supervision receipts 122 (refusals 1, escalations 1) · latest watch event: *supervisor escalation: resume budget exhausted*
-- **Watch 9110:** segments 69  · complete 64 · halted 5 · faults 6 · drift 0 · corrupted state files 0 · in-run chain verifications 8/8 ok · supervision receipts 31 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
+- **Watch 9110:** segments 74  · complete 68 · halted 6 · faults 7 · drift 0 · corrupted state files 0 · in-run chain verifications 8/8 ok · supervision receipts 34 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
 
 ### Box b3 — Cell C — stall vs death, then D — machine loss (staged) · us-west-1
 - **Phase:** DONE · **Step:** all · *all supervised runs finished*
 - **Watch 9106:** segments 240 / 240 · complete 217 · halted 23 · faults 24 · drift 0 · corrupted state files 0 · in-run chain verifications 28/28 ok · supervision receipts 107 (refusals 0, escalations 0) · latest watch event: *supervisor: agent completed*
+- **Watch 9107:** segments 3  · complete 3 · halted 0 · faults 0 · drift 0 · corrupted state files 0 · in-run chain verifications 0/0 ok · supervision receipts 7 (refusals 1, escalations 1) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
 
+**Anomalies this cycle:** new escalation events since last cycle: +1 (total 4); new refusal receipts since last cycle: total 4
 <!-- STATUS:END -->
 
 ## How to read this board — the language, filed before the first kill
