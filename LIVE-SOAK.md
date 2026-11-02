@@ -25,15 +25,15 @@ same publisher; this file remains the canonical text record.
 ## Status
 
 <!-- STATUS:BEGIN -->
-- **Segments done:** 963 / 11,520
-- **Steps executed:** 11556
-- **Faults injected so far:** 96 (one every ten segments)
-- **Segments complete / halted (fail-closed):** 889 / 74
+- **Segments done:** 1064 / 11,520
+- **Steps executed:** 12768
+- **Faults injected so far:** 106 (one every ten segments)
+- **Segments complete / halted (fail-closed):** 984 / 80
 - **Drift events:** 0
-- **Audit chain:** 930 entries under signed checkpoint in the published snapshot · 115 signed checkpoint(s) so far · the live log holds 935 entries (the tail past the newest checkpoint is not yet checkpointed — the verifier says so rather than guessing, by design)
-- **Last chain verification:** VERIFIED — the published snapshot pair was verified cold with the product's own verifier at this refresh; the soak's own in-run verifications: 115/115 ok
-- **Interruptions resumed from checkpoint so far:** 7 (a deliberate proof kill at segment 3, and a supervision loss at segment 49 when the platform session was torn down during an outage — in both cases the soak resumed from its checkpoint and the chain verified across the interruption)
-- **Status as of:** 2026-11-02 06:47 EST (refreshed hourly from the soak's own state)
+- **Audit chain:** 1028 entries under signed checkpoint in the published snapshot · 127 signed checkpoint(s) so far · the live log holds 1033 entries (the tail past the newest checkpoint is not yet checkpointed — the verifier says so rather than guessing, by design)
+- **Last chain verification:** VERIFIED — the published snapshot pair was verified cold with the product's own verifier at this refresh; the soak's own in-run verifications: 127/127 ok
+- **Interruptions resumed from checkpoint so far:** 8 (a deliberate proof kill at segment 3, and a supervision loss at segment 49 when the platform session was torn down during an outage — in both cases the soak resumed from its checkpoint and the chain verified across the interruption)
+- **Status as of:** 2026-11-02 08:47 EST (refreshed hourly from the soak's own state)
 <!-- STATUS:END -->
 
 ## How to read a halt — the language of this page, filed before the first segment
