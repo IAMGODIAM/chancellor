@@ -82,7 +82,7 @@ h2.sect{font-size:27px;font-weight:normal;text-align:center;margin:44px 0 4px}
 receipts, rendered in order: the conversation the system has with itself as it<br>
 notices, diagnoses, checks the chain, and only then corrects.</div>
 <div class="rule"></div>
-<div class="labelbar"><span class="prov">In flight / unverified — republished from the boxes' own state · as of 2026-11-02 11:46 EST · five-minute cadence</span></div>
+<div class="labelbar"><span class="prov">In flight / unverified — republished from the boxes' own state · as of 2026-11-02 11:52 EST · five-minute cadence</span></div>
 <div class="cols">
   <div class="col"><div class="dev"><svg width="86" height="86" viewBox="0 0 120 120" role="img">
 <path d="M22 34 L98 34 L88 22 L32 22 Z" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
@@ -92,8 +92,8 @@ notices, diagnoses, checks the chain, and only then corrects.</div>
 <rect x="24" y="92" width="72" height="7" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
 </svg></div><div class="rn">I</div><h3>Graded Work</h3>
     <div class="what">No agent marks its own homework.</div>
-    <div class="fig">1560 / 1440</div>
-    <div class="cap">segments of governed work across six watches · 1429 complete · 131 halted fail-closed · 155 faults injected — a halt is the product working</div></div>
+    <div class="fig">1565 / 1440</div>
+    <div class="cap">segments of governed work across six watches · 1433 complete · 132 halted fail-closed · 156 faults injected — a halt is the product working</div></div>
   <div class="col"><div class="dev"><svg width="86" height="86" viewBox="0 0 120 120" role="img">
 <path d="M22 34 L98 34 L88 22 L32 22 Z" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
 <rect x="30" y="42" width="9" height="42" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
@@ -112,7 +112,7 @@ notices, diagnoses, checks the chain, and only then corrects.</div>
 <rect x="24" y="92" width="72" height="7" fill="none" stroke="#c9a84c" stroke-width="1.6"/>
 </svg></div><div class="rn">III</div><h3>Kept Receipts</h3>
     <div class="what">Every decision leaves a receipt you can verify offline.</div>
-    <div class="fig">820</div>
+    <div class="fig">821</div>
     <div class="cap">supervision receipts across the six watches, hash-chained and signed in the supervisor's own log beside each agent's — the dialogue below is drawn from them, in the supervisor's own words</div></div>
   <div class="col watch"><div class="dev watchring"><svg width="86" height="86" viewBox="0 0 120 120" role="img" aria-label="The watch ring">
 <circle cx="60" cy="60" r="52" fill="none" stroke="#ecd9a4" stroke-width="1.6"/>
@@ -141,16 +141,15 @@ notices, diagnoses, checks the chain, and only then corrects.</div>
 <div class="age">checkpoint age 1 s at the last receipt · 122 supervision receipts this run</div></div><div class="mind"><div class="mh"><span class="seed">WATCH 9106</span><span class="cell">Cell C — stall vs death, then D — machine loss (staged)</span></div>
 <div class="seg">240 <span class="den">/ 240</span></div><div class="last">last event: supervisor: agent completed</div>
 <div class="age">checkpoint age 190 s at the last receipt · 107 supervision receipts this run</div></div><div class="mind"><div class="mh"><span class="seed">WATCH 9109</span><span class="cell">Cell B — supervisor death + refusal</span></div>
-<div class="seg">145</div><div class="last">last event: supervisor: agent stalled — checkpoint stale, process alive</div>
-<div class="age">checkpoint age 208 s at the last receipt · 66 supervision receipts this run</div></div></div>
+<div class="seg">150</div><div class="last">last event: supervisor: agent stalled — checkpoint stale, process alive</div>
+<div class="age">checkpoint age 388 s at the last receipt · 67 supervision receipts this run</div></div></div>
 <h2 class="sect">The Dialogue</h2>
 <p class="sectsub">the most recent 71 receipts across the six watches, drawn as 48 lines · heartbeats in runs of three or more are drawn as one line spanning the run — the sentence is the receipts' own, the count is the count. Every sentence below is a receipt's own rationale, verbatim —
 trimmed, where length forced it, only at a sentence boundary and marked with an ellipsis.
 The stage tags are this page's reading of the receipts (noticed · diagnosed · checked ·
 corrected · refused · escalated · completed); the raw event name stands under each line,
 so nothing here asks to be taken on the page's word.</p>
-<div class="stream"><div class="line st-corrected"><div class="meta"><span class="t">09:25:22 EST</span><span class="w">Watch 9105</span><span class="tag">CORRECTED</span></div>
-<div class="say">Agent relaunched from the verified boundary at 230 entries; the relaunch is provisional until the chain advances (R5).</div><div class="trace">resume_launched · receipt #117</div></div><div class="line st-diagnosed"><div class="meta"><span class="t">09:25:23 EST</span><span class="w">Watch 9105</span><span class="tag">DIAGNOSED</span></div>
+<div class="stream"><div class="line st-diagnosed"><div class="meta"><span class="t">09:25:23 EST</span><span class="w">Watch 9105</span><span class="tag">DIAGNOSED</span></div>
 <div class="say">The relaunched agent died inside its provisional window, before its checkpoint advanced past the loss point — a distinct event, not a silent retry (R5).</div><div class="trace">resume_failed · receipt #118</div></div><div class="line st-diagnosed"><div class="meta"><span class="t">09:25:23 EST</span><span class="w">Watch 9105</span><span class="tag">DIAGNOSED · cause: proven</span></div>
 <div class="say">Interruption 4: the agent stopped at 230 committed entries (checkpoint age 0.9s at detection). Cause: proven — graded from the evidence that survived.</div><div class="trace">interruption_detected · receipt #119</div></div><div class="line st-escalated"><div class="meta"><span class="t">09:25:23 EST</span><span class="w">Watch 9105</span><span class="tag">ESCALATED</span></div>
 <div class="say">3 consecutive resumes failed (budget 3); the supervisor stops and escalates rather than looping (R8).</div><div class="trace">budget_exhausted · receipt #120</div></div><div class="line st-escalated"><div class="meta"><span class="t">09:25:23 EST</span><span class="w">Watch 9105</span><span class="tag">ESCALATED</span></div>
@@ -197,7 +196,8 @@ so nothing here asks to be taken on the page's word.</p>
 <div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #62</div></div><div class="line st-noticed"><div class="meta"><span class="t">11:43:27 EST</span><span class="w">Watch 9109</span><span class="tag">NOTICED</span></div>
 <div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #63</div></div><div class="line st-noticed"><div class="meta"><span class="t">11:46:01 EST</span><span class="w">Watch 9109</span><span class="tag">NOTICED</span></div>
 <div class="say">The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).</div><div class="trace">stall_anomaly · receipt #64</div></div><div class="line st-noticed"><div class="meta"><span class="t">11:46:28 EST</span><span class="w">Watch 9109</span><span class="tag">NOTICED</span></div>
-<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #65</div></div></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #65</div></div><div class="line st-noticed"><div class="meta"><span class="t">11:49:28 EST</span><span class="w">Watch 9109</span><span class="tag">NOTICED</span></div>
+<div class="say">Supervisor alive; agent state as recorded.</div><div class="trace">supervisor_heartbeat · receipt #66</div></div></div>
 <p class="note">Read it as the product's thesis, demonstrated on itself: a death is noticed
 and its cause graded before anything moves; the chain is checked before anything resumes;
 a refusal is spoken aloud and receipted, never papered over. The watch does not guess,
