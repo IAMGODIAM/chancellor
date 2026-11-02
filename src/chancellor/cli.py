@@ -49,6 +49,19 @@ from .receipts import checkpoint_payload
 from .supervise import Supervisor, SupervisorConfig
 from .task_graph import TaskGraph, TaskNode
 
+SUPERVISE_USAGE = (
+    "usage: chancellor supervise [--state-dir DIR] "
+    "[--agent-log PATH] [--cadence SECONDS] [--missed N] "
+    "[--budget N] [--poll SECONDS] -- <agent command...>"
+)
+SUPERVISE_CADENCE_HELP = (
+    "cadence: --cadence is the agent's signed-checkpoint interval in "
+    "seconds (not its work or segment interval); the stale threshold "
+    "is --cadence × --missed. If a healthy agent draws stall_anomaly "
+    "receipts, match --cadence to that checkpoint interval. Full "
+    "guidance: docs/supervision-cadence.md."
+)
+
 # Anchored exemplars for the demo judge, two per OUTPUT_RUBRIC criterion:
 # what a weak and a strong worker output look like, and the grade each earns.
 DEMO_EXEMPLARS: list[Exemplar] = [
@@ -277,13 +290,14 @@ def _supervise_command(args: list[str]) -> int:
     user-authored scripting. Exit codes: 0 the agent completed;
     1 halted and escalated to the human gate; 2 usage error or a
     launch-time self-proof refusal."""
+    help_end = args.index("--") if "--" in args else len(args)
+    if any(flag in {"--help", "-h"} for flag in args[:help_end]):
+        print(SUPERVISE_USAGE)
+        print(SUPERVISE_CADENCE_HELP)
+        return 0
     if "--" not in args:
-        print(
-            "usage: chancellor supervise [--state-dir DIR] "
-            "[--agent-log PATH] [--cadence SECONDS] [--missed N] "
-            "[--budget N] [--poll SECONDS] -- <agent command...>",
-            file=sys.stderr,
-        )
+        print(SUPERVISE_USAGE, file=sys.stderr)
+        print(SUPERVISE_CADENCE_HELP, file=sys.stderr)
         return 2
     split = args.index("--")
     opts, command = args[:split], args[split + 1 :]
