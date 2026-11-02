@@ -12,7 +12,7 @@ url: "https://github.com/IAMGODIAM/chancellor"
 repository-code: "https://github.com/IAMGODIAM/chancellor"
 abstract: >-
   A governance-and-evaluation harness for long-running AI agents: work
-  runs as a durable task graph, an independent judge model grades every
+  runs as a durable task graph, an independent judge model (uncalibrated) grades every
   consequential output, consequential acts stop at a human gate, and
   every decision leaves a hash-chained, offline-verifiable receipt.
 keywords:
