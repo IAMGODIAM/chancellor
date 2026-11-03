@@ -66,26 +66,30 @@ receipts as they land.
 
 <!-- STATUS:BEGIN -->
 - **Standing:** IN FLIGHT — every figure UNVERIFIED, republished from the boxes’ own state files.
-- **As of:** 2026-11-02 20:17 EST (five-minute cadence)
-- **Boxes reporting:** 1 / 4
-- **Segments:** 75 / 240 across the watches polled · complete 70 · halted fail-closed 5 · faults injected 7
+- **As of:** 2026-11-02 20:23 EST (five-minute cadence)
+- **Boxes reporting:** 4 / 4
+- **Segments:** 582 / 1440 across the watches polled · complete 538 · halted fail-closed 44 · faults injected 56
 - **Drift events:** 0
-- **The watch's receipts so far:** refusals 0 · escalations 0 · cadence_advisory 1 · stall_anomaly 9 · supervision_started 1
+- **The watch's receipts so far:** refusals 0 · escalations 0 · cadence_advisory 8 · chain_verification 12 · interruption_detected 14 · resume_confirmed 12 · resume_launched 12 · stall_anomaly 81 · supervision_started 8
 
 ### Box b0 — Cell A — kill cycle · us-east-1
-- Not yet reported — state pull failed (lambda status: active). The cadence catches up; nothing is filled in by assumption.
+- **Phase:** RUN · **Step:** seed-10102 · *supervised soak started*
+- **Watch 10101:** segments 104 / 240 · complete 97 · halted 7 · faults 10 · drift 0 · corrupted state files 0 · in-run chain verifications 12/12 ok · supervision receipts 67 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
+- **Watch 10102:** segments 107 / 240 · complete 99 · halted 8 · faults 10 · drift 0 · corrupted state files 0 · in-run chain verifications 12/12 ok · supervision receipts 64 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
 
 ### Box b1 — Cell A — kill cycle (replication) · us-west-1
-- Not yet reported — state pull failed (lambda status: active). The cadence catches up; nothing is filled in by assumption.
+- **Phase:** RUN · **Step:** seed-10104 · *supervised soak started*
+- **Watch 10103:** segments 100 / 240 · complete 92 · halted 8 · faults 10 · drift 0 · corrupted state files 0 · in-run chain verifications 12/12 ok · supervision receipts 56 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
+- **Watch 10104:** segments 101 / 240 · complete 92 · halted 9 · faults 10 · drift 0 · corrupted state files 0 · in-run chain verifications 12/12 ok · supervision receipts 61 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
 
 ### Box b2 — Cell B — supervisor death + refusal · us-east-1
-- Not yet reported — state pull failed (lambda status: active). The cadence catches up; nothing is filled in by assumption.
+- **Phase:** RUN · **Step:** seed-10105 · *supervised run starting (B-main)*
+- **Watch 10105:** segments 93 / 240 · complete 86 · halted 7 · faults 9 · drift 0 · corrupted state files 0 · in-run chain verifications 11/11 ok · supervision receipts 49 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
 
 ### Box b3 — Cell C — stall vs death, then D — machine loss (staged) · us-west-1
 - **Phase:** RUN · **Step:** seed-10106 · *supervised run starting (C)*
-- **Watch 10106:** segments 75 / 240 · complete 70 · halted 5 · faults 7 · drift 0 · corrupted state files 0 · in-run chain verifications 9/9 ok · supervision receipts 39 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
+- **Watch 10106:** segments 77 / 240 · complete 72 · halted 5 · faults 7 · drift 0 · corrupted state files 0 · in-run chain verifications 9/9 ok · supervision receipts 42 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
 
-**Anomalies this cycle:** box b0 unreachable — state pull failed (lambda status: active); box b1 unreachable — state pull failed (lambda status: active); box b2 unreachable — state pull failed (lambda status: active)
 <!-- STATUS:END -->
 
 ## How to read this board — the language, filed before the first kill
