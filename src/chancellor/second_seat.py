@@ -383,8 +383,10 @@ class Monitor:
             age = ground.heartbeat_age_s
             if age is not None and age > self.seat.wedge_multiple * hb:
                 now = self._clock()
-                if self._stale_count >= 1 and self._stale_since is not None and (
-                    now - self._stale_since >= self.seat.poll_s
+                if (
+                    self._stale_count >= 1
+                    and self._stale_since is not None
+                    and (now - self._stale_since >= self.seat.poll_s)
                 ):
                     return WEDGED
                 return HEALTHY  # first stale observation; not yet a wedge
@@ -969,18 +971,14 @@ class Monitor:
             "the successor — failure receipted in the seat log."
         )
 
-    def _confirm(
-        self, successor: ProcessHandle, epoch: int
-    ) -> tuple[str, bool]:
+    def _confirm(self, successor: ProcessHandle, epoch: int) -> tuple[str, bool]:
         """Confirmation (§5.2): four chain facts read back, never the
         successor's mere existence. Returns (outcome, successor_live)
         with outcome in confirmed / confirmed_with_escalation /
         successor_refused / confirmation_timeout."""
         window = self.seat.confirmation_window(self.config.heartbeat_interval_s)
         deadline = self._clock() + window
-        started_deadline = min(
-            self._clock() + self.seat.started_readback_s, deadline
-        )
+        started_deadline = min(self._clock() + self.seat.started_readback_s, deadline)
         started_seq: int | None = None
         poll_step = min(self.seat.poll_s, 1.0)
         while True:
