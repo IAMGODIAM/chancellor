@@ -579,14 +579,24 @@ class Supervisor:
             fh = self.watch_lock_path.open("a+", encoding="utf-8")
         except OSError as exc:
             return f"watch lock failed: cannot open {self.watch_lock_path}: {exc}"
-        try:
-            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            fh.close()
-            return (
-                "watch lock failed: another supervisor holds this watch "
-                f"({self.watch_lock_path})"
-            )
+        # A seat-spawned successor (epoch > 0) is handed the lock by
+        # its monitor, which releases it the moment the successor
+        # process exists (SPEC §3.2 step 6): retry briefly so the
+        # handover cannot lose the race to process startup. A
+        # first-of-watch supervisor (epoch 0) refuses at once.
+        deadline = time.monotonic() + (5.0 if self.config.watch_epoch > 0 else 0.0)
+        while True:
+            try:
+                fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if time.monotonic() >= deadline:
+                    fh.close()
+                    return (
+                        "watch lock failed: another supervisor holds this watch "
+                        f"({self.watch_lock_path})"
+                    )
+                time.sleep(0.05)
         body = {
             "pid": os.getpid(),
             "watch_epoch": self.config.watch_epoch,
@@ -883,6 +893,15 @@ class Supervisor:
         try:
             self._log = AuditLog(self.supervision_log_path, signer=self._signer)
             self._state = rebuild_supervision_state(self._log.read_all())
+            if not self.config.seat_enabled and any(
+                _detail_of(e).get("event") == "supervision_started"
+                and _detail_of(e).get("second_seat") is True
+                for e in self._log.read_all()
+            ):
+                return (
+                    "persist leg failed: this watch is seat-enabled; a "
+                    "seat-less supervisor cannot join it"
+                )
             started_detail: dict = {
                 "agent_command": self.config.agent_command,
                 "agent_log": str(self.agent_log),

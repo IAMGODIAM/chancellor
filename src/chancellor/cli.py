@@ -53,13 +53,24 @@ from .instruments import default_panel
 from .judge import Exemplar, Judge
 from .orchestrator import CrewRunner
 from .receipts import checkpoint_payload
+from .second_seat import Monitor, SecondSeatConfig
 from .supervise import Supervisor, SupervisorConfig
 from .task_graph import TaskGraph, TaskNode
 
 SUPERVISE_USAGE = (
     "usage: chancellor supervise [--state-dir DIR] "
     "[--agent-log PATH] [--cadence SECONDS] [--missed N] "
-    "[--budget N] [--poll SECONDS] -- <agent command...>"
+    "[--budget N] [--poll SECONDS] [--second-seat] [--monitor-only] "
+    "[--seat-budget N] [--seat-poll SECONDS] -- <agent command...>"
+)
+SUPERVISE_SEAT_HELP = (
+    "second seat: --second-seat pair-launches a built-in monitor "
+    "that watches the supervisor itself and, on the supervisor's "
+    "proven death, reseats a successor through the ordinary verified "
+    "paths (bounded attempts, receipted, never a judgment). "
+    "--monitor-only attaches a monitor to a seat-enabled watch "
+    "already running. The seat is OFF unless one of these flags is "
+    "given. A fenced supervisor exits 3."
 )
 SUPERVISE_CADENCE_HELP = (
     "cadence: --cadence is the agent's signed-checkpoint interval in "
@@ -358,15 +369,26 @@ def _supervise_command(args: list[str]) -> int:
     if any(flag in {"--help", "-h"} for flag in args[:help_end]):
         print(SUPERVISE_USAGE)
         print(SUPERVISE_CADENCE_HELP)
+        print(SUPERVISE_SEAT_HELP)
         return 0
+    monitor_only = "--monitor-only" in args[:help_end]
     if "--" not in args:
-        print(SUPERVISE_USAGE, file=sys.stderr)
-        print(SUPERVISE_CADENCE_HELP, file=sys.stderr)
-        return 2
-    split = args.index("--")
+        if not monitor_only:
+            print(SUPERVISE_USAGE, file=sys.stderr)
+            print(SUPERVISE_CADENCE_HELP, file=sys.stderr)
+            return 2
+        split = len(args)
+    else:
+        split = args.index("--")
     opts, command = args[:split], args[split + 1 :]
-    if not command:
+    if not command and not monitor_only:
         print("supervise: no agent command after --", file=sys.stderr)
+        return 2
+    if command and monitor_only:
+        print(
+            "supervise: --monitor-only takes no agent command",
+            file=sys.stderr,
+        )
         return 2
     config = SupervisorConfig(agent_command=command)
     value_opts = {
@@ -378,9 +400,25 @@ def _supervise_command(args: list[str]) -> int:
         "--poll": ("poll_s", float),
         "--heartbeat": ("heartbeat_s", float),
     }
+    bool_flags = {"--second-seat", "--monitor-only"}
+    seat_values: dict[str, object] = {}
+    kept_opts: list[str] = []
     i = 0
     while i < len(opts):
         flag = opts[i]
+        if flag in bool_flags:
+            seat_values[flag] = True
+            i += 1
+            continue
+        if flag in {"--seat-budget", "--seat-poll", "--seat-epoch"}:
+            try:
+                raw = opts[i + 1]
+                seat_values[flag] = float(raw) if flag == "--seat-poll" else int(raw)
+            except (IndexError, ValueError):
+                print(f"{flag} needs a value", file=sys.stderr)
+                return 2
+            i += 2
+            continue
         if flag not in value_opts:
             print(f"unknown supervise flag: {flag}", file=sys.stderr)
             return 2
@@ -391,7 +429,31 @@ def _supervise_command(args: list[str]) -> int:
             print(f"{flag} needs a value", file=sys.stderr)
             return 2
         setattr(config, field_name, value)
+        kept_opts += [flag, opts[i + 1]]
         i += 2
+    if "--seat-epoch" in seat_values:
+        # A seat-spawned successor: seat-enabled at the minted epoch.
+        config.seat_enabled = True
+        config.watch_epoch = int(seat_values["--seat-epoch"])
+    seat = SecondSeatConfig(
+        budget=int(seat_values.get("--seat-budget", 3)),
+        poll_s=float(seat_values.get("--seat-poll", 30.0)),
+    )
+    if monitor_only:
+        return Monitor(config, seat, mode="attach").run()
+    if seat_values.get("--second-seat"):
+        recorded = [
+            sys.executable,
+            "-m",
+            "chancellor.cli",
+            "supervise",
+            *kept_opts,
+            "--",
+            *command,
+        ]
+        return Monitor(
+            config, seat, supervisor_argv=recorded, mode="pair"
+        ).run()
     return Supervisor(config).run()
 
 
