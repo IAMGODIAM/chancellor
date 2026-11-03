@@ -19,6 +19,7 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -925,36 +926,71 @@ def _good_successor_factory(state_dir: Path, alive: dict[int, bool], base: int):
     def launcher(argv):
         counter[0] += 1
         pid = base + counter[0]
-        epoch = int(argv[argv.index("--seat-epoch") + 1])
+        # The real CLI scans supervise options left to right into a
+        # dict, so the LAST --seat-epoch wins (cli.py seat_values);
+        # with_epoch inserts the minted epoch after any stale one in
+        # a recorded argv, so the successor's real parse takes the
+        # last occurrence. Parse it the same way here — taking the
+        # first left the fake writing its facts at the stale epoch,
+        # and the Monitor (confirming at the minted epoch) waited
+        # out real confirmation windows on every attempt.
+        epoch = int(argv[len(argv) - 1 - argv[::-1].index("--seat-epoch") + 1])
         lock_path = state_dir / "supervision.lock"
-        fh = open(lock_path, "a+")
-        fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
-        fh.seek(0)
-        fh.truncate()
-        fh.write(json.dumps({
-            "pid": pid, "watch_epoch": epoch, "host": "test",
-            "started_at": time.time(), "seat_armed": True,
-            "pid_identity": None,
-        }))
-        fh.flush()
-        sup = AuditLog(state_dir / "supervision-log.jsonl")
-        _record(
-            sup, "supervision_started",
-            {"watch_epoch": epoch, "second_seat": True,
-             "supervisor_pid": pid},
-            "supervisor", time.time(),
-        )
-        started_seq = AuditLog(
-            state_dir / "supervision-log.jsonl"
-        ).read_all()[-1]["seq"]
-        _record(
-            sup, "supervisor_reseat_confirmed",
-            {"watch_epoch": epoch, "confirming_started_seq": started_seq},
-            "supervisor", time.time(),
-        )
-        _record(sup, "supervisor_heartbeat", {"agent_alive": True},
-                "supervisor", time.time())
-        alive[pid] = True
+        holder: dict[str, object] = {}
+
+        def _serve():
+            # The successor's acts run CONCURRENTLY with the
+            # Monitor's post-spawn lock release, as a real
+            # successor process's do: the Monitor holds the watch
+            # lock across the spawn call and releases it only when
+            # the launcher returns, so a fake that takes the lock
+            # synchronously inside the launcher deadlocks against
+            # the handover it simulates (the lock is taken at
+            # self-proof, with the bounded retry supervise.py
+            # specifies — 5 s here). Serve from a thread instead:
+            # retry the lock non-blockingly, then write the body
+            # and the three chain facts.
+            fh = open(lock_path, "a+")
+            deadline = time.time() + 5.0
+            while True:
+                try:
+                    fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except OSError:
+                    if time.time() >= deadline:
+                        fh.close()
+                        return
+                    time.sleep(0.05)
+            holder["fh"] = fh
+            fh.seek(0)
+            fh.truncate()
+            fh.write(json.dumps({
+                "pid": pid, "watch_epoch": epoch, "host": "test",
+                "started_at": time.time(), "seat_armed": True,
+                "pid_identity": None,
+            }))
+            fh.flush()
+            sup = AuditLog(state_dir / "supervision-log.jsonl")
+            _record(
+                sup, "supervision_started",
+                {"watch_epoch": epoch, "second_seat": True,
+                 "supervisor_pid": pid},
+                "supervisor", time.time(),
+            )
+            started_seq = AuditLog(
+                state_dir / "supervision-log.jsonl"
+            ).read_all()[-1]["seq"]
+            _record(
+                sup, "supervisor_reseat_confirmed",
+                {"watch_epoch": epoch, "confirming_started_seq": started_seq},
+                "supervisor", time.time(),
+            )
+            _record(sup, "supervisor_heartbeat", {"agent_alive": True},
+                    "supervisor", time.time())
+            alive[pid] = True
+
+        thread = threading.Thread(target=_serve, daemon=True)
+        thread.start()
 
         class _GoodHandle:
             def __init__(self):
@@ -968,11 +1004,14 @@ def _good_successor_factory(state_dir: Path, alive: dict[int, bool], base: int):
 
             def die(self):
                 alive[self.pid] = False
-                try:
-                    fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
-                    fh.close()
-                except OSError:
-                    pass
+                thread.join(timeout=5)
+                fh = holder.get("fh")
+                if fh is not None:
+                    try:
+                        fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+                        fh.close()
+                    except OSError:
+                        pass
 
         handle = _GoodHandle()
         handles[pid] = handle
@@ -1116,7 +1155,8 @@ SEAT_EVENT_FIELDS = {
         "episode_budget",
     },
     "supervisor_reseat_confirmed": {"event", "watch_epoch",
-                                    "confirming_started_seq"},
+                                    "confirming_started_seq",
+                                    "predecessor_interruption_seq"},
     "supervisor_reseat_failed": {
         "event", "watch_epoch", "attempt", "reason",
         "successor_exit_status",
