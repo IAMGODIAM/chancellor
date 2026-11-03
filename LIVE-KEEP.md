@@ -66,7 +66,7 @@ receipts as they land.
 
 <!-- STATUS:BEGIN -->
 - **Standing:** IN FLIGHT — every figure UNVERIFIED, republished from the boxes’ own state files.
-- **As of:** 2026-11-03 00:17 EST (five-minute cadence)
+- **As of:** 2026-11-03 00:21 EST (five-minute cadence)
 - **Boxes reporting:** 4 / 4
 - **Segments:** 1514 / 1440 across the watches polled · complete 1396 · halted fail-closed 118 · faults injected 150
 - **Drift events:** 0
