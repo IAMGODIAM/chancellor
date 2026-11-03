@@ -209,6 +209,12 @@ def _live_client() -> MetaModelClient:
     return MetaModelClient(transport=openai_http_transport(base, api_key=key))
 
 
+def _flushing_print(line: str) -> None:
+    """Print one line and flush it, so paced output reaches pipes and
+    logs as it happens instead of in one block at exit."""
+    print(line, flush=True)
+
+
 def run_exhibit(
     *,
     fast: bool = False,
@@ -217,7 +223,7 @@ def run_exhibit(
     live: bool = False,
     seed: int = DEFAULT_SEED,
     state_dir: str | Path | None = None,
-    emit: Callable[[str], None] = print,
+    emit: Callable[[str], None] = _flushing_print,
     input_fn: Callable[[str], str] = input,
 ) -> int:
     """Run the hearing. Returns 0 only on the full, honest path."""
@@ -440,6 +446,11 @@ def run_exhibit(
         try:
             answer = input_fn("    press Enter to approve, anything else denies: ")
         except EOFError:
+            emit("")
+            emit(
+                "    no human at the gate (input is not a terminal) — denied,"
+                " fail-closed. For an unattended run, use --auto."
+            )
             return False, "no human at the gate — denied (fail-closed)"
         if answer.strip() == "":
             return True, "approved at the exhibit gate by the human present"
