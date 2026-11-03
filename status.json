@@ -1,5 +1,5 @@
 {
- "polled_at_est": "2026-11-02 23:31 EST",
+ "polled_at_est": "2026-11-02 23:37 EST",
  "label": "IN FLIGHT / UNVERIFIED",
  "boxes": [
   {
@@ -9073,12 +9073,12 @@
    "reachable": true,
    "progress": {
     "phase": "RUN",
-    "step": "seed-10109",
-    "msg": "supervised run starting (B-corrupt-live)",
+    "step": "seed-10110",
+    "msg": "supervised run starting (B-corrupt-kill)",
     "box": "b2",
     "cell": "B",
     "started_at": 1793663353.8884864,
-    "ts": 1793680274.28045
+    "ts": 1793680584.8781345
    },
    "soaks": [
     {
@@ -10948,12 +10948,12 @@
      "target": null,
      "checkpoint": {
       "seed": 10109,
-      "segments_done": 44,
-      "steps_done": 528,
+      "segments_done": 50,
+      "steps_done": 600,
       "drift_events": 0,
-      "segments_complete": 41,
-      "segments_halted": 3,
-      "faults_injected": 4,
+      "segments_complete": 46,
+      "segments_halted": 4,
+      "faults_injected": 5,
       "verifications": [
        {
         "steps": 108,
@@ -10989,31 +10989,44 @@
         "entries": 40,
         "checkpoints": 5,
         "failures": []
+       },
+       {
+        "steps": 600,
+        "ok": false,
+        "entries": 47,
+        "checkpoints": 6,
+        "failures": [
+         "entry_hash_mismatch: seq 13 (entry edited)",
+         "prev_hash_link_broken: seq 14",
+         "checkpoint_root_mismatch: Merkle root over the log's entry hashes != checkpoint root"
+        ]
        }
       ],
       "corrupted_state_files": 0,
       "started_at": 1793677702.7359138,
-      "updated_at": 1793680269.33276
+      "updated_at": 1793680584.5301893
      },
      "supervision": {
-      "entries": 21,
+      "entries": 26,
       "events": {
        "supervision_started": 1,
        "cadence_advisory": 1,
-       "stall_anomaly": 5,
-       "supervisor_heartbeat": 14
+       "stall_anomaly": 6,
+       "supervisor_heartbeat": 16,
+       "drift_detected": 1,
+       "escalation": 1
       },
-      "refusals": 0,
-      "escalations": 0,
+      "refusals": 1,
+      "escalations": 1,
       "latest_event": {
-       "ts": 1793679884.5330255,
-       "event": "stall_anomaly",
-       "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive"
+       "ts": 1793680584.8631482,
+       "event": "escalation",
+       "action": "supervisor escalation: chain drift detected under a live agent"
       },
       "last_log_size": 40,
       "resume_activity_ts": null
      },
-     "entries_present": 43,
+     "entries_present": 47,
      "dialogue": [
       {
        "ts": 1793677702.6649933,
@@ -11287,6 +11300,107 @@
        "ok": null,
        "age_s": 74.43657040596008,
        "log_size": 40
+      },
+      {
+       "ts": 1793680329.7396257,
+       "seq": 21,
+       "event": "stall_anomaly",
+       "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive",
+       "rationale": "The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).",
+       "approved": false,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 180.48602747917175,
+       "log_size": 40
+      },
+      {
+       "ts": 1793680403.7712934,
+       "seq": 22,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 254.51775693893433,
+       "log_size": 40
+      },
+      {
+       "ts": 1793680583.857858,
+       "seq": 23,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 434.6042501926422,
+       "log_size": 40
+      },
+      {
+       "ts": 1793680584.861259,
+       "seq": 24,
+       "event": "drift_detected",
+       "action": "supervisor: drift detected \u2014 boundary moved and no longer verifies",
+       "rationale": "A new checkpoint boundary fails verification while the agent lives: the agent is halted and the finding escalated, never retried (R7).",
+       "approved": false,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": null,
+       "log_size": null
+      },
+      {
+       "ts": 1793680584.8631482,
+       "seq": 25,
+       "event": "escalation",
+       "action": "supervisor escalation: chain drift detected under a live agent",
+       "rationale": "human gate with no approver attached \u2014 denied (fail-closed)",
+       "approved": false,
+       "refusal_state": "no-approver-attached",
+       "cause": null,
+       "ok": null,
+       "age_s": null,
+       "log_size": null
+      }
+     ]
+    },
+    {
+     "seed": 10110,
+     "target": null,
+     "checkpoint": null,
+     "supervision": {
+      "entries": 1,
+      "events": {
+       "supervision_started": 1
+      },
+      "refusals": 0,
+      "escalations": 0,
+      "latest_event": {
+       "ts": 1793680584.9611812,
+       "event": "supervision_started",
+       "action": "supervisor: supervision started"
+      },
+      "last_log_size": null,
+      "resume_activity_ts": null
+     },
+     "entries_present": 1,
+     "dialogue": [
+      {
+       "ts": 1793680584.9611812,
+       "seq": 0,
+       "event": "supervision_started",
+       "action": "supervisor: supervision started",
+       "rationale": "Supervisor accepted the watch; self-proof passed (observe, launch, persist).",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": null,
+       "log_size": null
       }
      ]
     }
@@ -13104,18 +13218,18 @@
   }
  ],
  "totals": {
-  "segments_done": 1476,
+  "segments_done": 1482,
   "segments_target": 1440,
-  "segments_complete": 1360,
-  "segments_halted": 116,
-  "faults_injected": 147,
+  "segments_complete": 1365,
+  "segments_halted": 117,
+  "faults_injected": 148,
   "drift_events": 0,
-  "refusals": 1,
-  "escalations": 1,
+  "refusals": 2,
+  "escalations": 2,
   "events": {
-   "supervision_started": 12,
+   "supervision_started": 13,
    "cadence_advisory": 12,
-   "stall_anomaly": 204,
+   "stall_anomaly": 205,
    "interruption_detected": 45,
    "chain_verification": 39,
    "resume_launched": 39,
@@ -13123,10 +13237,16 @@
    "resume_failed": 9,
    "agent_completed": 5,
    "budget_exhausted": 1,
-   "escalation": 1
+   "escalation": 2,
+   "drift_detected": 1
   }
  },
- "anomalies": [],
- "notables": [],
+ "anomalies": [
+  "new escalation events since last cycle: +1 (total 2)",
+  "new refusal receipts since last cycle: total 2"
+ ],
+ "notables": [
+  "stall_anomaly +1 (total 205) \u2014 diagnosed cadence background, inside the envelope (RUN-9's DIAGNOSIS-STALL-ANOMALY.md); filed, not paged"
+ ],
  "run_complete": false
 }
