@@ -34,3 +34,19 @@ jobs:
         run: mypy
       - name: Tests
         run: python -m pytest -q
+
+  # Release-sync Gate A on tag pushes (SPEC 3.1 caller 2): the same
+  # check set publish.yml enforces, run when the tag lands — a desync
+  # is caught before a Release object is even created from the tag.
+  release-sync-gate:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install gate tools
+        run: pip install "pytest>=8"
+      - name: Release-sync Gate A (tag push)
+        run: python tools/release_sync.py check --gate-a --tag "${{ github.ref_name }}"
