@@ -4,9 +4,9 @@
 
 [![gates](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml/badge.svg)](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml)
 <a href="docs/evidence/run-7/"><img src="docs/media/badge-drift.svg" alt="Suite B: drift 0 / 18,000 — bounds printed"></a>
-<a href="https://github.com/IAMGODIAM/chancellor/actions"><img src="docs/media/badge-tests.svg" alt="Tests: 273 passing — gates green"></a>
+<a href="https://github.com/IAMGODIAM/chancellor/actions"><img src="docs/media/badge-tests.svg" alt="Tests: 287 passing — gates green"></a>
 <a href="#results-measured-oct-29--nov-2-2026"><img src="docs/media/badge-calibration.svg" alt="Calibration: gate not passed — verdicts labeled"></a>
-<a href="https://github.com/IAMGODIAM/chancellor/releases/tag/v1.2.0"><img src="docs/media/badge-release.svg" alt="Release: v1.2.0"></a>
+<a href="https://github.com/IAMGODIAM/chancellor/releases/tag/v1.2.1"><img src="docs/media/badge-release.svg" alt="Release: v1.2.1"></a>
 [![PyPI version](https://img.shields.io/pypi/v/chancellor)](https://pypi.org/project/chancellor/)
 [![PyPI monthly downloads](https://img.shields.io/pypi/dm/chancellor)](https://pypi.org/project/chancellor/)
 
@@ -54,7 +54,7 @@ Two eval suites test the claims. **Suite A** asks whether the judge grades remed
 
 Model names in this repo are exact API model IDs only; one naming correction is recorded in [ERRATA.md](ERRATA.md).
 
-**Status — Nov 2, 2026:** v1.2.0. The offline demo is the guaranteed path and needs no key. The live connection to the Meta Model API was established Oct 30 and the transport is validated — the model list returns and both working models answer. Graded live runs are metered and reported in [BUILD-LOG.md](BUILD-LOG.md). The measured record was re-run at 10x volume (RUN-7, Nov 1–2) and the continuity supervisor is now built into the product — see [What's new in 1.1.0](#whats-new-in-110) and [Results](#results-measured-oct-29--nov-2-2026).
+**Status — Nov 3, 2026:** v1.2.1. The offline demo is the guaranteed path and needs no key. The live connection to the Meta Model API was established Oct 30 and the transport is validated — the model list returns and both working models answer. Graded live runs are metered and reported in [BUILD-LOG.md](BUILD-LOG.md). The measured record was re-run at 10x volume (RUN-7, Nov 1–2) and the continuity supervisor is now built into the product — see [What's new in 1.1.0](#whats-new-in-110) and [Results](#results-measured-oct-29--nov-2-2026).
 
 ## Results (measured, Oct 29 – Nov 2, 2026)
 
@@ -78,7 +78,7 @@ Governance is not free, and the price is printed, not hidden: the governed arm c
 
 **Kill-resume gate (T3):** **3,000 / 3,000** gates in RUN-7 — a 10-box reproduction of the same 300-gate instrument, *not* 3,000 independent trials; the label travels with the figure in the record. The fixed harness's original 300 / 300 (6,000 trials, RUN-5) and the first harness's 290 / 300 stand in [BUILD-LOG.md](BUILD-LOG.md) — the 290 was a defect in the test harness, not the product, and the diagnosis is recorded there in full.
 
-**Tests:** 273 passing, 0 failing — which also passes its own presentation gates: Ruff format and lint at zero findings, mypy clean, identical commands in pre-commit and CI (see the badge above).
+**Tests:** 287 passing, 0 failing — which also passes its own presentation gates: Ruff format and lint at zero findings, mypy clean, identical commands in pre-commit and CI (see the badge above).
 
 **Suite A:** the calibration gate has been run twice under pre-registration and has not passed — and no Suite A score is claimed anywhere in this submission. The calibration of record measured band κ 0.667 and Spearman ρ 0.881, with precedent-consistency (κ 0.294) and reversibility (κ 0.575) below the 0.6 criterion floor. The pre-registered remedy run then failed its own completeness gate — 35 of 36 references scored, one lost to two transport failures — and an incomplete run earns no gate statistics; its diagnostics (not gate statistics) put every criterion above threshold, and the judge's blind self-agreement, measured for the first time, satisfied its gate on all four criteria. What ships is the labeled fallback: live judge verdicts carry the label *uncalibrated* until a pre-registered run passes in full. The gate catching our own judge — twice — is the method working as designed.
 
@@ -103,6 +103,15 @@ The harness, drawn as the machine it is: four subassemblies — the Worker, the 
 See it move: [the film](https://www.youtube.com/watch?v=z-2BGfKpuKA) — and live, all judging week, [The Long Watch](https://iamgodiam.github.io/chancellor/live.html).
 
 The interactive machine itself is live on the project page — [explode it, cut it away, press TAMPER](https://muse.ai/s/chancellor-landing-page-ixc6runtx0wxw4/ExzrqSkjrxd3Z-Z4k2JdGi-gBRtvWbcZsqkloYmFXpE).
+
+## What's new in 1.2.1
+
+Two supervisor correctness fixes. Both were found after 1.2.0 shipped, both are proven by regression tests that ship with them, and the full suite stands at 287 passing with Ruff and mypy clean.
+
+- **A first launch onto existing state is a resume — F-WABI-001, closed.** The supervisor's initial chain verification is now honored whenever a pre-existing agent log exists and is non-empty on disk: file presence and size, not parseability. Before the fix, a malformed agent log with zero parseable entries and a missing checkpoint sidecar was adopted as a fresh start, and the agent launched onto an unverified chain with nothing receipted. A zero-byte log still starts fresh, and a sidecar committing entries against an empty log still fails as truncation. The hole was reported by an outside verifier and independently confirmed before it was fixed.
+- **The boundary verifier recounts a torn read — O1, closed.** Verification reads the agent log first and the checkpoint sidecar second; a writer that appends and checkpoints between the two reads leaves the sidecar ahead of the counted entries, and the tear read as tail truncation — halting healthy live agents on false drift verdicts. On that signature alone, the verifier now re-reads the pair fresh and judges on the consistent second read alone; a truncation that persists across the recount is real and still fails, as do genuine corruptions. Found by the second-seat acceptance programme, with three receipted sightings, each of which re-verified clean cold.
+
+Nothing else changes: no new surface, no behavior change on any path either fix does not name. Judge verdicts remain labeled *uncalibrated* under the interim calibration rule, exactly as in 1.2.0.
 
 ## What's new in 1.2.0
 
