@@ -267,6 +267,12 @@ commands:
   supervise   run an agent under supervision: chancellor supervise -- <cmd>
   eval-a      run Eval Suite A (normative judgment), JSON to stdout
   eval-b      run Eval Suite B (long-horizon reliability), JSON to stdout
+  policy      the Governor: check an act against the standing policy
+              packs (policy check --act FILE | policy packs)
+  manifest    the Manifest Registry: show / verify / bootstrap the
+              register of everything the fleet owns
+  preload     issue a class preload: preload --class C --charge "..."
+  receipts    query the Governor decision receipts on the audit spine
 
 options:
   -h, --help     show this help (also: chancellor <command> --help)
@@ -431,6 +437,190 @@ def _installs_command(args: list[str]) -> int:
     return 0
 
 
+GOVERNOR_STATE_DIR = Path(".chancellor/governor")
+
+
+def _governor_state(args: list[str]):
+    """The Governor's state: its receipts chain and registry, under
+    one state dir (default .chancellor/governor, --state-dir DIR)."""
+    from .governor_receipts import GovernorReceipts
+    from .manifest import Registry
+
+    state_dir = GOVERNOR_STATE_DIR
+    if "--state-dir" in args:
+        state_dir = Path(args[args.index("--state-dir") + 1])
+    state_dir.mkdir(parents=True, exist_ok=True)
+    receipts = GovernorReceipts(state_dir / "audit-log.jsonl")
+    registry = Registry(state_dir / "registry.json")
+    return receipts, registry
+
+
+def _governor_engine(receipts, registry):
+    """The policy engine wired to live state: the registry's freeze
+    flag (Pack 002) and the gate shelf (Pack 003) — a PASS is a
+    gate-kind receipt on this chain naming the package, minted by
+    the independent gate lane through the shipped issuer."""
+    from .packs import load_builtin_packs
+    from .policy import EngineContext, PolicyEngine
+
+    def gate_lookup(descriptor):
+        artifact = descriptor.get("artifact")
+        if not artifact:
+            return None
+        for entry in receipts.entries(kind="gate"):
+            if entry.get("artifact") == artifact and entry.get("verdict") == "PASS":
+                return entry
+        return None
+
+    context = EngineContext(
+        fetch_freeze=bool(registry.meta.get("fetch_freeze", False)),
+        gate_lookup=gate_lookup,
+    )
+    try:
+        packs = load_builtin_packs(receipts=receipts)
+    except Exception:  # noqa: BLE001 - a refused pack set = engine down
+        return PolicyEngine.unavailable(receipts=receipts)
+    return PolicyEngine(packs, receipts=receipts, context=context)
+
+
+def _policy_command(args: list[str]) -> int:
+    """`chancellor policy packs` lists the founding packs;
+    `chancellor policy check --act FILE` evaluates one act
+    descriptor. Exit codes: 0 allow/route/queue, 3 staged, 4 denied,
+    2 usage error."""
+    if not args:
+        print(
+            "usage: chancellor policy (packs | check --act FILE) [--state-dir DIR]",
+            file=sys.stderr,
+        )
+        return 2
+    receipts, registry = _governor_state(args)
+    if args[0] == "packs":
+        from .packs import load_builtin_packs
+
+        for pack in load_builtin_packs():
+            print(
+                f"{pack.name} v{pack.version} — {len(pack.rules)} rules; "
+                f"founded by: {pack.founded_by}"
+            )
+        return 0
+    if args[0] == "check":
+        if "--act" not in args:
+            print("policy check needs --act FILE", file=sys.stderr)
+            return 2
+        descriptor = json.loads(
+            Path(args[args.index("--act") + 1]).read_text(encoding="utf-8")
+        )
+        verdict = _governor_engine(receipts, registry).check(descriptor)
+        receipts.checkpoint()
+        print(json.dumps(verdict.to_dict(), indent=2))
+        if verdict.action == "deny":
+            return 4
+        if verdict.action.startswith("stage:"):
+            return 3
+        return 0
+    print(f"unknown policy subcommand: {args[0]}", file=sys.stderr)
+    return 2
+
+
+def _manifest_command(args: list[str]) -> int:
+    """`chancellor manifest show NAME` prints one registry entry;
+    `manifest verify [--slice KIND]` re-derives a slice against the
+    local tree and mints drift findings; `manifest bootstrap --from
+    DIR` builds the registry from the Empire Sweep census filings
+    (exit 1 while any census figure is unexplained)."""
+    if not args:
+        print(
+            "usage: chancellor manifest (show NAME | verify [--slice KIND] "
+            "| bootstrap --from DIR) [--state-dir DIR]",
+            file=sys.stderr,
+        )
+        return 2
+    receipts, registry = _governor_state(args)
+    if args[0] == "show":
+        entry = registry.get(args[1]) if len(args) > 1 else None
+        if entry is None:
+            print(
+                f"manifest: no entry named {args[1] if len(args) > 1 else ''!r}",
+                file=sys.stderr,
+            )
+            return 1
+        print(json.dumps(entry, indent=2, sort_keys=True))
+        return 0
+    if args[0] == "verify":
+        slice_kind = None
+        if "--slice" in args:
+            slice_kind = args[args.index("--slice") + 1]
+        report = registry.verify(slice_kind=slice_kind, receipts=receipts)
+        receipts.checkpoint()
+        print(json.dumps(report, indent=2))
+        return 0
+    if args[0] == "bootstrap":
+        from .census_bootstrap import bootstrap
+
+        if "--from" not in args:
+            print("manifest bootstrap needs --from DIR", file=sys.stderr)
+            return 2
+        report = bootstrap(args[args.index("--from") + 1], registry.path)
+        print(json.dumps(report, indent=2))
+        return 0 if not report["unexplained"] else 1
+    print(f"unknown manifest subcommand: {args[0]}", file=sys.stderr)
+    return 2
+
+
+def _preload_command(args: list[str]) -> int:
+    """`chancellor preload --class C --charge "..."`: issue the
+    class preload (hard budget 4096 bytes at issuance, receipted)."""
+    from .preload import PreloadBloatError, issue_preload
+
+    if "--class" not in args or "--charge" not in args:
+        print(
+            'usage: chancellor preload --class C --charge "..." [--state-dir DIR]',
+            file=sys.stderr,
+        )
+        return 2
+    receipts, registry = _governor_state(args)
+    try:
+        issued = issue_preload(
+            registry,
+            receipts,
+            args[args.index("--class") + 1],
+            args[args.index("--charge") + 1],
+        )
+    except (PreloadBloatError, ValueError) as exc:
+        print(f"preload: {exc}", file=sys.stderr)
+        return 1
+    receipts.checkpoint()
+    print(issued["text"])
+    return 0
+
+
+def _receipts_command(args: list[str]) -> int:
+    """`chancellor receipts query [--rule R] [--artifact A] [--kind
+    K]`: the Governor's decision receipts on the shipped chain —
+    every governed verdict, reproducible from the receipts alone."""
+    if not args or args[0] != "query":
+        print(
+            "usage: chancellor receipts query [--rule R] [--artifact A] "
+            "[--kind K] [--state-dir DIR]",
+            file=sys.stderr,
+        )
+        return 2
+    receipts, _registry = _governor_state(args)
+
+    def opt(flag):
+        return args[args.index(flag) + 1] if flag in args else None
+
+    found = receipts.query(
+        rule=opt("--rule"), artifact=opt("--artifact"), kind=opt("--kind")
+    )
+    for entry in found:
+        print(json.dumps(entry, sort_keys=True))
+    if not found:
+        print("receipts: no matching Governor receipts", file=sys.stderr)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Console entry point: dispatch the demo, supervise, verify-log,
     and eval subcommands."""
@@ -454,6 +644,14 @@ def main(argv: list[str] | None = None) -> int:
         return _supervise_command(argv[1:])
     if cmd == "installs":
         return _installs_command(argv[1:])
+    if cmd == "policy":
+        return _policy_command(argv[1:])
+    if cmd == "manifest":
+        return _manifest_command(argv[1:])
+    if cmd == "preload":
+        return _preload_command(argv[1:])
+    if cmd == "receipts":
+        return _receipts_command(argv[1:])
     if cmd == "eval-a":
         print(json.dumps(suite_a.run_suite().to_dict(), indent=2))
         return 0
@@ -462,7 +660,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     print(
         f"unknown command: {cmd} (expected demo | supervise | installs | "
-        "eval-a | eval-b)",
+        "eval-a | eval-b | policy | manifest | preload | receipts)",
         file=sys.stderr,
     )
     print("run `chancellor --help` for usage", file=sys.stderr)
