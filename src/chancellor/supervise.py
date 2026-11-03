@@ -840,12 +840,25 @@ class Supervisor:
             self._state.interruptions += 1
 
         # A first launch onto existing state is a resume: no resume
-        # proceeds on an unverified chain (R3).
+        # proceeds on an unverified chain (R3). F-WABI-001: the
+        # verification's failure is honored whenever a pre-existing
+        # agent log exists and is non-empty ON DISK — file presence +
+        # size, not parseability. A malformed log with zero parseable
+        # entries is still existing state; adopting it as a fresh
+        # start would launch onto an unverified chain. A zero-byte
+        # log carries no entries and no committed state, so it is
+        # treated exactly as no log: a fresh start (a checkpoint
+        # sidecar committing entries against it still triggers the
+        # honored path via log_size, and fails as truncation).
         if self.agent_log.exists():
             initial = verify_at_checkpoint_boundary(
                 self.agent_log, self.agent_checkpoints, self._signer
             )
-            if initial.entries_present > 0 or initial.log_size:
+            try:
+                pre_existing_nonempty = self.agent_log.stat().st_size > 0
+            except OSError:
+                pre_existing_nonempty = False
+            if pre_existing_nonempty or initial.log_size:
                 if not initial.ok:
                     self._receipt(
                         "chain verification failed before first launch",
