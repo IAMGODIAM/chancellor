@@ -66,7 +66,7 @@ receipts as they land.
 
 <!-- STATUS:BEGIN -->
 - **Standing:** IN FLIGHT — every figure UNVERIFIED, republished from the boxes’ own state files.
-- **As of:** 2026-11-03 05:45 EST (five-minute cadence)
+- **As of:** 2026-11-03 05:50 EST (five-minute cadence)
 - **Boxes reporting:** 0 / 4
 - **Segments:** 0 / 0 across the watches polled · complete 0 · halted fail-closed 0 · faults injected 0
 - **Drift events:** 0
@@ -84,7 +84,6 @@ receipts as they land.
 ### Box b3 — Cell C — stall vs death, then D — machine loss (staged) · us-west-1
 - Not yet reported — not present in lambda list. The cadence catches up; nothing is filled in by assumption.
 
-**Anomalies this cycle:** box b0 unreachable — not present in lambda list; box b1 unreachable — not present in lambda list; box b2 unreachable — not present in lambda list; box b3 unreachable — not present in lambda list
 <!-- STATUS:END -->
 
 ## How to read this board — the language, filed before the first kill
