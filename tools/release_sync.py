@@ -472,7 +472,11 @@ def check_g5(ctx: Ctx, dist: Path) -> Check:
             if not names:
                 problems.append(f"{sdist.name}:no-PKG-INFO")
                 continue
-            raw = tf.extractfile(names[0]).read()
+            member = tf.extractfile(names[0])
+            if member is None:
+                problems.append(f"{sdist.name}:unreadable-PKG-INFO")
+                continue
+            raw = member.read()
         version, body = _metadata_parts(raw)
         body_hash = hashlib.sha256(_canon(body).encode()).hexdigest()[:12]
         if version != ctx.decl:
@@ -661,6 +665,12 @@ def resolve_tag(args: argparse.Namespace, event: dict | None) -> str | None:
     return None
 
 
+def _dist_or_raise(dist: Path | None) -> Path:
+    if dist is None:
+        raise SurfaceError("gate-b checks require a dist directory")
+    return dist
+
+
 def run_check_set(
     root: Path,
     gids: list[str],
@@ -704,9 +714,9 @@ def run_check_set(
         elif gid == "G3":
             record("G3", lambda: check_g3(ctx))
         elif gid == "G5":
-            record("G5", lambda: check_g5(ctx, dist))
+            record("G5", lambda: check_g5(ctx, _dist_or_raise(dist)))
         elif gid == "G6":
-            record("G6", lambda: check_g6(ctx, dist))
+            record("G6", lambda: check_g6(ctx, _dist_or_raise(dist)))
         elif gid == "G7":
             record("G7", lambda: check_g7(ctx))
         elif gid == "G9":
@@ -725,7 +735,10 @@ def cmd_check(args: argparse.Namespace) -> int:
     event = resolve_event(args)
     tag = resolve_tag(args, event)
     if args.gate_b:
-        return run_check_set(root, ["G5", "G6"], tag, event, Path(args.gate_b))
+        dist = Path(args.gate_b)
+        if not dist.is_absolute():
+            dist = root / dist  # gate paths bind to --root, never to cwd
+        return run_check_set(root, ["G5", "G6"], tag, event, dist)
     if args.gate_a:
         return run_check_set(
             root, ["G1", "G2", "G3", "G4", "G7", "G9"], tag, event, None

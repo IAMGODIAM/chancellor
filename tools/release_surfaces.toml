@@ -69,6 +69,20 @@ reason = "frozen story text"
 glob = "tests/**"
 reason = "fixtures may contain version-shaped strings as test data"
 
+# --- Generated build output (not source; G5/G6 hold jurisdiction) --------
+
+[[exempt_files]]
+glob = "dist/**"
+reason = "built artifacts; their metadata is bound by G5 and G6"
+
+[[exempt_files]]
+glob = "build/**"
+reason = "setuptools build tree; regenerated from source on every build"
+
+[[exempt_files]]
+glob = "**/*.egg-info/**"
+reason = "generated package metadata (a build-time copy of the declaration and the README); the shipped copies inside artifacts are bound by G5"
+
 # --- Exempt patterns (individual occurrences, each with its reason) -------
 
 [[exempt_patterns]]

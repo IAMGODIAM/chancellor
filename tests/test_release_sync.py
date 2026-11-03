@@ -196,6 +196,56 @@ def test_changelog_head_and_notes(tmp_path):
     assert rc == 0
 
 
+def test_scan_ignores_generated_output(tmp_path):
+    root = make_tree(tmp_path)
+    for rel, content in rs.render_surfaces(root, 42).items():
+        (root / rel).write_text(content, encoding="utf-8")
+    egg = root / "src" / "chancellor.egg-info"
+    egg.mkdir(parents=True)
+    (egg / "PKG-INFO").write_text(
+        "Metadata-Version: 2.1\nVersion: 2.0.0\n\nShipped v1.0.0 notes.\n",
+        encoding="utf-8",
+    )
+    (root / "dist").mkdir()
+    (root / "dist" / "notes.txt").write_text("built at 0.0.1\n", encoding="utf-8")
+    result = rs.check_g7(rs.Ctx(root))
+    assert result.ok, result.line()
+
+
+def test_gate_b_dist_binds_to_root(tmp_path):
+    import zipfile
+
+    root = make_tree(tmp_path)
+    dist = root / "dist"
+    dist.mkdir()
+    with zipfile.ZipFile(dist / "chancellor-2.0.0-py3-none-any.whl", "w") as zf:
+        zf.writestr(
+            "chancellor-2.0.0.dist-info/METADATA",
+            "Metadata-Version: 2.1\nName: chancellor\nVersion: 9.9.9\n\n",
+        )
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(REPO / "tools" / "release_sync.py"),
+            "--root",
+            str(root),
+            "check",
+            "--gate-b",
+            "dist",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=elsewhere,
+    )
+    # A relative --gate-b path binds to --root, never to the caller's cwd:
+    # the wheel under root/dist is found (and fails on its merits).
+    assert "no-artifacts" not in proc.stdout
+    assert "no-wheel" not in proc.stdout
+    assert "RS-G5 FAIL" in proc.stdout
+
+
 def test_version_derivation_uninstalled(tmp_path):
     """SPEC 2.2 leg 2: no dist-info on the path -> pyproject fallback."""
     probe = textwrap.dedent(
