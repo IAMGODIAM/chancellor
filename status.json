@@ -1,5 +1,5 @@
 {
- "polled_at_est": "2026-11-03 01:43 EST",
+ "polled_at_est": "2026-11-03 03:47 EST",
  "label": "IN FLIGHT / UNVERIFIED",
  "boxes": [
   {
@@ -13593,24 +13593,148 @@
        "log_size": 231
       }
      ]
+    },
+    {
+     "seed": 10107,
+     "target": null,
+     "checkpoint": {
+      "seed": 10107,
+      "segments_done": 10,
+      "steps_done": 120,
+      "drift_events": 0,
+      "segments_complete": 9,
+      "segments_halted": 1,
+      "faults_injected": 1,
+      "verifications": [
+       {
+        "steps": 108,
+        "ok": true,
+        "entries": 9,
+        "checkpoints": 1,
+        "failures": []
+       }
+      ],
+      "corrupted_state_files": 0,
+      "started_at": 1793695013.400233,
+      "updated_at": 1793695588.7128246
+     },
+     "supervision": {
+      "entries": 6,
+      "events": {
+       "supervision_started": 1,
+       "cadence_advisory": 1,
+       "stall_anomaly": 1,
+       "supervisor_heartbeat": 3
+      },
+      "refusals": 0,
+      "escalations": 0,
+      "latest_event": {
+       "ts": 1793695193.372531,
+       "event": "stall_anomaly",
+       "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive"
+      },
+      "last_log_size": null,
+      "resume_activity_ts": null
+     },
+     "entries_present": 11,
+     "dialogue": [
+      {
+       "ts": 1793695013.3296123,
+       "seq": 0,
+       "event": "supervision_started",
+       "action": "supervisor: supervision started",
+       "rationale": "Supervisor accepted the watch; self-proof passed (observe, launch, persist).",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": null,
+       "log_size": null
+      },
+      {
+       "ts": 1793695193.3705745,
+       "seq": 1,
+       "event": "cadence_advisory",
+       "action": "supervisor: cadence advisory \u2014 checkpoint interval exceeds stale threshold",
+       "rationale": "The observed signed-checkpoint timing does not match the configured supervision cadence. Advisory only: no act was gated, no resume was blocked, and no escalation was raised.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": null,
+       "log_size": null
+      },
+      {
+       "ts": 1793695193.372531,
+       "seq": 2,
+       "event": "stall_anomaly",
+       "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive",
+       "rationale": "The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).",
+       "approved": false,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 180.03817629814148,
+       "log_size": null
+      },
+      {
+       "ts": 1793695193.3730526,
+       "seq": 3,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 180.03817629814148,
+       "log_size": null
+      },
+      {
+       "ts": 1793695373.4094272,
+       "seq": 4,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 360.0769262313843,
+       "log_size": null
+      },
+      {
+       "ts": 1793695553.4478755,
+       "seq": 5,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 540.1154959201813,
+       "log_size": null
+      }
+     ]
     }
    ],
    "error": null
   }
  ],
  "totals": {
-  "segments_done": 1514,
+  "segments_done": 1524,
   "segments_target": 1440,
-  "segments_complete": 1396,
-  "segments_halted": 118,
-  "faults_injected": 150,
+  "segments_complete": 1405,
+  "segments_halted": 119,
+  "faults_injected": 151,
   "drift_events": 0,
   "refusals": 4,
   "escalations": 4,
   "events": {
-   "supervision_started": 14,
-   "cadence_advisory": 14,
-   "stall_anomaly": 209,
+   "supervision_started": 15,
+   "cadence_advisory": 15,
+   "stall_anomaly": 210,
    "interruption_detected": 47,
    "chain_verification": 41,
    "resume_launched": 39,
