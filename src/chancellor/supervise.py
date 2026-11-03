@@ -41,9 +41,11 @@ named legs, R11 anchoring disclosure.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import shutil
+import socket
 import subprocess
 import time
 from collections.abc import Callable
@@ -303,6 +305,47 @@ class SupervisionState:
     escalations: int = 0
     open_watch: bool = False
     last_agent_log_size: int | None = None
+    # Second-seat derivation (SPEC §3.4): seat events on the chain are
+    # folded separately — a supervisor interruption is never an agent
+    # interruption and never touches the R8 budget.
+    watch_epoch: int = 0
+    supervisor_interruptions: int = 0
+    supervisor_absent: bool = False
+    newest_seat_event: str | None = None
+    newest_seat_event_seq: int | None = None
+    last_supervisor_interruption_seq: int | None = None
+
+
+# Seat events on the supervision chain (SPEC §3.4).
+SEAT_CHAIN_EVENTS = frozenset(
+    {
+        "supervisor_interruption",
+        "supervisor_reseat_initiated",
+        "supervisor_reseat_confirmed",
+        "supervisor_reseat_failed",
+    }
+)
+
+
+def pid_start_identity(pid: int) -> str | None:
+    """OS start-time identity for a pid (Linux /proc field 22), used to
+    defeat pid reuse: a recycled pid has a different start time. None
+    when the platform cannot say."""
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+        return stat.rsplit(")", 1)[1].split()[19]
+    except (OSError, IndexError):
+        return None
+
+
+def read_lock_body(path: Path) -> dict | None:
+    """The informational body of a watch lock file (SPEC §1.2). The
+    lock itself is the fence; the body only names the claimant."""
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
 
 
 def _detail_of(entry: dict) -> dict:
@@ -327,7 +370,23 @@ def rebuild_supervision_state(entries: list[dict]) -> SupervisionState:
             state.last_agent_log_size = detail["agent_log_size"]
         if isinstance(detail.get("entries_at_loss"), int):
             state.last_agent_log_size = detail["entries_at_loss"]
-        if event == "supervision_started":
+        if isinstance(detail.get("watch_epoch"), int):
+            state.watch_epoch = max(state.watch_epoch, detail["watch_epoch"])
+        if event in SEAT_CHAIN_EVENTS:
+            state.newest_seat_event = event
+            seq = entry.get("seq")
+            state.newest_seat_event_seq = seq if isinstance(seq, int) else None
+        if event == "supervisor_interruption":
+            # The monitor's graded receipt closes the predecessor's
+            # watch for derivation: the successor must not re-receipt
+            # it at the legacy unknown grade (SPEC §3.4).
+            state.supervisor_interruptions += 1
+            state.open_watch = False
+            seq = entry.get("seq")
+            state.last_supervisor_interruption_seq = (
+                seq if isinstance(seq, int) else None
+            )
+        elif event == "supervision_started":
             state.open_watch = True
         elif event == "interruption_detected":
             state.interruptions += 1
@@ -341,6 +400,10 @@ def rebuild_supervision_state(entries: list[dict]) -> SupervisionState:
         elif event == "agent_completed":
             state.consecutive_failures = 0
             state.open_watch = False
+    state.supervisor_absent = state.newest_seat_event in {
+        "supervisor_interruption",
+        "supervisor_reseat_failed",
+    }
     return state
 
 
@@ -413,6 +476,12 @@ class SupervisorConfig:
     budget: int = 3  # R8: consecutive failed resumes before escalation
     poll_s: float = 1.0
     heartbeat_s: float | None = None  # supervisor heartbeat (default: stale window)
+    # Second seat (SPEC §2/§7): seat-enabled watches take the watch
+    # lock at self-proof and carry their epoch on the chain. Default
+    # OFF — seat-less watches are byte-identical to the shipped
+    # product (no lock file, no epoch fields, no new exit codes).
+    seat_enabled: bool = False
+    watch_epoch: int = 0
 
     @property
     def stale_threshold_s(self) -> float:
@@ -495,6 +564,56 @@ class Supervisor:
         self._cadence_checkpoint_written_at: float | None = None
         self._cadence_fresh_start = False
         self._cadence_initial_launch = True
+        self._watch_lock_fh = None  # held flock on supervision.lock (seat)
+
+    # ------------------------------------------------------ watch lock
+    @property
+    def watch_lock_path(self) -> Path:
+        return self.state_dir / "supervision.lock"
+
+    def _acquire_watch_lock(self) -> str | None:
+        """SPEC §2.1: a seat-enabled supervisor takes the watch lock at
+        self-proof. The body is informational; the flock is the fence.
+        Returns a refusal string, or None when the lock is held."""
+        try:
+            fh = self.watch_lock_path.open("a+", encoding="utf-8")
+        except OSError as exc:
+            return f"watch lock failed: cannot open {self.watch_lock_path}: {exc}"
+        try:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            fh.close()
+            return (
+                "watch lock failed: another supervisor holds this watch "
+                f"({self.watch_lock_path})"
+            )
+        body = {
+            "pid": os.getpid(),
+            "watch_epoch": self.config.watch_epoch,
+            "host": socket.gethostname(),
+            "started_at": self._clock(),
+            "seat_armed": True,
+            "pid_identity": pid_start_identity(os.getpid()),
+        }
+        try:
+            fh.seek(0)
+            fh.truncate()
+            fh.write(json.dumps(body, sort_keys=True) + "\n")
+            fh.flush()
+            os.fsync(fh.fileno())
+        except OSError as exc:
+            fh.close()
+            return f"watch lock failed: cannot write the lock body: {exc}"
+        self._watch_lock_fh = fh
+        return None
+
+    def _release_watch_lock(self) -> None:
+        if self._watch_lock_fh is not None:
+            try:
+                self._watch_lock_fh.close()
+            except OSError:
+                pass
+            self._watch_lock_fh = None
 
     # ------------------------------------------------------------ text
     def anchoring_disclosure(self) -> str:
@@ -753,11 +872,34 @@ class Supervisor:
                 "launch leg failed: agent command is not executable: "
                 f"{self.config.agent_command!r}"
             )
+        # Watch-lock leg (seat-enabled watches only, SPEC §2.1): two
+        # supervisors on one state_dir must never both write.
+        if self.config.seat_enabled:
+            lock_refusal = self._acquire_watch_lock()
+            if lock_refusal is not None:
+                return lock_refusal
         # Persist leg: open the supervision log (its chain verifies at
         # open) and write + checkpoint the start receipt.
         try:
             self._log = AuditLog(self.supervision_log_path, signer=self._signer)
             self._state = rebuild_supervision_state(self._log.read_all())
+            started_detail: dict = {
+                "agent_command": self.config.agent_command,
+                "agent_log": str(self.agent_log),
+                "stale_threshold_s": self.config.stale_threshold_s,
+                "budget": self.config.budget,
+                "anchoring": "tier_a_same_machine",
+                "prior_interruptions": self._state.interruptions,
+                "prior_consecutive_failures": self._state.consecutive_failures,
+            }
+            if self.config.seat_enabled:
+                started_detail.update(
+                    {
+                        "watch_epoch": self.config.watch_epoch,
+                        "second_seat": True,
+                        "supervisor_pid": os.getpid(),
+                    }
+                )
             self._receipt(
                 "supervision started",
                 event="supervision_started",
@@ -766,18 +908,39 @@ class Supervisor:
                     "Supervisor accepted the watch; self-proof passed "
                     "(observe, launch, persist)."
                 ),
-                detail={
-                    "agent_command": self.config.agent_command,
-                    "agent_log": str(self.agent_log),
-                    "stale_threshold_s": self.config.stale_threshold_s,
-                    "budget": self.config.budget,
-                    "anchoring": "tier_a_same_machine",
-                    "prior_interruptions": self._state.interruptions,
-                    "prior_consecutive_failures": self._state.consecutive_failures,
-                },
+                detail=started_detail,
             )
             self._log.checkpoint()
+            # SPEC §3.4: a seat-spawned successor confirms its own
+            # reseat immediately after its supervision_started, and the
+            # monitor's graded interruption is never re-receipted at
+            # the legacy unknown grade.
+            if (
+                self.config.seat_enabled
+                and self._state.newest_seat_event == "supervisor_reseat_initiated"
+                and self._state.watch_epoch == self.config.watch_epoch
+            ):
+                started_seq = self._log.read_all()[-1].get("seq")
+                self._receipt(
+                    "supervisor reseat confirmed by successor",
+                    event="supervisor_reseat_confirmed",
+                    approved=True,
+                    rationale=(
+                        "The successor supervisor started at the minted "
+                        "epoch and confirms the reseat its predecessor's "
+                        "monitor initiated."
+                    ),
+                    detail={
+                        "watch_epoch": self.config.watch_epoch,
+                        "confirming_started_seq": started_seq,
+                        "predecessor_interruption_seq": (
+                            self._state.last_supervisor_interruption_seq
+                        ),
+                    },
+                )
+                self._log.checkpoint()
         except (ChainIntegrityError, OSError) as exc:
+            self._release_watch_lock()
             return (
                 "persist leg failed: the supervision log cannot be "
                 f"opened or written ({self.supervision_log_path}): {exc}"
@@ -812,6 +975,7 @@ class Supervisor:
         self._cadence_initial_launch = True
         refusal = self.self_proof()
         if refusal is not None:
+            self._release_watch_lock()
             self._emit(f"[supervise] REFUSED: {refusal}")
             self._emit(f"[supervise] {self.anchoring_disclosure()}")
             return 2
@@ -821,7 +985,14 @@ class Supervisor:
         # A previous watch left open (the supervisor itself died
         # mid-watch) is an interruption with no surviving witness:
         # receipt it at its honest grade before anything else (R6).
-        if self._state.open_watch:
+        # Seat exception (SPEC §3.4): when the monitor already
+        # receipted the interruption with a graded cause, the legacy
+        # receipt does not fire — no double-counting.
+        seat_receipted = self.config.seat_enabled and (
+            self._state.newest_seat_event
+            in {"supervisor_interruption", "supervisor_reseat_initiated"}
+        )
+        if self._state.open_watch and not seat_receipted:
             self._receipt(
                 "interruption discovered at supervisor restart",
                 event="interruption_detected",
@@ -876,6 +1047,7 @@ class Supervisor:
                         {"failures": initial.failures},
                     )
                     self._status("HALTED — escalated to the human gate", 0.0)
+                    self._release_watch_lock()
                     return 1
                 self._last_verified_size = initial.log_size
 
@@ -894,10 +1066,12 @@ class Supervisor:
             )
             self._escalate("initial launch failed", {"launch_error": str(exc)})
             self._status("HALTED — launch failed, escalated", 0.0)
+            self._release_watch_lock()
             return 1
         while True:
             outcome = self._poll_once()
             if outcome is not None:
+                self._release_watch_lock()
                 return outcome
             self._sleeper(self.config.poll_s)
 
@@ -1010,6 +1184,26 @@ class Supervisor:
                 )
                 self._status("HALTED — drift escalated to the human gate", age)
                 return 1
+
+        # SPEC §2.3 fence: a seat-enabled supervisor re-reads the
+        # chain tail before its next heartbeat append; a greater epoch
+        # means the watch was legitimately taken, and the stale writer
+        # stops itself — exit 3 (fenced stop), no escalation, no
+        # budget consumed.
+        if (
+            self.config.seat_enabled
+            and now - self._last_heartbeat >= self.config.heartbeat_interval_s
+        ):
+            assert self._log is not None
+            fresh = rebuild_supervision_state(self._log.read_all())
+            if fresh.watch_epoch > self.config.watch_epoch:
+                self._emit(
+                    "[supervise] FENCED: a successor holds this watch at "
+                    f"epoch {fresh.watch_epoch} (this supervisor's epoch "
+                    f"is {self.config.watch_epoch}); stopping without "
+                    "writing further."
+                )
+                return 3
 
         # R9/Tier A floor: signed supervisor heartbeat, so silence
         # itself is detectable by anything that can read a file's age.
