@@ -150,16 +150,17 @@ def _parse_jsonl_lenient(path: Path) -> tuple[list[dict], bool]:
     return rows, torn
 
 
-def verify_at_checkpoint_boundary(
+def _verify_at_checkpoint_boundary_once(
     log_path: str | Path,
     checkpoint_path: str | Path | None = None,
     signer: receipts.Signer | None = None,
 ) -> BoundaryVerification:
-    """Verify the chain at the newest signed checkpoint boundary:
-    checkpoint signature, the committed prefix's hash chain, its Merkle
-    root and head hash, and truncation (fewer chained entries present
-    than the checkpoint commits). Fail-closed: no signed checkpoint
-    means no verified boundary exists, and nothing may resume."""
+    """One read of the log/sidecar pair, judged as read. The pair is
+    read log-first, sidecar-second, so a live writer that appends and
+    checkpoints between the two reads presents exactly as
+    tail_truncation — the O1 tear. Callers that can meet a live
+    writer go through verify_at_checkpoint_boundary, which recounts
+    once on that signature."""
     signer = signer if signer is not None else receipts.default_signer()
     log_path = Path(log_path)
     cp_path = (
@@ -289,6 +290,38 @@ def verify_at_checkpoint_boundary(
         head_hash=payload.get("head_receipt_hash"),
         entries_present=entries_present,
     )
+
+
+def verify_at_checkpoint_boundary(
+    log_path: str | Path,
+    checkpoint_path: str | Path | None = None,
+    signer: receipts.Signer | None = None,
+) -> BoundaryVerification:
+    """Verify the chain at the newest signed checkpoint boundary:
+    checkpoint signature, the committed prefix's hash chain, its Merkle
+    root and head hash, and truncation (fewer chained entries present
+    than the checkpoint commits). Fail-closed: no signed checkpoint
+    means no verified boundary exists, and nothing may resume.
+
+    O1 recount-on-tear: the pair is read log-first, sidecar-second,
+    so a writer that appends + checkpoints between the two reads
+    leaves the sidecar's log_size ahead of the counted entries and
+    the tear reads as tail_truncation on a healthy chain. On that
+    signature alone, recount once: re-read the pair fresh and judge
+    on the consistent second read alone (never a mix of snapshots).
+    A truncation that persists across the recount is real and still
+    fails; one that vanishes was the tear."""
+    result = _verify_at_checkpoint_boundary_once(log_path, checkpoint_path, signer)
+    if not any(f.startswith("tail_truncation") for f in result.failures):
+        return result
+    recount = _verify_at_checkpoint_boundary_once(log_path, checkpoint_path, signer)
+    recount.warnings.append(
+        "tail_truncation_recounted: the first read pair was torn "
+        "(writer appended + checkpointed between the log and "
+        "sidecar reads); verdict taken from a fresh consistent "
+        "re-read (O1)"
+    )
+    return recount
 
 
 # ------------------------------------------------- supervisor state
