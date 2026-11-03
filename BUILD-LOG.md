@@ -274,3 +274,10 @@ Every new Chancellor receipt and gate verdict now names the governing frame it w
   - `docs/media/social-card.png` — 71,139 B, blob `6becabd907d881d0fec8b0eb1bb58c67e70bd390` → 414,251 B, blob `9c68a210be65220161392e951bab29e7a7d6019e` (commit `cbd7fc2b31c514f97962be07e2c6fe50117935c1`).
   Both read back from main at the new blob hashes. The social-preview setting itself is re-set from the new card by the desk's browser step; the film plate is outside this pick and untouched.
 - **The figure check.** Before either file shipped, the figures were crop-read at full resolution against the Chairman's source emblem and against the master: the source elder is dark-skinned in face and hand with silver-white hair and beard; the master and both renditions carry him the same way — a Black elder, no drift. The bearer and the witness likewise read as the source and the rule hold them.
+
+## 2026-11-03 — Mark swap dispositions (the two flagged files)
+
+Ruled by the design desk as the mark's owner, under the Chairman's F1 pick: no live source may keep drawing the old mark. Executed by the Chancellor desk through the swap entry's chain.
+
+- `docs/media/banner.svg` — RETIRED. The pre-F1 vector source (old wordmark banner) replaced with a superseded stub pointing at the raster master of record, `docs/media/banner.png`; the stub renders no mark. Before: 1943 B, blob 5a60d9d93f073347f86edbc76ad2d8dceb7551b6. After: 999 B, blob b654a4fb954599cab9b370684ec16753de611a37. Commit 6e65523c9f0d5c60b4cdf4a236e1e0ec23cb9b23.
+- `docs/media/social-preview.png` — OVERWRITTEN with the F1 social card, byte-identical to `docs/media/social-card.png` on main, so any legacy reference serves the current mark. Before: 48270 B, blob ea734b2260dbaeb8b27d7172031974b69b5d1621 (the old banner blob). After: 414251 B, blob 9c68a210be65220161392e951bab29e7a7d6019e (file sha256 3f965292f642a21c578ce30742ea8e6e00e1c944bb149e44842f4bacffc5f1a8). Commit b32d4a1de715ac334220452ad4a52ef5974b032c.
