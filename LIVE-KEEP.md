@@ -66,30 +66,27 @@ receipts as they land.
 
 <!-- STATUS:BEGIN -->
 - **Standing:** IN FLIGHT — every figure UNVERIFIED, republished from the boxes’ own state files.
-- **As of:** 2026-11-02 18:54 EST (five-minute cadence)
-- **Boxes reporting:** 4 / 4
-- **Segments:** 53 / 1440 across the watches polled · complete 51 · halted fail-closed 2 · faults injected 2
+- **As of:** 2026-11-02 19:07 EST (five-minute cadence)
+- **Boxes reporting:** 1 / 4
+- **Segments:** 0 / 480 across the watches polled · complete 0 · halted fail-closed 0 · faults injected 0
 - **Drift events:** 0
-- **The watch's receipts so far:** refusals 0 · escalations 0 · cadence_advisory 6 · chain_verification 1 · interruption_detected 1 · resume_launched 1 · stall_anomaly 9 · supervision_started 6
+- **The watch's receipts so far:** refusals 0 · escalations 0
 
 ### Box b0 — Cell A — kill cycle · us-east-1
 - **Phase:** RUN · **Step:** seed-10102 · *supervised soak started*
-- **Watch 10101:** segments 15 / 240 · complete 14 · halted 1 · faults 1 · drift 0 · corrupted state files 0 · in-run chain verifications 1/1 ok · supervision receipts 8 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
-- **Watch 10102:** segments 15 / 240 · complete 14 · halted 1 · faults 1 · drift 0 · corrupted state files 0 · in-run chain verifications 1/1 ok · supervision receipts 12 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
+- **Watch 10101:** segments not yet reported / 240 · complete — · halted — · faults — · drift — · corrupted state files — · in-run chain verifications 0/0 ok · supervision receipts 0 (refusals 0, escalations 0)
+- **Watch 10102:** segments not yet reported / 240 · complete — · halted — · faults — · drift — · corrupted state files — · in-run chain verifications 0/0 ok · supervision receipts 0 (refusals 0, escalations 0)
 
 ### Box b1 — Cell A — kill cycle (replication) · us-west-1
-- **Phase:** RUN · **Step:** seed-10104 · *supervised soak started*
-- **Watch 10103:** segments 9 / 240 · complete 9 · halted 0 · faults 0 · drift 0 · corrupted state files 0 · in-run chain verifications 1/1 ok · supervision receipts 6 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
-- **Watch 10104:** segments 9 / 240 · complete 9 · halted 0 · faults 0 · drift 0 · corrupted state files 0 · in-run chain verifications 1/1 ok · supervision receipts 6 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
+- Not yet reported — state pull failed (lambda status: active). The cadence catches up; nothing is filled in by assumption.
 
 ### Box b2 — Cell B — supervisor death + refusal · us-east-1
-- **Phase:** RUN · **Step:** seed-10105 · *supervised run starting (B-main)*
-- **Watch 10105:** segments 3 / 240 · complete 3 · halted 0 · faults 0 · drift 0 · corrupted state files 0 · in-run chain verifications 0/0 ok · supervision receipts 4 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
+- Not yet reported — state pull failed (lambda status: active). The cadence catches up; nothing is filled in by assumption.
 
 ### Box b3 — Cell C — stall vs death, then D — machine loss (staged) · us-west-1
-- **Phase:** RUN · **Step:** seed-10106 · *supervised run starting (C)*
-- **Watch 10106:** segments 2 / 240 · complete 2 · halted 0 · faults 0 · drift 0 · corrupted state files 0 · in-run chain verifications 0/0 ok · supervision receipts 4 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
+- Not yet reported — state pull failed (lambda status: active). The cadence catches up; nothing is filled in by assumption.
 
+**Anomalies this cycle:** box b1 unreachable — state pull failed (lambda status: active); box b2 unreachable — state pull failed (lambda status: active); box b3 unreachable — state pull failed (lambda status: active)
 <!-- STATUS:END -->
 
 ## How to read this board — the language, filed before the first kill
