@@ -39,14 +39,15 @@ from . import receipts
 from .escalation import ActionClass, AuditLog, Decision, EscalationRequest
 from .receipts import ChainIntegrityError
 from .supervise import (
+    BoundaryVerification,
     ProcessHandle,
     SupervisorConfig,
     _default_launcher,
     pid_start_identity,
     read_lock_body,
     rebuild_supervision_state,
+    verify_at_checkpoint_boundary,
 )
-from .verify_log import verify_log
 
 SEAT_DISCLOSURE = (
     "anchoring: Tier A — seat, supervisor, and agent share this "
@@ -639,8 +640,25 @@ class Monitor:
             self._emit("[second-seat] ESCALATION: supervisor wedge persistent.")
 
     # ------------------------------------------------------------ chain broken
+    def _verify_supervision_chain(self) -> BoundaryVerification:
+        """The §6.3 gate, at the supervisor's own discipline: verify
+        the supervision chain at its newest signed checkpoint
+        boundary — the same verification the supervisor runs before
+        any resume. Only breaks in the committed prefix count as
+        unverifiable (hash/signature breaks, truncation below the
+        boundary, a forged or invalid checkpoint). Entries past the
+        boundary are uncommitted by design: a live chain, and a chain
+        whose writer was just killed, routinely sit in that state,
+        and the offline verifier's tail-growth failures
+        (checkpoint_size_mismatch and its downstream head/root
+        mismatches) must never be read as §6.3 corruption — a seat
+        that did so would suspend itself on healthy watches."""
+        return verify_at_checkpoint_boundary(
+            self.supervision_log_path, signer=self._signer
+        )
+
     def _on_chain_unverifiable(self, ground: _Ground) -> int | None:
-        result = verify_log(self.supervision_log_path, signer=self._signer)
+        result = self._verify_supervision_chain()
         self._seat_receipt(
             "second seat escalation: supervision chain unverifiable",
             event="second_seat_escalation",
@@ -715,7 +733,7 @@ class Monitor:
             return None
         # Step 2 — verify the supervision chain read-only before any
         # append. A break ends self-repair for this watch (§6.3).
-        result = verify_log(self.supervision_log_path, signer=self._signer)
+        result = self._verify_supervision_chain()
         if not result.ok:
             return self._on_chain_unverifiable(fresh)
         # Step 3 — acquire the watch lock. A live holder means the
@@ -781,7 +799,7 @@ class Monitor:
         for attempt in range(1, self.seat.budget + 1):
             attempts = attempt
             # Re-verify before each attempt's append (§6.3 discipline).
-            check = verify_log(self.supervision_log_path, signer=self._signer)
+            check = self._verify_supervision_chain()
             if not check.ok:
                 return self._on_chain_unverifiable(self._read_ground())
             epoch = self._read_ground().state.watch_epoch + 1
