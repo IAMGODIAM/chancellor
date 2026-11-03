@@ -27,6 +27,7 @@ Designed invariants (SPEC §§1–6):
 
 from __future__ import annotations
 
+import contextlib
 import fcntl
 import json
 import os
@@ -34,6 +35,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TextIO
 
 from . import receipts
 from .escalation import ActionClass, AuditLog, Decision, EscalationRequest
@@ -41,6 +43,7 @@ from .receipts import ChainIntegrityError
 from .supervise import (
     BoundaryVerification,
     ProcessHandle,
+    SupervisionState,
     SupervisorConfig,
     _default_launcher,
     pid_start_identity,
@@ -118,7 +121,7 @@ def _events(entries: list[dict]) -> list[tuple[dict, dict]]:
 class _Ground:
     entries: list[dict] = field(default_factory=list)
     chain_error: str | None = None
-    state: object = None  # SupervisionState
+    state: SupervisionState = field(default_factory=SupervisionState)
     lock_body: dict | None = None
     lock_free: bool | None = None
     pid: int | None = None
@@ -162,8 +165,8 @@ class Monitor:
         self.seat_lock_path = self.state_dir / "second-seat.lock"
         self._recorded_command = list(supervisor_argv) if supervisor_argv else None
         self._seat_log: AuditLog | None = None
-        self._seat_lock_fh = None
-        self._watch_lock_fh = None
+        self._seat_lock_fh: TextIO | None = None
+        self._watch_lock_fh: TextIO | None = None
         self._child: ProcessHandle | None = None  # current supervisor
         self._child_exit: int | None = None
         self._primary_pid: int | None = None
@@ -231,10 +234,8 @@ class Monitor:
 
     def _release_watch_lock(self) -> None:
         if self._watch_lock_fh is not None:
-            try:
+            with contextlib.suppress(OSError):
                 self._watch_lock_fh.close()
-            except OSError:
-                pass
             self._watch_lock_fh = None
 
     # ------------------------------------------------------------ logs
@@ -371,7 +372,8 @@ class Monitor:
             # Cross-check: alive but the lock is free while the chain
             # advances — contradictory instruments; never act on them.
             started = any(
-                d.get("event") == "supervision_started" for _e, d in _events(ground.entries)
+                d.get("event") == "supervision_started"
+                for _e, d in _events(ground.entries)
             )
             if started and ground.lock_free:
                 return UNKNOWN
@@ -688,10 +690,12 @@ class Monitor:
             "no append, no spawn, no repair."
         )
         self._suspended = True
-        self._suspend_after_seq = max(
-            (e.get("seq") for e in ground.entries if isinstance(e.get("seq"), int)),
-            default=-1,
-        )
+        seqs: list[int] = []
+        for e in ground.entries:
+            s = e.get("seq")
+            if isinstance(s, int):
+                seqs.append(s)
+        self._suspend_after_seq = max(seqs, default=-1)
         return None
 
     # ------------------------------------------------------------ episode
@@ -707,7 +711,9 @@ class Monitor:
                     count += 1
         return count
 
-    def _escalate_seat(self, reason: str, episode: dict, attempts: int, entries: list[dict]) -> None:
+    def _escalate_seat(
+        self, reason: str, episode: dict, attempts: int, entries: list[dict]
+    ) -> None:
         head = entries[-1].get("entry_hash") if entries else None
         self._seat_receipt(
             f"second seat escalation: {reason}",
@@ -723,10 +729,12 @@ class Monitor:
         )
         self._emit(f"[second-seat] ESCALATION: {reason}.")
         self._suspended = True
-        self._suspend_after_seq = max(
-            (e.get("seq") for e in entries if isinstance(e.get("seq"), int)),
-            default=-1,
-        )
+        seqs: list[int] = []
+        for e in entries:
+            s = e.get("seq")
+            if isinstance(s, int):
+                seqs.append(s)
+        self._suspend_after_seq = max(seqs, default=-1)
 
     def _run_episode(self, ground: _Ground) -> int | None:
         """The reseat act (SPEC §3.2). Returns an exit code to stop,
@@ -766,9 +774,7 @@ class Monitor:
         # was anchored at arm time, plausible otherwise.
         exit_status = self._child_exit if self.mode == "pair" else None
         witnessed = self.mode == "pair" and self._child is not None
-        if exit_status is not None and witnessed:
-            cause = "proven"
-        elif self._anchored:
+        if exit_status is not None and witnessed or self._anchored:
             cause = "proven"
         else:
             cause = "plausible"
@@ -793,14 +799,12 @@ class Monitor:
         except (ChainIntegrityError, OSError) as exc:
             # §6.8: an unrecorded reseat must not be spent from the
             # budget; receipt the failure in the seat log if writable.
-            try:
+            with contextlib.suppress(Exception):
                 self._seat_receipt(
                     "second seat: chain append failed",
                     event="second_seat_append_failed",
                     detail={"error": f"{type(exc).__name__}: {exc}"},
                 )
-            except Exception:
-                pass
             self._emit(f"[second-seat] chain append failed: {exc}")
             self._sleeper(self.seat.poll_s)
             return None
@@ -854,17 +858,17 @@ class Monitor:
             # successor process exists; it takes the lock itself at
             # self-proof (with the epoch>0 retry, supervise.py).
             self._release_watch_lock()
-            outcome, successor_live = self._confirm(successor, epoch)
-            if outcome == "confirmed":
+            confirm_outcome, successor_live = self._confirm(successor, epoch)
+            if confirm_outcome == "confirmed":
                 self._child = successor
                 self._child_exit = None
                 self._primary_pid = successor.pid
                 self._after_episode_close()
                 return None
-            if outcome == "confirmed_with_escalation":
+            if confirm_outcome == "confirmed_with_escalation":
                 self._after_episode_close()
                 return 1  # the restored watch escalated; a human holds it
-            if outcome == "successor_refused":
+            if confirm_outcome == "successor_refused":
                 self._append_reseat_failed(epoch, attempt, "successor_refused", 2)
                 entries = self._read_ground().entries
                 self._escalate_seat(
@@ -879,7 +883,7 @@ class Monitor:
                 )
                 return None
             # confirmation_timeout or successor died mid-window.
-            reason = outcome
+            reason = confirm_outcome
             code = successor.poll()
             self._append_reseat_failed(epoch, attempt, reason, code)
             outcome2 = self._after_failed_attempt(attempt)

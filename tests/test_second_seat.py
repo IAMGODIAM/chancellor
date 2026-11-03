@@ -13,6 +13,7 @@ analogy.
 
 from __future__ import annotations
 
+import contextlib
 import fcntl
 import json
 import os
@@ -159,10 +160,8 @@ def test_t1_kill_primary_reseat_exactly_once(tmp_path):
         # successor relaunches it, and the successor would be right
         # to refuse; that is a different test (T3's family).
         if pidfile.exists():
-            try:
+            with contextlib.suppress(OSError, ValueError):
                 os.kill(int(pidfile.read_text()), signal.SIGKILL)
-            except (OSError, ValueError):
-                pass
         out, _err = proc.communicate(timeout=240)
     finally:
         _kill(proc)
@@ -171,7 +170,11 @@ def test_t1_kill_primary_reseat_exactly_once(tmp_path):
     # Agent steps exactly once: segment details 0..39, each once.
     details = [
         e["detail"]
-        for e in (json.loads(ln) for ln in agent_log.read_text().splitlines() if ln.strip())
+        for e in (
+            json.loads(ln)
+            for ln in agent_log.read_text().splitlines()
+            if ln.strip()
+        )
         if e.get("action") == "segment"
     ]
     assert sorted(details, key=lambda d: int(d.split()[1])) == [
@@ -190,9 +193,13 @@ def test_t1_kill_primary_reseat_exactly_once(tmp_path):
         if e["event"] == "supervision_started" and e["detail"].get("watch_epoch") == 1
     )
     confirmed = next(e for e in events if e["event"] == "supervisor_reseat_confirmed")
-    assert confirmed["detail"]["confirming_started_seq"] == started["entry"]["seq"]
+    assert (
+        confirmed["detail"]["confirming_started_seq"]
+        == started["entry"]["seq"]
+    )
     assert any(
-        e["event"] == "supervisor_heartbeat" and e["entry"]["seq"] > started["entry"]["seq"]
+        e["event"] == "supervisor_heartbeat"
+        and e["entry"]["seq"] > started["entry"]["seq"]
         for e in events
     )
     # R8 untouched by the reseat: no agent failures existed, none appear.
@@ -220,7 +227,11 @@ def test_t2_wedged_primary_never_reseated(tmp_path):
         assert _wait_until(wedged, timeout=60), "no wedge receipted"
         # Exactly one wedge receipt for the episode.
         time.sleep(2)
-        assert sum(1 for e in _events(seat_log) if e["event"] == "supervisor_wedged") == 1
+        wedged_count = sum(
+            1 for e in _events(seat_log)
+            if e["event"] == "supervisor_wedged"
+        )
+        assert wedged_count == 1
         # No spawn, no chain appends by the seat, primary untouched.
         kinds = [e["event"] for e in _events(sup_log)]
         assert "supervisor_interruption" not in kinds
@@ -256,10 +267,8 @@ def test_t2_wedged_primary_never_reseated(tmp_path):
         _kill(proc)
         agent_pid_file = tmp_path / "agent.pid"
         if agent_pid_file.exists():
-            try:
+            with contextlib.suppress(OSError, ValueError):
                 os.kill(int(agent_pid_file.read_text()), signal.SIGKILL)
-            except (OSError, ValueError):
-                pass
 
 
 # ---------------------------------------------------------------- T3
@@ -279,10 +288,8 @@ def test_t3_corrupt_agent_chain_successor_refuses(tmp_path):
         # frozen at the corruption point, so "no new entries after
         # the corruption" is assertable and the pidfile comparison
         # below measures the successor, not a surviving orphan.
-        try:
+        with contextlib.suppress(OSError, ValueError):
             os.kill(int(agent_pid_before), signal.SIGKILL)
-        except (OSError, ValueError):
-            pass
         # Corrupt a committed entry below the newest boundary at once;
         # the seat's 2 s poll gives the corruption time to land before
         # the successor's initial verification.
@@ -294,10 +301,8 @@ def test_t3_corrupt_agent_chain_successor_refuses(tmp_path):
     finally:
         _kill(proc)
         if pidfile.exists():
-            try:
+            with contextlib.suppress(OSError, ValueError):
                 os.kill(int(pidfile.read_text()), signal.SIGKILL)
-            except (OSError, ValueError):
-                pass
     assert proc.returncode == 1, f"monitor exited {proc.returncode}:\n{out}"
     events = _events(sup_log)
     kinds = [e["event"] for e in events]
@@ -345,10 +350,8 @@ def test_t4_two_monitors_and_hand_launch_refused(tmp_path):
         _kill(proc)
         agent_pid_file = tmp_path / "agent.pid"
         if agent_pid_file.exists():
-            try:
+            with contextlib.suppress(OSError, ValueError):
                 os.kill(int(agent_pid_file.read_text()), signal.SIGKILL)
-            except (OSError, ValueError):
-                pass
 
 
 def test_t4_stale_primary_fences_itself(tmp_path):
@@ -756,10 +759,8 @@ def _make_legacy_open_watch(tmp_path: Path) -> Path:
     proc.wait(timeout=30)
     pidfile = tmp_path / "agent.pid"
     if pidfile.exists():
-        try:
+        with contextlib.suppress(OSError, ValueError):
             os.kill(int(pidfile.read_text()), signal.SIGKILL)
-        except (OSError, ValueError):
-            pass
     return state_dir
 
 
@@ -950,7 +951,8 @@ def _good_successor_factory(state_dir: Path, alive: dict[int, bool], base: int):
             # specifies — 5 s here). Serve from a thread instead:
             # retry the lock non-blockingly, then write the body
             # and the three chain facts.
-            fh = open(lock_path, "a+")
+            fh = open(lock_path, "a+")  # noqa: SIM115 — held by the
+            # fake successor for its lifetime; closed by die().
             deadline = time.time() + 5.0
             while True:
                 try:
@@ -1088,7 +1090,9 @@ def test_t13_clock_steps_cannot_manufacture_a_reseat(tmp_path):
     # contradictory instrument set, and the Monitor classifies it
     # UNKNOWN (never WEDGED) — correctly. Hold the flock here for
     # the test's duration so the instruments agree.
-    lock_fh = open(state_dir / "supervision.lock", "a+")
+    lock_fh = open(  # noqa: SIM115 — held for the test's duration
+        state_dir / "supervision.lock", "a+"
+    )
     fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
     spawns: list[list[str]] = []
 
@@ -1240,7 +1244,5 @@ def test_t15_wedged_then_dead_converts_once(tmp_path):
         _kill(proc)
         agent_pid_file = tmp_path / "agent.pid"
         if agent_pid_file.exists():
-            try:
+            with contextlib.suppress(OSError, ValueError):
                 os.kill(int(agent_pid_file.read_text()), signal.SIGKILL)
-            except (OSError, ValueError):
-                pass

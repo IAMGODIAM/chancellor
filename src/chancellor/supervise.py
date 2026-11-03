@@ -41,6 +41,7 @@ named legs, R11 anchoring disclosure.
 
 from __future__ import annotations
 
+import contextlib
 import fcntl
 import json
 import os
@@ -52,7 +53,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, TextIO
 
 from . import receipts
 from .escalation import (
@@ -564,7 +565,7 @@ class Supervisor:
         self._cadence_checkpoint_written_at: float | None = None
         self._cadence_fresh_start = False
         self._cadence_initial_launch = True
-        self._watch_lock_fh = None  # held flock on supervision.lock (seat)
+        self._watch_lock_fh: TextIO | None = None  # held flock (seat)
 
     # ------------------------------------------------------ watch lock
     @property
@@ -619,10 +620,8 @@ class Supervisor:
 
     def _release_watch_lock(self) -> None:
         if self._watch_lock_fh is not None:
-            try:
+            with contextlib.suppress(OSError):
                 self._watch_lock_fh.close()
-            except OSError:
-                pass
             self._watch_lock_fh = None
 
     # ------------------------------------------------------------ text

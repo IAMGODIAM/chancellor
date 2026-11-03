@@ -401,7 +401,7 @@ def _supervise_command(args: list[str]) -> int:
         "--heartbeat": ("heartbeat_s", float),
     }
     bool_flags = {"--second-seat", "--monitor-only"}
-    seat_values: dict[str, object] = {}
+    seat_values: dict[str, Any] = {}
     kept_opts: list[str] = []
     i = 0
     while i < len(opts):
