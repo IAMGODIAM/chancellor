@@ -66,9 +66,9 @@ receipts as they land.
 
 <!-- STATUS:BEGIN -->
 - **Standing:** IN FLIGHT — every figure UNVERIFIED, republished from the boxes’ own state files.
-- **As of:** 2026-11-02 20:14 EST (five-minute cadence)
+- **As of:** 2026-11-02 20:17 EST (five-minute cadence)
 - **Boxes reporting:** 1 / 4
-- **Segments:** 73 / 240 across the watches polled · complete 68 · halted fail-closed 5 · faults injected 7
+- **Segments:** 75 / 240 across the watches polled · complete 70 · halted fail-closed 5 · faults injected 7
 - **Drift events:** 0
 - **The watch's receipts so far:** refusals 0 · escalations 0 · cadence_advisory 1 · stall_anomaly 9 · supervision_started 1
 
@@ -83,7 +83,7 @@ receipts as they land.
 
 ### Box b3 — Cell C — stall vs death, then D — machine loss (staged) · us-west-1
 - **Phase:** RUN · **Step:** seed-10106 · *supervised run starting (C)*
-- **Watch 10106:** segments 73 / 240 · complete 68 · halted 5 · faults 7 · drift 0 · corrupted state files 0 · in-run chain verifications 8/8 ok · supervision receipts 38 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
+- **Watch 10106:** segments 75 / 240 · complete 70 · halted 5 · faults 7 · drift 0 · corrupted state files 0 · in-run chain verifications 9/9 ok · supervision receipts 39 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
 
 **Anomalies this cycle:** box b0 unreachable — state pull failed (lambda status: active); box b1 unreachable — state pull failed (lambda status: active); box b2 unreachable — state pull failed (lambda status: active)
 <!-- STATUS:END -->
