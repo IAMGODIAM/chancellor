@@ -318,13 +318,27 @@ class Monitor:
             if ev == "supervision_started":
                 break
         # Heartbeat age from the newest supervisor_heartbeat ts.
+        # When no heartbeat entry exists at all — a primary frozen
+        # before its first heartbeat, or in any window where none was
+        # written — the silence is aged from the newest
+        # supervision_started instead: a live pid with no heartbeat
+        # entry is silent since it started, not healthy forever
+        # (SPEC §1/§6.4: wedge detection runs from the watch's start).
         now = self._clock()
+        started_ts: float | None = None
         for _entry, detail in reversed(_events(entries)):
-            if detail.get("event") == "supervisor_heartbeat":
+            ev = detail.get("event")
+            if ev == "supervisor_heartbeat":
                 ts = _entry.get("ts")
                 if isinstance(ts, (int, float)):
                     ground.heartbeat_age_s = max(0.0, now - float(ts))
                 break
+            if ev == "supervision_started" and started_ts is None:
+                ts = _entry.get("ts")
+                if isinstance(ts, (int, float)):
+                    started_ts = float(ts)
+        if ground.heartbeat_age_s is None and started_ts is not None:
+            ground.heartbeat_age_s = max(0.0, now - started_ts)
         # Liveness.
         if pid is not None:
             if (
