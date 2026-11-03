@@ -1097,6 +1097,34 @@ class Supervisor:
     # ------------------------------------------------------------- poll
     def _poll_once(self) -> int | None:
         assert self._child is not None  # invariant: run() launches first
+        # SPEC §2.3 fence, at the head of the poll: a seat-enabled
+        # supervisor re-reads the chain tail before ANY append this
+        # poll can make — agent-state receipts included. A greater
+        # epoch on the tail means the watch was legitimately taken
+        # while this process was stopped or descheduled; the stale
+        # writer stops itself — exit 3 (fenced stop), no escalation,
+        # no budget consumed, zero further appends. (Checking only at
+        # heartbeat time let a revived stale primary append first,
+        # from instance-cached seq/prev-hash state, forking the chain
+        # before it could fence itself.)
+        if self.config.seat_enabled:
+            assert self._log is not None
+            fresh_entries = self._log.read_all()
+            fresh = rebuild_supervision_state(fresh_entries)
+            if fresh.watch_epoch > self.config.watch_epoch:
+                self._emit(
+                    "[supervise] FENCED: a successor holds this watch at "
+                    f"epoch {fresh.watch_epoch} (this supervisor's epoch "
+                    f"is {self.config.watch_epoch}); stopping without "
+                    "writing further."
+                )
+                return 3
+            # The tail moved under this writer without a greater
+            # epoch (the monitor's appends): resync the writer's
+            # cached chain state from disk before appending, or the
+            # next append would reuse a seq and fork the chain.
+            if len(fresh_entries) != self._log._state.total_entries:
+                self._log._state = receipts.scan_chain(fresh_entries)
         status = self._child.poll()
         snap = self._snapshot_fn()
         now = self._clock()
@@ -1204,25 +1232,8 @@ class Supervisor:
                 self._status("HALTED — drift escalated to the human gate", age)
                 return 1
 
-        # SPEC §2.3 fence: a seat-enabled supervisor re-reads the
-        # chain tail before its next heartbeat append; a greater epoch
-        # means the watch was legitimately taken, and the stale writer
-        # stops itself — exit 3 (fenced stop), no escalation, no
-        # budget consumed.
-        if (
-            self.config.seat_enabled
-            and now - self._last_heartbeat >= self.config.heartbeat_interval_s
-        ):
-            assert self._log is not None
-            fresh = rebuild_supervision_state(self._log.read_all())
-            if fresh.watch_epoch > self.config.watch_epoch:
-                self._emit(
-                    "[supervise] FENCED: a successor holds this watch at "
-                    f"epoch {fresh.watch_epoch} (this supervisor's epoch "
-                    f"is {self.config.watch_epoch}); stopping without "
-                    "writing further."
-                )
-                return 3
+        # The §2.3 fence re-read happens at the head of this poll
+        # (above), gating every append — not only the heartbeat's.
 
         # R9/Tier A floor: signed supervisor heartbeat, so silence
         # itself is detectable by anything that can read a file's age.
