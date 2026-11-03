@@ -66,11 +66,11 @@ receipts as they land.
 
 <!-- STATUS:BEGIN -->
 - **Standing:** IN FLIGHT — every figure UNVERIFIED, republished from the boxes’ own state files.
-- **As of:** 2026-11-03 00:04 EST (five-minute cadence)
+- **As of:** 2026-11-03 00:10 EST (five-minute cadence)
 - **Boxes reporting:** 4 / 4
-- **Segments:** 1509 / 1440 across the watches polled · complete 1391 · halted fail-closed 118 · faults injected 150
+- **Segments:** 1514 / 1440 across the watches polled · complete 1396 · halted fail-closed 118 · faults injected 150
 - **Drift events:** 0
-- **The watch's receipts so far:** refusals 3 · escalations 3 · agent_completed 5 · budget_exhausted 1 · cadence_advisory 13 · chain_verification 40 · drift_detected 1 · escalation 3 · interruption_detected 46 · resume_confirmed 29 · resume_failed 9 · resume_launched 39 · stall_anomaly 208 · supervision_started 14
+- **The watch's receipts so far:** refusals 4 · escalations 4 · agent_completed 5 · budget_exhausted 1 · cadence_advisory 14 · chain_verification 41 · drift_detected 1 · escalation 4 · interruption_detected 47 · resume_confirmed 29 · resume_failed 9 · resume_launched 39 · stall_anomaly 209 · supervision_started 14
 
 ### Box b0 — Cell A — kill cycle · us-east-1
 - **Phase:** DONE · **Step:** all · *all supervised runs finished*
@@ -85,7 +85,7 @@ receipts as they land.
 ### Box b2 — Cell B — supervisor death + refusal · us-east-1
 - **Phase:** RUN · **Step:** seed-10108 · *supervised run starting (B-budget)*
 - **Watch 10105:** segments 240 / 240 · complete 220 · halted 20 · faults 24 · drift 0 · corrupted state files 0 · in-run chain verifications 28/28 ok · supervision receipts 125 (refusals 0, escalations 0) · latest watch event: *supervisor: agent completed*
-- **Watch 10108:** segments 2  · complete 2 · halted 0 · faults 0 · drift 0 · corrupted state files 0 · in-run chain verifications 0/0 ok · supervision receipts 1 (refusals 0, escalations 0) · latest watch event: *supervisor: supervision started*
+- **Watch 10108:** segments 7  · complete 7 · halted 0 · faults 0 · drift 0 · corrupted state files 0 · in-run chain verifications 0/0 ok · supervision receipts 8 (refusals 1, escalations 1) · latest watch event: *supervisor escalation: chain verification failed — resume refused*
 - **Watch 10109:** segments 50  · complete 46 · halted 4 · faults 5 · drift 0 · corrupted state files 0 · in-run chain verifications 5/6 ok · supervision receipts 26 (refusals 1, escalations 1) · latest watch event: *supervisor escalation: chain drift detected under a live agent*
 - **Watch 10110:** segments 25  · complete 24 · halted 1 · faults 2 · drift 0 · corrupted state files 0 · in-run chain verifications 3/3 ok · supervision receipts 16 (refusals 1, escalations 1) · latest watch event: *supervisor escalation: chain verification failed — resume refused*
 
@@ -93,7 +93,7 @@ receipts as they land.
 - **Phase:** DONE · **Step:** all · *all supervised runs finished*
 - **Watch 10106:** segments 240 / 240 · complete 221 · halted 19 · faults 24 · drift 0 · corrupted state files 0 · in-run chain verifications 28/28 ok · supervision receipts 119 (refusals 0, escalations 0) · latest watch event: *supervisor: agent completed*
 
-**Anomalies this cycle:** new escalation events since last cycle: +1 (total 3); new refusal receipts since last cycle: total 3
+**Anomalies this cycle:** new escalation events since last cycle: +1 (total 4); new refusal receipts since last cycle: total 4
 <!-- STATUS:END -->
 
 ## How to read this board — the language, filed before the first kill
