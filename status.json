@@ -1,5 +1,5 @@
 {
- "polled_at_est": "2026-11-03 05:02 EST",
+ "polled_at_est": "2026-11-03 05:07 EST",
  "label": "IN FLIGHT / UNVERIFIED",
  "boxes": [
   {
@@ -13599,12 +13599,12 @@
      "target": null,
      "checkpoint": {
       "seed": 10107,
-      "segments_done": 86,
-      "steps_done": 1032,
+      "segments_done": 92,
+      "steps_done": 1104,
       "drift_events": 0,
-      "segments_complete": 80,
-      "segments_halted": 6,
-      "faults_injected": 8,
+      "segments_complete": 85,
+      "segments_halted": 7,
+      "faults_injected": 9,
       "verifications": [
        {
         "steps": 108,
@@ -13675,31 +13675,38 @@
         "entries": 82,
         "checkpoints": 10,
         "failures": []
+       },
+       {
+        "steps": 1104,
+        "ok": true,
+        "entries": 89,
+        "checkpoints": 11,
+        "failures": []
        }
       ],
       "corrupted_state_files": 0,
       "started_at": 1793695013.400233,
-      "updated_at": 1793700086.4079716
+      "updated_at": 1793700406.6268232
      },
      "supervision": {
-      "entries": 40,
+      "entries": 43,
       "events": {
        "supervision_started": 1,
        "cadence_advisory": 1,
-       "stall_anomaly": 10,
-       "supervisor_heartbeat": 28
+       "stall_anomaly": 11,
+       "supervisor_heartbeat": 30
       },
       "refusals": 0,
       "escalations": 0,
       "latest_event": {
-       "ts": 1793699616.2552729,
+       "ts": 1793700146.5204704,
        "event": "stall_anomaly",
        "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive"
       },
-      "last_log_size": 82,
+      "last_log_size": 89,
       "resume_activity_ts": null
      },
-     "entries_present": 85,
+     "entries_present": 90,
      "dialogue": [
       {
        "ts": 1793695013.3296123,
@@ -14220,6 +14227,45 @@
        "ok": null,
        "age_s": 89.13950681686401,
        "log_size": 82
+      },
+      {
+       "ts": 1793700146.5204704,
+       "seq": 40,
+       "event": "stall_anomaly",
+       "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive",
+       "rationale": "The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).",
+       "approved": false,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 180.18409156799316,
+       "log_size": 82
+      },
+      {
+       "ts": 1793700235.5656433,
+       "seq": 41,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 269.2292814254761,
+       "log_size": 82
+      },
+      {
+       "ts": 1793700415.6525018,
+       "seq": 42,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 9.028991937637329,
+       "log_size": 89
       }
      ]
     }
@@ -14228,18 +14274,18 @@
   }
  ],
  "totals": {
-  "segments_done": 1600,
+  "segments_done": 1606,
   "segments_target": 1440,
-  "segments_complete": 1476,
-  "segments_halted": 124,
-  "faults_injected": 158,
+  "segments_complete": 1481,
+  "segments_halted": 125,
+  "faults_injected": 159,
   "drift_events": 0,
   "refusals": 4,
   "escalations": 4,
   "events": {
    "supervision_started": 15,
    "cadence_advisory": 15,
-   "stall_anomaly": 219,
+   "stall_anomaly": 220,
    "interruption_detected": 47,
    "chain_verification": 41,
    "resume_launched": 39,
@@ -14252,6 +14298,8 @@
   }
  },
  "anomalies": [],
- "notables": [],
+ "notables": [
+  "stall_anomaly +1 (total 220) \u2014 diagnosed cadence background, inside the envelope (RUN-9's DIAGNOSIS-STALL-ANOMALY.md); filed, not paged"
+ ],
  "run_complete": false
 }
