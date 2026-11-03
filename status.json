@@ -1,5 +1,5 @@
 {
- "polled_at_est": "2026-11-03 00:10 EST",
+ "polled_at_est": "2026-11-03 00:17 EST",
  "label": "IN FLIGHT / UNVERIFIED",
  "boxes": [
   {
@@ -9072,13 +9072,14 @@
    },
    "reachable": true,
    "progress": {
-    "phase": "RUN",
-    "step": "seed-10108",
-    "msg": "supervised run starting (B-budget)",
+    "phase": "DONE",
+    "step": "all",
+    "msg": "all supervised runs finished",
     "box": "b2",
     "cell": "B",
     "started_at": 1793663353.8884864,
-    "ts": 1793682554.33716
+    "done": true,
+    "ts": 1793682840.304527
    },
    "soaks": [
     {
@@ -13621,12 +13622,7 @@
    "drift_detected": 1
   }
  },
- "anomalies": [
-  "new escalation events since last cycle: +1 (total 4)",
-  "new refusal receipts since last cycle: total 4"
- ],
- "notables": [
-  "stall_anomaly +1 (total 209) \u2014 diagnosed cadence background, inside the envelope (RUN-9's DIAGNOSIS-STALL-ANOMALY.md); filed, not paged"
- ],
+ "anomalies": [],
+ "notables": [],
  "run_complete": false
 }
