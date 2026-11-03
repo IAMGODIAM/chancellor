@@ -1,5 +1,5 @@
 {
- "polled_at_est": "2026-11-02 22:22 EST",
+ "polled_at_est": "2026-11-02 22:27 EST",
  "label": "IN FLIGHT / UNVERIFIED",
  "boxes": [
   {
@@ -21,7 +21,7 @@
     "box": "b0",
     "cell": "A",
     "started_at": 1793662613.8312562,
-    "ts": 1793676054.128337
+    "ts": 1793676354.1355088
    },
    "soaks": [
     {
@@ -29,12 +29,12 @@
      "target": 240,
      "checkpoint": {
       "seed": 10101,
-      "segments_done": 225,
-      "steps_done": 2700,
+      "segments_done": 231,
+      "steps_done": 2772,
       "drift_events": 0,
-      "segments_complete": 208,
-      "segments_halted": 17,
-      "faults_injected": 22,
+      "segments_complete": 213,
+      "segments_halted": 18,
+      "faults_injected": 23,
       "verifications": [
        {
         "steps": 108,
@@ -228,15 +228,15 @@
       ],
       "corrupted_state_files": 0,
       "started_at": 1793662613.9888725,
-      "updated_at": 1793676012.0260851
+      "updated_at": 1793676362.2465367
      },
      "supervision": {
-      "entries": 147,
+      "entries": 150,
       "events": {
        "supervision_started": 1,
        "cadence_advisory": 1,
-       "stall_anomaly": 31,
-       "supervisor_heartbeat": 74,
+       "stall_anomaly": 32,
+       "supervisor_heartbeat": 76,
        "interruption_detected": 10,
        "chain_verification": 10,
        "resume_launched": 10,
@@ -246,14 +246,14 @@
       "refusals": 0,
       "escalations": 0,
       "latest_event": {
-       "ts": 1793676012.9289925,
-       "event": "resume_confirmed",
-       "action": "supervisor: resume confirmed \u2014 chain advancing past the loss point"
+       "ts": 1793676192.046881,
+       "event": "stall_anomaly",
+       "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive"
       },
       "last_log_size": 221,
       "resume_activity_ts": 1793676012.9289925
      },
-     "entries_present": 222,
+     "entries_present": 228,
      "dialogue": [
       {
        "ts": 1793662613.9166293,
@@ -2165,6 +2165,45 @@
        "ok": null,
        "age_s": null,
        "log_size": 221
+      },
+      {
+       "ts": 1793676122.0024514,
+       "seq": 147,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 109.98251342773438,
+       "log_size": 221
+      },
+      {
+       "ts": 1793676192.046881,
+       "seq": 148,
+       "event": "stall_anomaly",
+       "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive",
+       "rationale": "The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).",
+       "approved": false,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 180.02706289291382,
+       "log_size": 221
+      },
+      {
+       "ts": 1793676302.1097884,
+       "seq": 149,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 290.0899693965912,
+       "log_size": 221
       }
      ]
     },
@@ -2173,12 +2212,12 @@
      "target": 240,
      "checkpoint": {
       "seed": 10102,
-      "segments_done": 227,
-      "steps_done": 2724,
+      "segments_done": 232,
+      "steps_done": 2784,
       "drift_events": 0,
-      "segments_complete": 210,
-      "segments_halted": 17,
-      "faults_injected": 22,
+      "segments_complete": 214,
+      "segments_halted": 18,
+      "faults_injected": 23,
       "verifications": [
        {
         "steps": 108,
@@ -2372,15 +2411,15 @@
       ],
       "corrupted_state_files": 0,
       "started_at": 1793662613.9894607,
-      "updated_at": 1793676070.2199588
+      "updated_at": 1793676345.4024448
      },
      "supervision": {
-      "entries": 152,
+      "entries": 155,
       "events": {
        "supervision_started": 1,
        "cadence_advisory": 1,
-       "stall_anomaly": 36,
-       "supervisor_heartbeat": 74,
+       "stall_anomaly": 37,
+       "supervisor_heartbeat": 76,
        "interruption_detected": 10,
        "chain_verification": 10,
        "resume_launched": 10,
@@ -2390,14 +2429,14 @@
       "refusals": 0,
       "escalations": 0,
       "latest_event": {
-       "ts": 1793675655.681557,
+       "ts": 1793676130.97753,
        "event": "stall_anomaly",
        "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive"
       },
-      "last_log_size": 211,
+      "last_log_size": 219,
       "resume_activity_ts": 1793673979.654361
      },
-     "entries_present": 221,
+     "entries_present": 227,
      "dialogue": [
       {
        "ts": 1793662613.9174592,
@@ -4374,6 +4413,45 @@
        "ok": null,
        "age_s": 466.06661558151245,
        "log_size": 211
+      },
+      {
+       "ts": 1793676120.9694045,
+       "seq": 152,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 170.8447413444519,
+       "log_size": 219
+      },
+      {
+       "ts": 1793676130.97753,
+       "seq": 153,
+       "event": "stall_anomaly",
+       "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive",
+       "rationale": "The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).",
+       "approved": false,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 180.85286903381348,
+       "log_size": 219
+      },
+      {
+       "ts": 1793676301.0822196,
+       "seq": 154,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 350.9575569629669,
+       "log_size": 219
       }
      ]
     }
@@ -4399,7 +4477,7 @@
     "box": "b1",
     "cell": "A",
     "started_at": 1793662987.7238314,
-    "ts": 1793676068.017869
+    "ts": 1793676398.0267508
    },
    "soaks": [
     {
@@ -4407,12 +4485,12 @@
      "target": 240,
      "checkpoint": {
       "seed": 10103,
-      "segments_done": 218,
-      "steps_done": 2616,
+      "segments_done": 223,
+      "steps_done": 2676,
       "drift_events": 0,
-      "segments_complete": 204,
+      "segments_complete": 209,
       "segments_halted": 14,
-      "faults_injected": 21,
+      "faults_injected": 22,
       "verifications": [
        {
         "steps": 108,
@@ -4599,15 +4677,15 @@
       ],
       "corrupted_state_files": 0,
       "started_at": 1793662987.8826733,
-      "updated_at": 1793676050.5089502
+      "updated_at": 1793676371.0242753
      },
      "supervision": {
-      "entries": 129,
+      "entries": 132,
       "events": {
        "supervision_started": 1,
        "cadence_advisory": 1,
-       "stall_anomaly": 31,
-       "supervisor_heartbeat": 72,
+       "stall_anomaly": 32,
+       "supervisor_heartbeat": 74,
        "interruption_detected": 6,
        "chain_verification": 6,
        "resume_launched": 6,
@@ -4616,14 +4694,14 @@
       "refusals": 0,
       "escalations": 0,
       "latest_event": {
-       "ts": 1793675734.9059887,
+       "ts": 1793676171.175114,
        "event": "stall_anomaly",
        "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive"
       },
-      "last_log_size": 206,
+      "last_log_size": 213,
       "resume_activity_ts": 1793674067.8943214
      },
-     "entries_present": 215,
+     "entries_present": 220,
      "dialogue": [
       {
        "ts": 1793662987.8076215,
@@ -6301,6 +6379,45 @@
        "ok": null,
        "age_s": 400.3009135723114,
        "log_size": 206
+      },
+      {
+       "ts": 1793676135.1561708,
+       "seq": 129,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 144.69801330566406,
+       "log_size": 213
+      },
+      {
+       "ts": 1793676171.175114,
+       "seq": 130,
+       "event": "stall_anomaly",
+       "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive",
+       "rationale": "The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).",
+       "approved": false,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 180.71695637702942,
+       "log_size": 213
+      },
+      {
+       "ts": 1793676315.2628603,
+       "seq": 131,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 324.8047094345093,
+       "log_size": 213
       }
      ]
     },
@@ -6309,10 +6426,10 @@
      "target": 240,
      "checkpoint": {
       "seed": 10104,
-      "segments_done": 223,
-      "steps_done": 2676,
+      "segments_done": 228,
+      "steps_done": 2736,
       "drift_events": 0,
-      "segments_complete": 203,
+      "segments_complete": 208,
       "segments_halted": 20,
       "faults_injected": 22,
       "verifications": [
@@ -6497,35 +6614,42 @@
         "entries": 209,
         "checkpoints": 26,
         "failures": []
+       },
+       {
+        "steps": 2700,
+        "ok": true,
+        "entries": 217,
+        "checkpoints": 27,
+        "failures": []
        }
       ],
       "corrupted_state_files": 0,
       "started_at": 1793662987.8833885,
-      "updated_at": 1793676053.415291
+      "updated_at": 1793676378.5763166
      },
      "supervision": {
-      "entries": 127,
+      "entries": 133,
       "events": {
        "supervision_started": 1,
        "cadence_advisory": 1,
-       "stall_anomaly": 29,
-       "supervisor_heartbeat": 72,
-       "interruption_detected": 6,
-       "chain_verification": 6,
-       "resume_launched": 6,
+       "stall_anomaly": 30,
+       "supervisor_heartbeat": 74,
+       "interruption_detected": 7,
+       "chain_verification": 7,
+       "resume_launched": 7,
        "resume_confirmed": 6
       },
       "refusals": 0,
       "escalations": 0,
       "latest_event": {
-       "ts": 1793675873.1422768,
+       "ts": 1793676354.4409542,
        "event": "stall_anomaly",
        "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive"
       },
-      "last_log_size": 209,
-      "resume_activity_ts": 1793672311.856623
+      "last_log_size": 217,
+      "resume_activity_ts": 1793676198.3512366
      },
-     "entries_present": 216,
+     "entries_present": 221,
      "dialogue": [
       {
        "ts": 1793662987.8081422,
@@ -8177,6 +8301,84 @@
        "ok": null,
        "age_s": 262.1233561038971,
        "log_size": 209
+      },
+      {
+       "ts": 1793676135.2981079,
+       "seq": 127,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 442.22970485687256,
+       "log_size": 209
+      },
+      {
+       "ts": 1793676198.3438034,
+       "seq": 128,
+       "event": "interruption_detected",
+       "action": "supervisor: interruption detected \u2014 agent down",
+       "rationale": "Interruption 7: the agent stopped at 217 committed entries (checkpoint age 24.6s at detection). Cause: proven \u2014 graded from the evidence that survived.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": "proven",
+       "ok": null,
+       "age_s": 24.606518745422363,
+       "log_size": null
+      },
+      {
+       "ts": 1793676198.3500707,
+       "seq": 129,
+       "event": "chain_verification",
+       "action": "supervisor: chain verified at checkpoint boundary",
+       "rationale": "The chain verifies at the newest signed checkpoint boundary; resume may proceed from that boundary.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": true,
+       "age_s": null,
+       "log_size": null
+      },
+      {
+       "ts": 1793676198.3512366,
+       "seq": 130,
+       "event": "resume_launched",
+       "action": "supervisor: agent resumed from verified boundary",
+       "rationale": "Agent relaunched from the verified boundary at 217 entries; the relaunch is provisional until the chain advances (R5).",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": null,
+       "log_size": null
+      },
+      {
+       "ts": 1793676315.4163163,
+       "seq": 131,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 141.67903852462769,
+       "log_size": 217
+      },
+      {
+       "ts": 1793676354.4409542,
+       "seq": 132,
+       "event": "stall_anomaly",
+       "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive",
+       "rationale": "The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).",
+       "approved": false,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 180.70367693901062,
+       "log_size": 217
       }
      ]
     }
@@ -8202,7 +8404,7 @@
     "box": "b2",
     "cell": "B",
     "started_at": 1793663353.8884864,
-    "ts": 1793676074.1813853
+    "ts": 1793676434.1898198
    },
    "soaks": [
     {
@@ -8210,10 +8412,10 @@
      "target": 240,
      "checkpoint": {
       "seed": 10105,
-      "segments_done": 212,
-      "steps_done": 2544,
+      "segments_done": 218,
+      "steps_done": 2616,
       "drift_events": 0,
-      "segments_complete": 195,
+      "segments_complete": 201,
       "segments_halted": 17,
       "faults_injected": 21,
       "verifications": [
@@ -8391,32 +8593,39 @@
         "entries": 202,
         "checkpoints": 25,
         "failures": []
+       },
+       {
+        "steps": 2604,
+        "ok": true,
+        "entries": 210,
+        "checkpoints": 26,
+        "failures": []
        }
       ],
       "corrupted_state_files": 0,
       "started_at": 1793663354.0442348,
-      "updated_at": 1793676080.6173122
+      "updated_at": 1793676440.849081
      },
      "supervision": {
-      "entries": 111,
+      "entries": 114,
       "events": {
        "supervision_started": 6,
-       "cadence_advisory": 5,
+       "cadence_advisory": 6,
        "stall_anomaly": 29,
-       "supervisor_heartbeat": 66,
+       "supervisor_heartbeat": 68,
        "interruption_detected": 5
       },
       "refusals": 0,
       "escalations": 0,
       "latest_event": {
-       "ts": 1793676042.5206027,
-       "event": "stall_anomaly",
-       "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive"
+       "ts": 1793676381.727811,
+       "event": "cadence_advisory",
+       "action": "supervisor: cadence advisory \u2014 checkpoint interval exceeds stale threshold"
       },
-      "last_log_size": 202,
+      "last_log_size": 210,
       "resume_activity_ts": 1793676020.5016181
      },
-     "entries_present": 205,
+     "entries_present": 211,
      "dialogue": [
       {
        "ts": 1793663353.9724123,
@@ -9860,6 +10069,45 @@
        "ok": null,
        "age_s": 180.08122301101685,
        "log_size": 202
+      },
+      {
+       "ts": 1793676200.615298,
+       "seq": 111,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 338.17598271369934,
+       "log_size": 202
+      },
+      {
+       "ts": 1793676380.7249837,
+       "seq": 112,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 518.2856678962708,
+       "log_size": 202
+      },
+      {
+       "ts": 1793676381.727811,
+       "seq": 113,
+       "event": "cadence_advisory",
+       "action": "supervisor: cadence advisory \u2014 checkpoint interval exceeds stale threshold",
+       "rationale": "The observed signed-checkpoint timing does not match the configured supervision cadence. Advisory only: no act was gated, no resume was blocked, and no escalation was raised.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": null,
+       "log_size": 210
       }
      ]
     }
@@ -9885,7 +10133,7 @@
     "box": "b3",
     "cell": "C",
     "started_at": 1793663452.4630406,
-    "ts": 1793676106.4331017
+    "ts": 1793676436.954129
    },
    "soaks": [
     {
@@ -9893,12 +10141,12 @@
      "target": 240,
      "checkpoint": {
       "seed": 10106,
-      "segments_done": 198,
-      "steps_done": 2376,
+      "segments_done": 204,
+      "steps_done": 2448,
       "drift_events": 0,
-      "segments_complete": 184,
-      "segments_halted": 14,
-      "faults_injected": 19,
+      "segments_complete": 189,
+      "segments_halted": 15,
+      "faults_injected": 20,
       "verifications": [
        {
         "steps": 108,
@@ -10060,31 +10308,38 @@
         "entries": 186,
         "checkpoints": 23,
         "failures": []
+       },
+       {
+        "steps": 2400,
+        "ok": true,
+        "entries": 194,
+        "checkpoints": 24,
+        "failures": []
        }
       ],
       "corrupted_state_files": 0,
       "started_at": 1793663452.798023,
-      "updated_at": 1793676095.7492275
+      "updated_at": 1793676441.0045736
      },
      "supervision": {
-      "entries": 96,
+      "entries": 99,
       "events": {
        "supervision_started": 1,
        "cadence_advisory": 1,
-       "stall_anomaly": 24,
-       "supervisor_heartbeat": 70
+       "stall_anomaly": 25,
+       "supervisor_heartbeat": 72
       },
       "refusals": 0,
       "escalations": 0,
       "latest_event": {
-       "ts": 1793675916.1421738,
+       "ts": 1793676381.2930274,
        "event": "stall_anomaly",
        "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive"
       },
-      "last_log_size": 186,
+      "last_log_size": 194,
       "resume_activity_ts": null
      },
-     "entries_present": 192,
+     "entries_present": 199,
      "dialogue": [
       {
        "ts": 1793663452.7045243,
@@ -11333,6 +11588,45 @@
        "ok": null,
        "age_s": 320.6930613517761,
        "log_size": 186
+      },
+      {
+       "ts": 1793676236.2461908,
+       "seq": 96,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 35.416794776916504,
+       "log_size": 194
+      },
+      {
+       "ts": 1793676381.2930274,
+       "seq": 97,
+       "event": "stall_anomaly",
+       "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive",
+       "rationale": "The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).",
+       "approved": false,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 180.463636636734,
+       "log_size": 194
+      },
+      {
+       "ts": 1793676416.3060393,
+       "seq": 98,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 215.476642370224,
+       "log_size": 194
       }
      ]
     }
@@ -11341,28 +11635,28 @@
   }
  ],
  "totals": {
-  "segments_done": 1303,
+  "segments_done": 1336,
   "segments_target": 1440,
-  "segments_complete": 1204,
-  "segments_halted": 99,
-  "faults_injected": 127,
+  "segments_complete": 1234,
+  "segments_halted": 102,
+  "faults_injected": 131,
   "drift_events": 0,
   "refusals": 0,
   "escalations": 0,
   "events": {
    "supervision_started": 11,
-   "cadence_advisory": 10,
-   "stall_anomaly": 180,
-   "interruption_detected": 37,
-   "chain_verification": 32,
-   "resume_launched": 32,
+   "cadence_advisory": 11,
+   "stall_anomaly": 185,
+   "interruption_detected": 38,
+   "chain_verification": 33,
+   "resume_launched": 33,
    "resume_confirmed": 28,
    "resume_failed": 4
   }
  },
  "anomalies": [],
  "notables": [
-  "stall_anomaly +3 (total 180) \u2014 diagnosed cadence background, inside the envelope (RUN-9's DIAGNOSIS-STALL-ANOMALY.md); filed, not paged"
+  "stall_anomaly +5 (total 185) \u2014 diagnosed cadence background, inside the envelope (RUN-9's DIAGNOSIS-STALL-ANOMALY.md); filed, not paged"
  ],
  "run_complete": false
 }
