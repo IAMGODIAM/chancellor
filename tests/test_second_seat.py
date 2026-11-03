@@ -64,9 +64,7 @@ def _events(log_path: Path) -> list[dict]:
             detail = json.loads(entry.get("detail") or "{}")
         except json.JSONDecodeError:
             detail = {}
-        events.append(
-            {"entry": entry, "detail": detail, "event": detail.get("event")}
-        )
+        events.append({"entry": entry, "detail": detail, "event": detail.get("event")})
     return events
 
 
@@ -124,15 +122,35 @@ def _spawn_pair(
     env = dict(os.environ, PYTHONPATH=SRC)
     proc = subprocess.Popen(
         [
-            sys.executable, "-m", "chancellor.cli", "supervise",
-            "--second-seat", "--seat-poll", str(seat_poll),
-            "--state-dir", str(state_dir),
-            "--cadence", "0.2", "--missed", "3", "--poll", "0.05",
-            "--heartbeat", str(heartbeat),
-            "--", sys.executable, str(agent_py), str(agent_log),
-            str(total), str(interval), str(pidfile),
+            sys.executable,
+            "-m",
+            "chancellor.cli",
+            "supervise",
+            "--second-seat",
+            "--seat-poll",
+            str(seat_poll),
+            "--state-dir",
+            str(state_dir),
+            "--cadence",
+            "0.2",
+            "--missed",
+            "3",
+            "--poll",
+            "0.05",
+            "--heartbeat",
+            str(heartbeat),
+            "--",
+            sys.executable,
+            str(agent_py),
+            str(agent_log),
+            str(total),
+            str(interval),
+            str(pidfile),
         ],
-        env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
     )
     return proc, state_dir, pidfile
 
@@ -171,9 +189,7 @@ def test_t1_kill_primary_reseat_exactly_once(tmp_path):
     details = [
         e["detail"]
         for e in (
-            json.loads(ln)
-            for ln in agent_log.read_text().splitlines()
-            if ln.strip()
+            json.loads(ln) for ln in agent_log.read_text().splitlines() if ln.strip()
         )
         if e.get("action") == "segment"
     ]
@@ -189,14 +205,12 @@ def test_t1_kill_primary_reseat_exactly_once(tmp_path):
     initiated = next(e for e in events if e["event"] == "supervisor_reseat_initiated")
     assert initiated["detail"]["watch_epoch"] == 1
     started = next(
-        e for e in events
+        e
+        for e in events
         if e["event"] == "supervision_started" and e["detail"].get("watch_epoch") == 1
     )
     confirmed = next(e for e in events if e["event"] == "supervisor_reseat_confirmed")
-    assert (
-        confirmed["detail"]["confirming_started_seq"]
-        == started["entry"]["seq"]
-    )
+    assert confirmed["detail"]["confirming_started_seq"] == started["entry"]["seq"]
     assert any(
         e["event"] == "supervisor_heartbeat"
         and e["entry"]["seq"] > started["entry"]["seq"]
@@ -228,8 +242,7 @@ def test_t2_wedged_primary_never_reseated(tmp_path):
         # Exactly one wedge receipt for the episode.
         time.sleep(2)
         wedged_count = sum(
-            1 for e in _events(seat_log)
-            if e["event"] == "supervisor_wedged"
+            1 for e in _events(seat_log) if e["event"] == "supervisor_wedged"
         )
         assert wedged_count == 1
         # No spawn, no chain appends by the seat, primary untouched.
@@ -252,8 +265,7 @@ def test_t2_wedged_primary_never_reseated(tmp_path):
         # The seat appended nothing to the supervision chain all episode
         # (heartbeats are the primary's own and resume after SIGCONT).
         seat_chain_events = [
-            e for e in _events(sup_log)
-            if e["entry"].get("decider") == "second-seat"
+            e for e in _events(sup_log) if e["entry"].get("decider") == "second-seat"
         ]
         assert seat_chain_events == []
         assert chain_events >= 0  # chain grew only by the primary's own hand
@@ -309,7 +321,8 @@ def test_t3_corrupt_agent_chain_successor_refuses(tmp_path):
     # `approved` is the receipt-level Decision field (ACCEPTANCE's
     # wording); the verifier's named failures ride in detail.
     refused = [
-        e for e in events
+        e
+        for e in events
         if e["event"] == "chain_verification"
         and e["entry"].get("approved") is False
         and e["detail"].get("failures")
@@ -332,18 +345,42 @@ def test_t4_two_monitors_and_hand_launch_refused(tmp_path):
         assert _wait_until(lambda: _supervisor_pid(state_dir) is not None)
         # (a) a second monitor cannot arm: the seat lock is held.
         second = subprocess.run(
-            [sys.executable, "-m", "chancellor.cli", "supervise",
-             "--monitor-only", "--state-dir", str(state_dir)],
-            env=env, capture_output=True, text=True, timeout=60,
+            [
+                sys.executable,
+                "-m",
+                "chancellor.cli",
+                "supervise",
+                "--monitor-only",
+                "--state-dir",
+                str(state_dir),
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         assert second.returncode == 2, second.stdout + second.stderr
         # (b) a hand-launched seat-less supervisor refuses to join a
         # seat-enabled watch while the seat's supervisor holds it.
         hand = subprocess.run(
-            [sys.executable, "-m", "chancellor.cli", "supervise",
-             "--state-dir", str(state_dir), "--cadence", "0.2",
-             "--", sys.executable, "-c", "pass"],
-            env=env, capture_output=True, text=True, timeout=60,
+            [
+                sys.executable,
+                "-m",
+                "chancellor.cli",
+                "supervise",
+                "--state-dir",
+                str(state_dir),
+                "--cadence",
+                "0.2",
+                "--",
+                sys.executable,
+                "-c",
+                "pass",
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         assert hand.returncode == 2, hand.stdout + hand.stderr
     finally:
@@ -375,8 +412,12 @@ def test_t4_stale_primary_fences_itself(tmp_path):
     config = SupervisorConfig(
         agent_command=[sys.executable, "-c", "pass"],
         state_dir=state_dir,
-        cadence_s=1.0, missed=3, poll_s=0.01, heartbeat_s=5.0,
-        seat_enabled=True, watch_epoch=0,
+        cadence_s=1.0,
+        missed=3,
+        poll_s=0.01,
+        heartbeat_s=5.0,
+        seat_enabled=True,
+        watch_epoch=0,
     )
     sup = Supervisor(
         config,
@@ -396,8 +437,13 @@ def test_t4_stale_primary_fences_itself(tmp_path):
         action="second-seat: supervisor reseat initiated",
         action_class=ActionClass.COMPUTE,
         detail=json.dumps(
-            {"event": "supervisor_reseat_initiated", "watch_epoch": 1,
-             "successor_command": ["x"], "attempt": 1, "episode_budget": 3},
+            {
+                "event": "supervisor_reseat_initiated",
+                "watch_epoch": 1,
+                "successor_command": ["x"],
+                "attempt": 1,
+                "episode_budget": 3,
+            },
             sort_keys=True,
         ),
     )
@@ -444,23 +490,43 @@ def _seat_watch_on_disk(
     state_dir.mkdir()
     sup = AuditLog(state_dir / "supervision-log.jsonl")
     _record(
-        sup, "supervision_started",
-        {"watch_epoch": 0, "second_seat": True, "supervisor_pid": DEAD_PID,
-         "agent_command": ["/bin/true"]},
-        "supervisor", ts,
+        sup,
+        "supervision_started",
+        {
+            "watch_epoch": 0,
+            "second_seat": True,
+            "supervisor_pid": DEAD_PID,
+            "agent_command": ["/bin/true"],
+        },
+        "supervisor",
+        ts,
     )
     (state_dir / "supervision.lock").write_text(
-        json.dumps({"pid": DEAD_PID, "watch_epoch": 0, "host": "test",
-                    "started_at": ts, "seat_armed": True,
-                    "pid_identity": None}),
+        json.dumps(
+            {
+                "pid": DEAD_PID,
+                "watch_epoch": 0,
+                "host": "test",
+                "started_at": ts,
+                "seat_armed": True,
+                "pid_identity": None,
+            }
+        ),
         encoding="utf-8",
     )
     seat = AuditLog(state_dir / "second-seat-log.jsonl")
     _record(
-        seat, "second_seat_armed",
-        {"watch_epoch": 0, "state_dir": str(state_dir), "mode": "pair",
-         "anchoring": "tier_a_same_machine", "successor_command": recorded},
-        "second-seat", ts,
+        seat,
+        "second_seat_armed",
+        {
+            "watch_epoch": 0,
+            "state_dir": str(state_dir),
+            "mode": "pair",
+            "anchoring": "tier_a_same_machine",
+            "successor_command": recorded,
+        },
+        "second-seat",
+        ts,
     )
     return state_dir
 
@@ -476,8 +542,11 @@ def _monitor(
     recorded: list[str] | None = None,
 ) -> Monitor:
     config = SupervisorConfig(
-        agent_command=["/bin/true"], state_dir=state_dir,
-        cadence_s=2.0, missed=3, heartbeat_s=2.0,
+        agent_command=["/bin/true"],
+        state_dir=state_dir,
+        cadence_s=2.0,
+        missed=3,
+        heartbeat_s=2.0,
     )
     return Monitor(
         config,
@@ -547,11 +616,16 @@ def test_t5_confirmation_timeout_budget_and_clearing(tmp_path):
         return _FakeHandle(999002, status=None)  # starts, never writes
 
     seat = SecondSeatConfig(
-        poll_s=0.05, confirmation_window_s=1.5, started_readback_s=1.0,
+        poll_s=0.05,
+        confirmation_window_s=1.5,
+        started_readback_s=1.0,
         backoff_s=(0.5, 0.5),
     )
     mon = _monitor(
-        state_dir, launcher=launcher, alive={}, seat=seat,
+        state_dir,
+        launcher=launcher,
+        alive={},
+        seat=seat,
         clock=lambda: now[0],
         sleeper=lambda s: now.__setitem__(0, now[0] + s),
         recorded=recorded,
@@ -562,9 +636,7 @@ def test_t5_confirmation_timeout_budget_and_clearing(tmp_path):
     assert len(spawns) == 3
     failed = [e for e in events if e["event"] == "supervisor_reseat_failed"]
     assert len(failed) == 3
-    assert all(
-        e["detail"]["reason"] == "confirmation_timeout" for e in failed
-    )
+    assert all(e["detail"]["reason"] == "confirmation_timeout" for e in failed)
     seat_events = _events(state_dir / "second-seat-log.jsonl")
     esc = [e for e in seat_events if e["event"] == "second_seat_escalation"]
     assert esc and esc[0]["detail"]["reason"] == "budget"
@@ -573,14 +645,23 @@ def test_t5_confirmation_timeout_budget_and_clearing(tmp_path):
     # normal classification with counters reset.
     sup = AuditLog(state_dir / "supervision-log.jsonl")
     _record(
-        sup, "supervision_started",
+        sup,
+        "supervision_started",
         {"watch_epoch": 4, "second_seat": True, "supervisor_pid": 777},
-        "supervisor", now[0],
+        "supervisor",
+        now[0],
     )
     (state_dir / "supervision.lock").write_text(
-        json.dumps({"pid": 777, "watch_epoch": 4, "host": "test",
-                    "started_at": now[0], "seat_armed": True,
-                    "pid_identity": None}),
+        json.dumps(
+            {
+                "pid": 777,
+                "watch_epoch": 4,
+                "host": "test",
+                "started_at": now[0],
+                "seat_armed": True,
+                "pid_identity": None,
+            }
+        ),
         encoding="utf-8",
     )
     mon._pid_alive_fn = lambda pid: pid == 777  # the hand-started watch lives
@@ -639,7 +720,10 @@ def test_t6_pending_approval_never_decided_by_seat(tmp_path):
     block_flag = tmp_path / "block.flag"
     block_flag.write_text("block", encoding="utf-8")
     recorded = [
-        sys.executable, str(driver), str(state_dir), str(block_flag),
+        sys.executable,
+        str(driver),
+        str(state_dir),
+        str(block_flag),
     ]
     env = dict(os.environ, PYTHONPATH=SRC)
     primary = subprocess.Popen(recorded, env=env)
@@ -648,22 +732,24 @@ def test_t6_pending_approval_never_decided_by_seat(tmp_path):
         # Primary self-proofs, verifies (fails), and blocks in
         # authorize with the request outstanding.
         assert _wait_until(
-            lambda: any(
-                e["event"] == "chain_verification"
-                for e in _events(sup_log)
-            )
+            lambda: any(e["event"] == "chain_verification" for e in _events(sup_log))
         )
         time.sleep(0.5)  # it is now inside the blocking approver
         os.kill(primary.pid, signal.SIGKILL)
         primary.wait(timeout=30)
         block_flag.unlink()  # the successor's authorize must not block
         config = SupervisorConfig(
-            agent_command=["/bin/true"], state_dir=state_dir,
-            cadence_s=2.0, missed=3, heartbeat_s=2.0,
+            agent_command=["/bin/true"],
+            state_dir=state_dir,
+            cadence_s=2.0,
+            missed=3,
+            heartbeat_s=2.0,
         )
         mon = Monitor(
-            config, SecondSeatConfig(poll_s=0.2),
-            supervisor_argv=recorded, mode="attach",
+            config,
+            SecondSeatConfig(poll_s=0.2),
+            supervisor_argv=recorded,
+            mode="attach",
             emit=lambda line: None,
         )
         assert mon.arm() is None
@@ -676,16 +762,10 @@ def test_t6_pending_approval_never_decided_by_seat(tmp_path):
         # The successor resolved the request itself: an escalation
         # receipt decided by the gate (no approver attached), and the
         # seat never appears as a decider of anything but its own acts.
-        resolutions = [
-            e for e in events if e["event"] == "escalation"
-        ]
+        resolutions = [e for e in events if e["event"] == "escalation"]
         assert resolutions, "successor never resolved the pending request"
-        assert all(
-            e["entry"]["decider"] != "second-seat" for e in resolutions
-        )
-        seat_chain = [
-            e for e in events if e["entry"]["decider"] == "second-seat"
-        ]
+        assert all(e["entry"]["decider"] != "second-seat" for e in resolutions)
+        seat_chain = [e for e in events if e["entry"]["decider"] == "second-seat"]
         assert {e["event"] for e in seat_chain} <= {
             "supervisor_interruption",
             "supervisor_reseat_initiated",
@@ -701,8 +781,13 @@ def test_t6_pending_approval_never_decided_by_seat(tmp_path):
 
 # ---------------------------------------------------------------- T7
 EXPECTED_STARTED_KEYS = {
-    "event", "agent_command", "agent_log", "stale_threshold_s",
-    "budget", "anchoring", "prior_interruptions",
+    "event",
+    "agent_command",
+    "agent_log",
+    "stale_threshold_s",
+    "budget",
+    "anchoring",
+    "prior_interruptions",
     "prior_consecutive_failures",
 }
 SHIPPED_FILE_SET = {
@@ -720,12 +805,31 @@ def test_t7_seat_disabled_is_the_shipped_product(tmp_path):
     agent_log = state_dir / "audit-log.jsonl"
     env = dict(os.environ, PYTHONPATH=SRC)
     proc = subprocess.Popen(
-        [sys.executable, "-m", "chancellor.cli", "supervise",
-         "--state-dir", str(state_dir), "--cadence", "0.2",
-         "--missed", "3", "--poll", "0.05",
-         "--", sys.executable, str(agent_py), str(agent_log),
-         "5", "0.1", str(tmp_path / "agent.pid")],
-        env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        [
+            sys.executable,
+            "-m",
+            "chancellor.cli",
+            "supervise",
+            "--state-dir",
+            str(state_dir),
+            "--cadence",
+            "0.2",
+            "--missed",
+            "3",
+            "--poll",
+            "0.05",
+            "--",
+            sys.executable,
+            str(agent_py),
+            str(agent_log),
+            "5",
+            "0.1",
+            str(tmp_path / "agent.pid"),
+        ],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
     )
     out, _err = proc.communicate(timeout=120)
     assert proc.returncode == 0, out
@@ -747,12 +851,31 @@ def _make_legacy_open_watch(tmp_path: Path) -> Path:
     agent_log = state_dir / "audit-log.jsonl"
     env = dict(os.environ, PYTHONPATH=SRC)
     proc = subprocess.Popen(
-        [sys.executable, "-m", "chancellor.cli", "supervise",
-         "--state-dir", str(state_dir), "--cadence", "0.2",
-         "--missed", "3", "--poll", "0.05",
-         "--", sys.executable, str(agent_py), str(agent_log),
-         "200", "0.2", str(tmp_path / "agent.pid")],
-        env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        [
+            sys.executable,
+            "-m",
+            "chancellor.cli",
+            "supervise",
+            "--state-dir",
+            str(state_dir),
+            "--cadence",
+            "0.2",
+            "--missed",
+            "3",
+            "--poll",
+            "0.05",
+            "--",
+            sys.executable,
+            str(agent_py),
+            str(agent_log),
+            "200",
+            "0.2",
+            str(tmp_path / "agent.pid"),
+        ],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
     )
     assert _wait_until(lambda: _checkpoint_count(agent_log) >= 3)
     proc.kill()
@@ -772,12 +895,31 @@ def test_t8_legacy_watch_opens_as_before_and_monitor_refuses(tmp_path):
     agent_py = tmp_path / "agent.py"
     agent_log = state_dir / "audit-log.jsonl"
     proc = subprocess.Popen(
-        [sys.executable, "-m", "chancellor.cli", "supervise",
-         "--state-dir", str(state_dir), "--cadence", "0.2",
-         "--missed", "3", "--poll", "0.05",
-         "--", sys.executable, str(agent_py), str(agent_log),
-         "80", "0.05", str(tmp_path / "agent.pid")],
-        env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        [
+            sys.executable,
+            "-m",
+            "chancellor.cli",
+            "supervise",
+            "--state-dir",
+            str(state_dir),
+            "--cadence",
+            "0.2",
+            "--missed",
+            "3",
+            "--poll",
+            "0.05",
+            "--",
+            sys.executable,
+            str(agent_py),
+            str(agent_log),
+            "80",
+            "0.05",
+            str(tmp_path / "agent.pid"),
+        ],
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
     )
     # Completion-leg parameters gentled (was 200 @ 0.01): at a
     # checkpoint-per-segment with O(n) checkpoint cost, the resumed
@@ -788,9 +930,7 @@ def test_t8_legacy_watch_opens_as_before_and_monitor_refuses(tmp_path):
     out, _err = proc.communicate(timeout=240)
     assert proc.returncode == 0, out
     events = _events(state_dir / "supervision-log.jsonl")
-    legacy = [
-        e for e in events if e["event"] == "interruption_detected"
-    ]
+    legacy = [e for e in events if e["event"] == "interruption_detected"]
     assert legacy and legacy[0]["detail"]["cause"] == "unknown"
     assert any(e["event"] == "agent_completed" for e in events)
 
@@ -799,9 +939,19 @@ def test_t8_monitor_refuses_legacy_watch(tmp_path):
     state_dir = _make_legacy_open_watch(tmp_path)
     env = dict(os.environ, PYTHONPATH=SRC)
     refused = subprocess.run(
-        [sys.executable, "-m", "chancellor.cli", "supervise",
-         "--monitor-only", "--state-dir", str(state_dir)],
-        env=env, capture_output=True, text=True, timeout=60,
+        [
+            sys.executable,
+            "-m",
+            "chancellor.cli",
+            "supervise",
+            "--monitor-only",
+            "--state-dir",
+            str(state_dir),
+        ],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     assert refused.returncode == 2, refused.stdout + refused.stderr
 
@@ -822,9 +972,7 @@ def test_t9_agent_completes_while_supervisor_lives(tmp_path):
     assert "supervisor_reseat_initiated" not in kinds
     seat_kinds = [e["event"] for e in _events(seat_log)]
     assert "second_seat_stopped" in seat_kinds
-    stopped = next(
-        e for e in _events(seat_log) if e["event"] == "second_seat_stopped"
-    )
+    stopped = next(e for e in _events(seat_log) if e["event"] == "second_seat_stopped")
     # SPEC's seat-log table: second_seat_stopped carries {reason}
     # only; the exit-0 outcome is asserted on proc.returncode above.
     assert stopped["detail"]["reason"] == "watch_ended"
@@ -876,19 +1024,25 @@ def test_t11_started_but_never_confirmed_times_out(tmp_path):
         epoch = int(argv[argv.index("--seat-epoch") + 1])
         sup = AuditLog(state_dir / "supervision-log.jsonl")
         _record(
-            sup, "supervision_started",
-            {"watch_epoch": epoch, "second_seat": True,
-             "supervisor_pid": 999004},
-            "supervisor", now[0],
+            sup,
+            "supervision_started",
+            {"watch_epoch": epoch, "second_seat": True, "supervisor_pid": 999004},
+            "supervisor",
+            now[0],
         )
         return _FakeHandle(999004, status=None)  # never heartbeats
 
     seat = SecondSeatConfig(
-        poll_s=0.05, budget=1, confirmation_window_s=1.5,
+        poll_s=0.05,
+        budget=1,
+        confirmation_window_s=1.5,
         started_readback_s=1.0,
     )
     mon = _monitor(
-        state_dir, launcher=launcher, alive={}, seat=seat,
+        state_dir,
+        launcher=launcher,
+        alive={},
+        seat=seat,
         clock=lambda: now[0],
         sleeper=lambda s: now.__setitem__(0, now[0] + s),
         recorded=recorded,
@@ -899,21 +1053,16 @@ def test_t11_started_but_never_confirmed_times_out(tmp_path):
     failed = [e for e in events if e["event"] == "supervisor_reseat_failed"]
     assert len(failed) == 1
     assert failed[0]["detail"]["reason"] == "confirmation_timeout"
-    assert not any(
-        e["event"] == "supervisor_reseat_confirmed" for e in events
-    )
+    assert not any(e["event"] == "supervisor_reseat_confirmed" for e in events)
     # A heartbeat landing after the timeout does not retroactively
     # confirm: the episode stands escalated.
     sup = AuditLog(state_dir / "supervision-log.jsonl")
-    _record(sup, "supervisor_heartbeat", {"agent_alive": True},
-            "supervisor", now[0])
+    _record(sup, "supervisor_heartbeat", {"agent_alive": True}, "supervisor", now[0])
     chain_len = len(_events(state_dir / "supervision-log.jsonl"))
     mon.cycle()
     events = _events(state_dir / "supervision-log.jsonl")
     assert len(events) == chain_len
-    assert not any(
-        e["event"] == "supervisor_reseat_confirmed" for e in events
-    )
+    assert not any(e["event"] == "supervisor_reseat_confirmed" for e in events)
     assert len(spawns) == 1
 
 
@@ -966,29 +1115,44 @@ def _good_successor_factory(state_dir: Path, alive: dict[int, bool], base: int):
             holder["fh"] = fh
             fh.seek(0)
             fh.truncate()
-            fh.write(json.dumps({
-                "pid": pid, "watch_epoch": epoch, "host": "test",
-                "started_at": time.time(), "seat_armed": True,
-                "pid_identity": None,
-            }))
+            fh.write(
+                json.dumps(
+                    {
+                        "pid": pid,
+                        "watch_epoch": epoch,
+                        "host": "test",
+                        "started_at": time.time(),
+                        "seat_armed": True,
+                        "pid_identity": None,
+                    }
+                )
+            )
             fh.flush()
             sup = AuditLog(state_dir / "supervision-log.jsonl")
             _record(
-                sup, "supervision_started",
-                {"watch_epoch": epoch, "second_seat": True,
-                 "supervisor_pid": pid},
-                "supervisor", time.time(),
+                sup,
+                "supervision_started",
+                {"watch_epoch": epoch, "second_seat": True, "supervisor_pid": pid},
+                "supervisor",
+                time.time(),
             )
-            started_seq = AuditLog(
-                state_dir / "supervision-log.jsonl"
-            ).read_all()[-1]["seq"]
+            started_seq = AuditLog(state_dir / "supervision-log.jsonl").read_all()[-1][
+                "seq"
+            ]
             _record(
-                sup, "supervisor_reseat_confirmed",
+                sup,
+                "supervisor_reseat_confirmed",
                 {"watch_epoch": epoch, "confirming_started_seq": started_seq},
-                "supervisor", time.time(),
+                "supervisor",
+                time.time(),
             )
-            _record(sup, "supervisor_heartbeat", {"agent_alive": True},
-                    "supervisor", time.time())
+            _record(
+                sup,
+                "supervisor_heartbeat",
+                {"agent_alive": True},
+                "supervisor",
+                time.time(),
+            )
             alive[pid] = True
 
         thread = threading.Thread(target=_serve, daemon=True)
@@ -1024,8 +1188,14 @@ def _good_successor_factory(state_dir: Path, alive: dict[int, bool], base: int):
 
 def test_t12_crash_looping_supervisor_episode_governor(tmp_path):
     recorded = [
-        sys.executable, "-m", "chancellor.cli", "supervise",
-        "--seat-epoch", "0", "--", "/bin/true",
+        sys.executable,
+        "-m",
+        "chancellor.cli",
+        "supervise",
+        "--seat-epoch",
+        "0",
+        "--",
+        "/bin/true",
     ]
     state_dir = _seat_watch_on_disk(tmp_path, recorded=recorded)
     alive: dict[int, bool] = {}
@@ -1038,7 +1208,9 @@ def test_t12_crash_looping_supervisor_episode_governor(tmp_path):
         return base_launcher(argv)
 
     mon = _monitor(
-        state_dir, launcher=counting_launcher, alive=alive,
+        state_dir,
+        launcher=counting_launcher,
+        alive=alive,
         recorded=recorded,
     )
     assert mon.arm() is None
@@ -1046,10 +1218,7 @@ def test_t12_crash_looping_supervisor_episode_governor(tmp_path):
     for episode in range(3):
         mon.cycle()  # DOWN -> reseat -> confirmed
         events = _events(sup_path)
-        confirmed = [
-            e for e in events
-            if e["event"] == "supervisor_reseat_confirmed"
-        ]
+        confirmed = [e for e in events if e["event"] == "supervisor_reseat_confirmed"]
         assert len(confirmed) == episode + 1
         state = rebuild_supervision_state(AuditLog(sup_path).read_all())
         assert state.consecutive_failures == 0  # R8 budget untouched
@@ -1058,7 +1227,8 @@ def test_t12_crash_looping_supervisor_episode_governor(tmp_path):
         current.die()
     seat_events = _events(state_dir / "second-seat-log.jsonl")
     freq = [
-        e for e in seat_events
+        e
+        for e in seat_events
         if e["event"] == "second_seat_escalation"
         and e["detail"].get("reason") == "episode_frequency"
     ]
@@ -1074,14 +1244,20 @@ def test_t13_clock_steps_cannot_manufacture_a_reseat(tmp_path):
     state_dir = _seat_watch_on_disk(tmp_path, recorded=recorded)
     now = [1000.0]
     sup = AuditLog(state_dir / "supervision-log.jsonl")
-    _record(sup, "supervisor_heartbeat", {"agent_alive": True},
-            "supervisor", now[0])
+    _record(sup, "supervisor_heartbeat", {"agent_alive": True}, "supervisor", now[0])
     # The primary is ALIVE at DEAD_PID for this test's pid table.
     alive = {DEAD_PID: True}
     (state_dir / "supervision.lock").write_text(
-        json.dumps({"pid": DEAD_PID, "watch_epoch": 0, "host": "test",
-                    "started_at": now[0], "seat_armed": True,
-                    "pid_identity": None}),
+        json.dumps(
+            {
+                "pid": DEAD_PID,
+                "watch_epoch": 0,
+                "host": "test",
+                "started_at": now[0],
+                "seat_armed": True,
+                "pid_identity": None,
+            }
+        ),
         encoding="utf-8",
     )
     # The simulated primary holds the watch lock for its whole
@@ -1102,7 +1278,10 @@ def test_t13_clock_steps_cannot_manufacture_a_reseat(tmp_path):
 
     seat = SecondSeatConfig(poll_s=5.0)
     mon = _monitor(
-        state_dir, launcher=launcher, alive=alive, seat=seat,
+        state_dir,
+        launcher=launcher,
+        alive=alive,
+        seat=seat,
         clock=lambda: now[0],
         sleeper=lambda s: now.__setitem__(0, now[0] + s),
         recorded=recorded,
@@ -1123,27 +1302,32 @@ def test_t13_clock_steps_cannot_manufacture_a_reseat(tmp_path):
     # Stepping back and a fresh heartbeat clears the wedge.
     now[0] -= 3610.0
     sup = AuditLog(state_dir / "supervision-log.jsonl")
-    _record(sup, "supervisor_heartbeat", {"agent_alive": True},
-            "supervisor", now[0])
+    _record(sup, "supervisor_heartbeat", {"agent_alive": True}, "supervisor", now[0])
     mon.cycle()
     seat_events = _events(state_dir / "second-seat-log.jsonl")
-    assert any(
-        e["event"] == "supervisor_wedge_cleared" for e in seat_events
-    )
+    assert any(e["event"] == "supervisor_wedge_cleared" for e in seat_events)
     assert spawns == []
 
 
 def test_t13_dead_primary_reseats_despite_clock_step(tmp_path):
     recorded = [
-        sys.executable, "-m", "chancellor.cli", "supervise",
-        "--seat-epoch", "0", "--", "/bin/true",
+        sys.executable,
+        "-m",
+        "chancellor.cli",
+        "supervise",
+        "--seat-epoch",
+        "0",
+        "--",
+        "/bin/true",
     ]
     state_dir = _seat_watch_on_disk(tmp_path, recorded=recorded)
     now = [1000.0 + 3600.0]  # clock already stepped an hour forward
     alive: dict[int, bool] = {}
     launcher, _handles = _good_successor_factory(state_dir, alive, 6000)
     mon = _monitor(
-        state_dir, launcher=launcher, alive=alive,
+        state_dir,
+        launcher=launcher,
+        alive=alive,
         clock=lambda: now[0],
         sleeper=lambda s: now.__setitem__(0, now[0] + s),
         recorded=recorded,
@@ -1158,19 +1342,34 @@ def test_t13_dead_primary_reseats_despite_clock_step(tmp_path):
 # --------------------------------------------------------------- T14
 SEAT_EVENT_FIELDS = {
     "supervisor_interruption": {
-        "event", "cause", "witnessed", "exit_status", "prior_watch_epoch",
-        "last_heartbeat_age_s", "supervision_log_size", "agent_log_size",
+        "event",
+        "cause",
+        "witnessed",
+        "exit_status",
+        "prior_watch_epoch",
+        "last_heartbeat_age_s",
+        "supervision_log_size",
+        "agent_log_size",
         "seat_log_head",
     },
     "supervisor_reseat_initiated": {
-        "event", "watch_epoch", "successor_command", "attempt",
+        "event",
+        "watch_epoch",
+        "successor_command",
+        "attempt",
         "episode_budget",
     },
-    "supervisor_reseat_confirmed": {"event", "watch_epoch",
-                                    "confirming_started_seq",
-                                    "predecessor_interruption_seq"},
+    "supervisor_reseat_confirmed": {
+        "event",
+        "watch_epoch",
+        "confirming_started_seq",
+        "predecessor_interruption_seq",
+    },
     "supervisor_reseat_failed": {
-        "event", "watch_epoch", "attempt", "reason",
+        "event",
+        "watch_epoch",
+        "attempt",
+        "reason",
         "successor_exit_status",
     },
 }
@@ -1206,7 +1405,8 @@ def test_t14_seat_record_verifies_cold_and_matches_schema(tmp_path):
     for e in _events(sup_log):
         if e["event"] in SEAT_EVENT_FIELDS:
             assert set(e["detail"].keys()) == SEAT_EVENT_FIELDS[e["event"]], (
-                e["event"], set(e["detail"].keys()),
+                e["event"],
+                set(e["detail"].keys()),
             )
 
 
@@ -1229,24 +1429,20 @@ def test_t15_wedged_then_dead_converts_once(tmp_path):
         assert _wait_until(escalated, timeout=90), "wedge never escalated"
         os.kill(sup_pid, signal.SIGKILL)
         reseated = lambda: any(  # noqa: E731
-            e["event"] == "supervisor_reseat_confirmed"
-            for e in _events(sup_log)
+            e["event"] == "supervisor_reseat_confirmed" for e in _events(sup_log)
         )
         assert _wait_until(reseated, timeout=90), "no reseat after death"
         events = _events(sup_log)
-        interruptions = [
-            e for e in events if e["event"] == "supervisor_interruption"
-        ]
+        interruptions = [e for e in events if e["event"] == "supervisor_interruption"]
         assert len(interruptions) == 1  # the wedge was never a second one
         head = interruptions[0]["detail"]["seat_log_head"]
         seat_entries = _events(seat_log)
         wedge_seqs = [
-            e["entry"]["seq"] for e in seat_entries
+            e["entry"]["seq"]
+            for e in seat_entries
             if e["event"] in ("supervisor_wedged", "second_seat_escalation")
         ]
-        head_entry = next(
-            e for e in seat_entries if e["entry"]["entry_hash"] == head
-        )
+        head_entry = next(e for e in seat_entries if e["entry"]["entry_hash"] == head)
         assert head_entry["entry"]["seq"] >= max(wedge_seqs)
     finally:
         _kill(proc)
