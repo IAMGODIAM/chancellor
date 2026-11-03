@@ -1,5 +1,5 @@
 {
- "polled_at_est": "2026-11-03 03:51 EST",
+ "polled_at_est": "2026-11-03 03:54 EST",
  "label": "IN FLIGHT / UNVERIFIED",
  "boxes": [
   {
@@ -13599,10 +13599,10 @@
      "target": null,
      "checkpoint": {
       "seed": 10107,
-      "segments_done": 14,
-      "steps_done": 168,
+      "segments_done": 18,
+      "steps_done": 216,
       "drift_events": 0,
-      "segments_complete": 13,
+      "segments_complete": 17,
       "segments_halted": 1,
       "faults_injected": 1,
       "verifications": [
@@ -13612,19 +13612,26 @@
         "entries": 9,
         "checkpoints": 1,
         "failures": []
+       },
+       {
+        "steps": 204,
+        "ok": true,
+        "entries": 17,
+        "checkpoints": 2,
+        "failures": []
        }
       ],
       "corrupted_state_files": 0,
       "started_at": 1793695013.400233,
-      "updated_at": 1793695828.8577769
+      "updated_at": 1793696069.006717
      },
      "supervision": {
-      "entries": 8,
+      "entries": 9,
       "events": {
        "supervision_started": 1,
        "cadence_advisory": 1,
        "stall_anomaly": 2,
-       "supervisor_heartbeat": 4
+       "supervisor_heartbeat": 5
       },
       "refusals": 0,
       "escalations": 0,
@@ -13636,7 +13643,7 @@
       "last_log_size": 9,
       "resume_activity_ts": null
      },
-     "entries_present": 15,
+     "entries_present": 18,
      "dialogue": [
       {
        "ts": 1793695013.3296123,
@@ -13741,6 +13748,19 @@
        "ok": null,
        "age_s": 180.82875037193298,
        "log_size": 9
+      },
+      {
+       "ts": 1793695913.590493,
+       "seq": 8,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 359.89853596687317,
+       "log_size": 9
       }
      ]
     }
@@ -13749,9 +13769,9 @@
   }
  ],
  "totals": {
-  "segments_done": 1528,
+  "segments_done": 1532,
   "segments_target": 1440,
-  "segments_complete": 1409,
+  "segments_complete": 1413,
   "segments_halted": 119,
   "faults_injected": 151,
   "drift_events": 0,
@@ -13773,8 +13793,6 @@
   }
  },
  "anomalies": [],
- "notables": [
-  "stall_anomaly +1 (total 211) \u2014 diagnosed cadence background, inside the envelope (RUN-9's DIAGNOSIS-STALL-ANOMALY.md); filed, not paged"
- ],
+ "notables": [],
  "run_complete": false
 }
