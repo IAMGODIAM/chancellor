@@ -1,5 +1,5 @@
 {
- "polled_at_est": "2026-11-03 05:45 EST",
+ "polled_at_est": "2026-11-03 05:50 EST",
  "label": "IN FLIGHT / UNVERIFIED",
  "boxes": [
   {
@@ -54,12 +54,12 @@
   "escalations": 0,
   "events": {}
  },
- "anomalies": [
-  "box b0 unreachable \u2014 not present in lambda list",
-  "box b1 unreachable \u2014 not present in lambda list",
-  "box b2 unreachable \u2014 not present in lambda list",
-  "box b3 unreachable \u2014 not present in lambda list"
+ "anomalies": [],
+ "notables": [
+  "box b0 not yet reporting (lambda: absent)",
+  "box b1 not yet reporting (lambda: absent)",
+  "box b2 not yet reporting (lambda: absent)",
+  "box b3 not yet reporting (lambda: absent)"
  ],
- "notables": [],
  "run_complete": false
 }
