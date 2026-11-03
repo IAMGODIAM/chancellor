@@ -1082,6 +1082,14 @@ def test_t13_clock_steps_cannot_manufacture_a_reseat(tmp_path):
                     "pid_identity": None}),
         encoding="utf-8",
     )
+    # The simulated primary holds the watch lock for its whole
+    # life, as a real supervisor does from self-proof on: pid
+    # alive + lock body naming it + the lock itself FREE is a
+    # contradictory instrument set, and the Monitor classifies it
+    # UNKNOWN (never WEDGED) — correctly. Hold the flock here for
+    # the test's duration so the instruments agree.
+    lock_fh = open(state_dir / "supervision.lock", "a+")
+    fcntl.flock(lock_fh.fileno(), fcntl.LOCK_EX)
     spawns: list[list[str]] = []
 
     def launcher(argv):
