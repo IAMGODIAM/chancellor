@@ -7,8 +7,6 @@ Doctrine:
   * Authority escalates; capability doesn't.
 """
 
-__version__ = "1.2.1"
-
 from .api_client import CostMeter, MetaModelClient, NotConfiguredError
 from .escalation import (
     ActionClass,
@@ -35,6 +33,39 @@ from .task_graph import (
     TaskGraph,
     TaskNode,
 )
+
+
+def _declared_version() -> str:
+    """The version is declared exactly once: pyproject.toml [project].
+
+    Installed distributions read it back from their own metadata; an
+    uninstalled source checkout reads the pyproject two levels above
+    this file; a bare copied tree gets the sentinel, which says the
+    version is unknown rather than repeating a stale literal.
+    (Release-sync SPEC 2.2.)
+    """
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+
+        try:
+            return version("chancellor")
+        except PackageNotFoundError:
+            pass
+    except ImportError:
+        pass
+    try:
+        import tomllib
+        from pathlib import Path
+
+        pyproject = Path(__file__).resolve().parents[2] / "pyproject.toml"
+        with pyproject.open("rb") as fh:
+            return str(tomllib.load(fh)["project"]["version"])
+    except Exception:
+        return "0.0.0+unknown"
+
+
+__version__ = _declared_version()
+
 
 __all__ = [
     "TaskGraph",

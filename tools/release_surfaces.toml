@@ -1,0 +1,146 @@
+# tools/release_surfaces.toml — the release-sync surfaces manifest.
+#
+# The line between living surfaces and the record (SPEC 2.5). Every
+# version-shaped string in the living tree is either the declaration,
+# inside a managed surface below, or covered by an exemption listed
+# here with its reason. Anything else fails check G7 — an incomplete
+# manifest fails closed rather than passing silently. New living
+# surfaces join this manifest in the same commit that introduces them.
+#
+# Scan pattern note: the pattern below is the SPEC 2.5 pattern widened
+# to admit an optional leading "v" (not preceded by a word char or a
+# dot). Read literally, "\b\d+\.\d+\.\d+\b" cannot match v-prefixed
+# forms at all — yet the release surfaces themselves are v-prefixed
+# and ACCEPTANCE A1f pre-registers its planted v-prefixed string as
+# caught by this scan.
+# Reconciliation recorded in the build's MIGRATION-CENSUS.md.
+
+[scan]
+pattern = "(?<![0-9A-Za-z_.])v?[0-9]+\\.[0-9]+\\.[0-9]+\\b"
+
+# --- Managed surfaces -----------------------------------------------------
+
+[[managed]]
+path = "pyproject.toml"
+kind = "declared" # the single declaration: [project] version
+
+[[managed]]
+path = "src/chancellor/__init__.py"
+kind = "derived-code" # __version__ is derived at import (SPEC 2.2);
+# the only version-shaped string allowed here is the sentinel below
+
+[[managed]]
+path = "CITATION.cff"
+kind = "generated" # from tools/templates/CITATION.cff.tmpl
+
+[[managed]]
+path = "docs/media/badge-release.svg"
+kind = "generated" # from tools/templates/badge-release.svg.tmpl
+
+[[managed]]
+path = "docs/media/badge-tests.svg"
+kind = "generated" # from tools/templates/badge-tests.svg.tmpl
+
+[[managed]]
+path = "README.md"
+kind = "marker-regions" # STATUS-LINE, RELEASE-BADGE, TESTS-BADGE-ALT,
+# TESTS-LINE, WHATSNEW-HEADING; everything outside the markers is prose
+
+[[managed]]
+path = "CHANGELOG.md"
+kind = "checked-copy" # the head entry is bound by G3
+scan = "exempt" # entries below the head are record (SPEC 2.6)
+
+# --- Exempt files (record; never rewritten by sync machinery) -------------
+
+[[exempt_files]]
+path = "BUILD-LOG.md"
+reason = "append-only build record; entries name the tree they were written on"
+
+[[exempt_files]]
+glob = "docs/evidence/**"
+reason = "measured records; figures keep their trees' names by the attribution rule"
+
+[[exempt_files]]
+path = "docs/EVOLUTION.md"
+reason = "frozen story text"
+
+[[exempt_files]]
+glob = "tests/**"
+reason = "fixtures may contain version-shaped strings as test data"
+
+# --- Generated build output (not source; G5/G6 hold jurisdiction) --------
+
+[[exempt_files]]
+glob = "dist/**"
+reason = "built artifacts; their metadata is bound by G5 and G6"
+
+[[exempt_files]]
+glob = "build/**"
+reason = "setuptools build tree; regenerated from source on every build"
+
+[[exempt_files]]
+glob = "**/*.egg-info/**"
+reason = "generated package metadata (a build-time copy of the declaration and the README); the shipped copies inside artifacts are bound by G5"
+
+# --- Exempt patterns (individual occurrences, each with its reason) -------
+
+[[exempt_patterns]]
+path = ".github/workflows/gates.yml"
+regex = "ruff==0\\.17\\.3"
+reason = "pinned tool version in a CI install line — not the product version"
+
+[[exempt_patterns]]
+path = ".pre-commit-config.yaml"
+regex = "rev: v0\\.17\\.3"
+reason = "pinned tool version (ruff pre-commit rev) — not the product version"
+
+[[exempt_patterns]]
+path = "src/chancellor/__init__.py"
+regex = "0\\.0\\.0\\+unknown"
+reason = "the SPEC 2.2 uninstalled-tree sentinel: the string that says the version is unknown"
+
+[[exempt_patterns]]
+path = "docs/release-process.md"
+regex = "0\\.0\\.0\\+unknown"
+reason = "names the SPEC 2.2 uninstalled-tree sentinel in the operator documentation"
+
+[[exempt_patterns]]
+path = "src/chancellor/receipts.py"
+regex = "RFC 9162 §2\\.1\\.1"
+reason = "an RFC section number in a docstring — not a version"
+
+[[exempt_patterns]]
+path = "docs/bridge/OUTBOX.md"
+regex = "pytest==8\\.4\\.2"
+reason = "toolchain version inside a dated bridge measurement record — record"
+
+[[exempt_patterns]]
+path = "docs/bridge/receipts/bridge-setup-checks.txt"
+regex = "pytest==8\\.4\\.2"
+reason = "toolchain version inside a dated bridge measurement record — record"
+
+[[exempt_patterns]]
+path = "tools/templates/CITATION.cff.tmpl"
+regex = "cff-version: 1\\.2\\.0"
+reason = "the CFF schema version, hardcoded by the template per SPEC 2.4 — not the product version"
+
+[[exempt_patterns]]
+path = "README.md"
+regex = "^## What's new in [0-9]+\\.[0-9]+\\.[0-9]+$"
+reason = "past-version section headings are record; the current version's heading sits inside the WHATSNEW-HEADING marker region and is classified there first"
+
+[[exempt_patterns]]
+path = "README.md"
+regex = "found after [0-9]+\\.[0-9]+\\.[0-9]+ shipped"
+reason = "changelog prose — the release's own human words (SPEC 5)"
+
+[[exempt_patterns]]
+path = "README.md"
+regex = "exactly as in [0-9]+\\.[0-9]+\\.[0-9]+"
+reason = "changelog prose — the release's own human words (SPEC 5)"
+
+[[exempt_patterns]]
+path = "README.md"
+regex = "measured on the v[0-9]+\\.[0-9]+\\.[0-9]+ tree; the install hearing ran on v[0-9]+\\.[0-9]+\\.[0-9]+"
+reason = "evidence attribution (SPEC 5): names the trees the measurements were taken on; rewriting it would falsify the record"
