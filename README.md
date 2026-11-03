@@ -84,6 +84,12 @@ Don't take the tables' word for any of this — the audit log of a governed run 
 
 The full record — measurements, honest negative results, and corrections filed as new entries rather than silent edits — is the development log: [BUILD-LOG.md](BUILD-LOG.md) and [ERRATA.md](ERRATA.md).
 
+## The story
+
+Chancellor was not built in one motion. It began with three questions — who grades an agent's work, who can say stop, and where is the proof — and grew in dated increments: releases, measurements at increasing scale, a supervisor that had to pass its own gate, a film, a public failure recounted rather than buried, and an independent review whose refutations were repaired in the open. The full arc, every figure carrying the bound it was published with, is in [docs/EVOLUTION.md](docs/EVOLUTION.md).
+
+*Work is graded. Authority is gated. Every decision leaves a receipt.*
+
 ## What's new in 1.2.0
 
 - **Capability install — the ninth gated act class.** Under frame v2 (`e5.chancellor_frame.v2`, whose clause 6 states that growth is governed), an agent gaining a new capability is a gated act: proposed, checked before it moves, decided at the human gate, receipted, verified live by a reader who did not install it, watched through a probationary window of ten receipted uses, and reversible under receipt — proven in a pre-registered install hearing on file in the repository ([docs/evidence/foundry-install-hearing/](docs/evidence/foundry-install-hearing/)), every receipt verifiable offline. The grades stand as the records print them: the registry bindings are test-grade until the registrar custody act, and the decision chain is consistency-grade under the development signer — labeled on their faces, and labeled here. *Attribution, per evidence:* the measurements below were measured on the v1.1.0 tree; the install hearing ran on v1.2.0.
