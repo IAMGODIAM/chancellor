@@ -66,34 +66,25 @@ receipts as they land.
 
 <!-- STATUS:BEGIN -->
 - **Standing:** IN FLIGHT — every figure UNVERIFIED, republished from the boxes’ own state files.
-- **As of:** 2026-11-03 05:37 EST (five-minute cadence)
-- **Boxes reporting:** 4 / 4
-- **Segments:** 1637 / 1440 across the watches polled · complete 1509 · halted fail-closed 128 · faults injected 162
+- **As of:** 2026-11-03 05:45 EST (five-minute cadence)
+- **Boxes reporting:** 0 / 4
+- **Segments:** 0 / 0 across the watches polled · complete 0 · halted fail-closed 0 · faults injected 0
 - **Drift events:** 0
-- **The watch's receipts so far:** refusals 4 · escalations 4 · agent_completed 5 · budget_exhausted 1 · cadence_advisory 15 · chain_verification 41 · drift_detected 1 · escalation 4 · interruption_detected 47 · resume_confirmed 29 · resume_failed 9 · resume_launched 39 · stall_anomaly 224 · supervision_started 15
+- **The watch's receipts so far:** refusals 0 · escalations 0
 
 ### Box b0 — Cell A — kill cycle · us-east-1
-- **Phase:** DONE · **Step:** all · *all supervised runs finished*
-- **Watch 10101:** segments 240 / 240 · complete 221 · halted 19 · faults 24 · drift 0 · corrupted state files 0 · in-run chain verifications 28/28 ok · supervision receipts 155 (refusals 0, escalations 0) · latest watch event: *supervisor: agent completed*
-- **Watch 10102:** segments 240 / 240 · complete 222 · halted 18 · faults 24 · drift 0 · corrupted state files 0 · in-run chain verifications 28/28 ok · supervision receipts 160 (refusals 0, escalations 0) · latest watch event: *supervisor: agent completed*
+- Not yet reported — not present in lambda list. The cadence catches up; nothing is filled in by assumption.
 
 ### Box b1 — Cell A — kill cycle (replication) · us-west-1
-- **Phase:** DONE · **Step:** all · *all supervised runs finished*
-- **Watch 10103:** segments 240 / 240 · complete 224 · halted 16 · faults 24 · drift 0 · corrupted state files 0 · in-run chain verifications 28/28 ok · supervision receipts 156 (refusals 0, escalations 0) · latest watch event: *supervisor: agent completed*
-- **Watch 10104:** segments 232 / 240 · complete 211 · halted 21 · faults 23 · drift 0 · corrupted state files 0 · in-run chain verifications 27/27 ok · supervision receipts 148 (refusals 1, escalations 1) · latest watch event: *supervisor escalation: resume budget exhausted*
+- Not yet reported — not present in lambda list. The cadence catches up; nothing is filled in by assumption.
 
 ### Box b2 — Cell B — supervisor death + refusal · us-east-1
-- **Phase:** DONE · **Step:** all · *all supervised runs finished*
-- **Watch 10105:** segments 240 / 240 · complete 220 · halted 20 · faults 24 · drift 0 · corrupted state files 0 · in-run chain verifications 28/28 ok · supervision receipts 125 (refusals 0, escalations 0) · latest watch event: *supervisor: agent completed*
-- **Watch 10108:** segments 7  · complete 7 · halted 0 · faults 0 · drift 0 · corrupted state files 0 · in-run chain verifications 0/0 ok · supervision receipts 8 (refusals 1, escalations 1) · latest watch event: *supervisor escalation: chain verification failed — resume refused*
-- **Watch 10109:** segments 50  · complete 46 · halted 4 · faults 5 · drift 0 · corrupted state files 0 · in-run chain verifications 5/6 ok · supervision receipts 26 (refusals 1, escalations 1) · latest watch event: *supervisor escalation: chain drift detected under a live agent*
-- **Watch 10110:** segments 25  · complete 24 · halted 1 · faults 2 · drift 0 · corrupted state files 0 · in-run chain verifications 3/3 ok · supervision receipts 16 (refusals 1, escalations 1) · latest watch event: *supervisor escalation: chain verification failed — resume refused*
+- Not yet reported — not present in lambda list. The cadence catches up; nothing is filled in by assumption.
 
 ### Box b3 — Cell C — stall vs death, then D — machine loss (staged) · us-west-1
-- **Phase:** DONE · **Step:** all · *all supervised runs finished*
-- **Watch 10106:** segments 240 / 240 · complete 221 · halted 19 · faults 24 · drift 0 · corrupted state files 0 · in-run chain verifications 28/28 ok · supervision receipts 119 (refusals 0, escalations 0) · latest watch event: *supervisor: agent completed*
-- **Watch 10107:** segments 123  · complete 113 · halted 10 · faults 12 · drift 0 · corrupted state files 0 · in-run chain verifications 14/14 ok · supervision receipts 57 (refusals 0, escalations 0) · latest watch event: *supervisor: agent stalled — checkpoint stale, process alive*
+- Not yet reported — not present in lambda list. The cadence catches up; nothing is filled in by assumption.
 
+**Anomalies this cycle:** box b0 unreachable — not present in lambda list; box b1 unreachable — not present in lambda list; box b2 unreachable — not present in lambda list; box b3 unreachable — not present in lambda list
 <!-- STATUS:END -->
 
 ## How to read this board — the language, filed before the first kill
