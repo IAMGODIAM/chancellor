@@ -451,9 +451,7 @@ def _supervise_command(args: list[str]) -> int:
             "--",
             *command,
         ]
-        return Monitor(
-            config, seat, supervisor_argv=recorded, mode="pair"
-        ).run()
+        return Monitor(config, seat, supervisor_argv=recorded, mode="pair").run()
     return Supervisor(config).run()
 
 
