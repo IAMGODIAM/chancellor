@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chancellor"
-version = "1.2.0"
+version = "1.2.1"
 description = "Chancellor — governance for long-running agents on the Meta Model API. Work runs as a durable task graph that survives crashes; a separate judge model grades every consequential output; and spending, sending, publishing, or using credentials stops at a human gate that leaves a signed receipt."
 readme = "README.md"
 requires-python = ">=3.11"
