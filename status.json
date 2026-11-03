@@ -1,5 +1,5 @@
 {
- "polled_at_est": "2026-11-03 05:22 EST",
+ "polled_at_est": "2026-11-03 05:28 EST",
  "label": "IN FLIGHT / UNVERIFIED",
  "boxes": [
   {
@@ -13599,12 +13599,12 @@
      "target": null,
      "checkpoint": {
       "seed": 10107,
-      "segments_done": 108,
-      "steps_done": 1296,
+      "segments_done": 114,
+      "steps_done": 1368,
       "drift_events": 0,
-      "segments_complete": 100,
-      "segments_halted": 8,
-      "faults_injected": 10,
+      "segments_complete": 105,
+      "segments_halted": 9,
+      "faults_injected": 11,
       "verifications": [
        {
         "steps": 108,
@@ -13689,31 +13689,38 @@
         "entries": 96,
         "checkpoints": 12,
         "failures": []
+       },
+       {
+        "steps": 1308,
+        "ok": true,
+        "entries": 105,
+        "checkpoints": 13,
+        "failures": []
        }
       ],
       "corrupted_state_files": 0,
       "started_at": 1793695013.400233,
-      "updated_at": 1793701327.1857963
+      "updated_at": 1793701662.3982797
      },
      "supervision": {
-      "entries": 50,
+      "entries": 53,
       "events": {
        "supervision_started": 1,
        "cadence_advisory": 1,
-       "stall_anomaly": 13,
-       "supervisor_heartbeat": 35
+       "stall_anomaly": 14,
+       "supervisor_heartbeat": 37
       },
       "refusals": 0,
       "escalations": 0,
       "latest_event": {
-       "ts": 1793701026.963132,
+       "ts": 1793701567.245295,
        "event": "stall_anomaly",
        "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive"
       },
-      "last_log_size": 96,
+      "last_log_size": 105,
       "resume_activity_ts": null
      },
-     "entries_present": 104,
+     "entries_present": 110,
      "dialogue": [
       {
        "ts": 1793695013.3296123,
@@ -14364,6 +14371,45 @@
        "ok": null,
        "age_s": 469.2140257358551,
        "log_size": 96
+      },
+      {
+       "ts": 1793701496.2068217,
+       "seq": 50,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 108.98671174049377,
+       "log_size": 105
+      },
+      {
+       "ts": 1793701567.245295,
+       "seq": 51,
+       "event": "stall_anomaly",
+       "action": "supervisor: agent stalled \u2014 checkpoint stale, process alive",
+       "rationale": "The agent process lives but its checkpoint is past the stale threshold: congestion or a hang, not a death. No second copy is started (R2).",
+       "approved": false,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 180.0252583026886,
+       "log_size": 105
+      },
+      {
+       "ts": 1793701676.30229,
+       "seq": 52,
+       "event": "supervisor_heartbeat",
+       "action": "supervisor: supervisor heartbeat",
+       "rationale": "Supervisor alive; agent state as recorded.",
+       "approved": true,
+       "refusal_state": null,
+       "cause": null,
+       "ok": null,
+       "age_s": 289.08225178718567,
+       "log_size": 105
       }
      ]
     }
@@ -14372,18 +14418,18 @@
   }
  ],
  "totals": {
-  "segments_done": 1622,
+  "segments_done": 1628,
   "segments_target": 1440,
-  "segments_complete": 1496,
-  "segments_halted": 126,
-  "faults_injected": 160,
+  "segments_complete": 1501,
+  "segments_halted": 127,
+  "faults_injected": 161,
   "drift_events": 0,
   "refusals": 4,
   "escalations": 4,
   "events": {
    "supervision_started": 15,
    "cadence_advisory": 15,
-   "stall_anomaly": 222,
+   "stall_anomaly": 223,
    "interruption_detected": 47,
    "chain_verification": 41,
    "resume_launched": 39,
@@ -14396,6 +14442,8 @@
   }
  },
  "anomalies": [],
- "notables": [],
+ "notables": [
+  "stall_anomaly +1 (total 223) \u2014 diagnosed cadence background, inside the envelope (RUN-9's DIAGNOSIS-STALL-ANOMALY.md); filed, not paged"
+ ],
  "run_complete": false
 }
