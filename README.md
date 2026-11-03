@@ -7,6 +7,8 @@
 <a href="https://github.com/IAMGODIAM/chancellor/actions"><img src="docs/media/badge-tests.svg" alt="Tests: 273 passing — gates green"></a>
 <a href="#results-measured-oct-29--nov-2-2026"><img src="docs/media/badge-calibration.svg" alt="Calibration: gate not passed — verdicts labeled"></a>
 <a href="https://github.com/IAMGODIAM/chancellor/releases/tag/v1.2.0"><img src="docs/media/badge-release.svg" alt="Release: v1.2.0"></a>
+[![PyPI version](https://img.shields.io/pypi/v/chancellor)](https://pypi.org/project/chancellor/)
+[![PyPI monthly downloads](https://img.shields.io/pypi/dm/chancellor)](https://pypi.org/project/chancellor/)
 
 </div>
 
@@ -90,6 +92,16 @@ Chancellor was not built in one motion. It began with three questions — who gr
 
 *Work is graded. Authority is gated. Every decision leaves a receipt.*
 
+## The machine
+
+<img src="docs/media/engine-plate.png" alt="The Chancellor Engine at full separation: the pull-apart of the harness, its subassemblies bloomed along the receipt chain" width="880">
+
+<img src="docs/media/engine.gif" alt="The governed mesh, alive: light routing along the chain as receipts" width="880">
+
+The harness, drawn as the machine it is: four subassemblies — the Worker, the Grader, the Human Gate, and the Watch — mounted on the receipt chain as the central shaft. The model is not an illustration of the system; it is counted from one: **1,435 parts** in all — 114 authored parts, 1,175 checkpointed entries from a real audit chain, and 146 seals. Press TAMPER and one character in one entry's rationale is flipped; the verification then names the damage exactly — **587 entries downstream of the break, 74 seals invalidated, 588 re-derived** — and the refusal is receipted, not asserted. Through every press, the governed bin stays at zero.
+
+See it move: [the film](https://www.youtube.com/watch?v=z-2BGfKpuKA) — and live, all judging week, [The Long Watch](https://iamgodiam.github.io/chancellor/live.html).
+
 ## What's new in 1.2.0
 
 - **Capability install — the ninth gated act class.** Under frame v2 (`e5.chancellor_frame.v2`, whose clause 6 states that growth is governed), an agent gaining a new capability is a gated act: proposed, checked before it moves, decided at the human gate, receipted, verified live by a reader who did not install it, watched through a probationary window of ten receipted uses, and reversible under receipt — proven in a pre-registered install hearing on file in the repository ([docs/evidence/foundry-install-hearing/](docs/evidence/foundry-install-hearing/)), every receipt verifiable offline. The grades stand as the records print them: the registry bindings are test-grade until the registrar custody act, and the decision chain is consistency-grade under the development signer — labeled on their faces, and labeled here. *Attribution, per evidence:* the measurements below were measured on the v1.1.0 tree; the install hearing ran on v1.2.0.
@@ -132,9 +144,9 @@ chancellor supervise -- <agent command...>
 
 <img src="docs/media/exhibit.gif" alt="The exhibit, animated: the four beats of a governed run — graded work, a halted fault, a human gate, and a receipt chain verified cold" width="880">
 
-*The exhibit in half a minute — real output of `chancellor demo`, typeset from the verified capture. The full hearing, narrated, is the film:*
+*The exhibit in half a minute — real output of `chancellor demo`, typeset from the verified capture. The full hearing is the three-minute narrated film:*
 
-https://github.com/user-attachments/assets/8a0843e8-a226-4218-bcd0-ef50a4110e45
+[![Chancellor — a hearing in three exhibits](docs/media/film-plate.png)](https://www.youtube.com/watch?v=z-2BGfKpuKA)
 
 The demo is the exhibit — `chancellor demo` (Quickstart above) runs the hearing live in the terminal: graded work with a revision, an injected fault halted fail-closed, a human gate the run waits at, and a receipt chain verified cold (with `--tamper`, a quietly altered copy is rejected on screen, the entry named). Its verdict block is byte-identical across clean runs, so the video above is a capture of a fixed target, not a lucky take.
 
@@ -161,6 +173,17 @@ cp .env.example .env   # set META_MODEL_API_BASE_URL and META_MODEL_API_KEY
 With no key configured, `MetaModelClient.chat()` raises `NotConfiguredError` — use `chancellor.api_client.offline_client()` for keyless development. The connection was established and validated on Oct 30, 2026; see [BUILD-LOG.md](BUILD-LOG.md).
 
 ## Layout
+
+```mermaid
+flowchart LR
+    TG[Task graph] --> WK[Worker — muse-spark-1.3]
+    WK --> IN[Instruments — fail-closed]
+    IN --> JG[Judge — muse-wonder-1.0 — grades independently]
+    JG --> HG{Human gate — spend · sends · publishing · irreversible acts}
+    HG --> RC[Receipt chain — hash-chained · Merkle checkpoints]
+    RC --> KP[KEEP supervisor — watches the signed checkpoints]
+    KP -->|verifies before any resume| WK
+```
 
 ```
 src/chancellor/
