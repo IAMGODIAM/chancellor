@@ -13,6 +13,20 @@ a GitHub Release, so its entry is assembled from the README's own
 "What's new in 1.1.0" section. The words are the releases' own in
 every case.*
 
+## [1.2.2] — 2026-11-03
+
+The release-machinery release: **release-sync tooling and the drift watch ship; the product does not change.** No behavior change on any shipped path, no new surface, no second-seat code (that is its own later release). What changes is how releases are made and watched, so the failure that shipped 1.2.0 carrying the previous release's PyPI page (F-CUE-001, found by an outside reader) cannot recur silently.
+
+- **One declaration.** The version lives in exactly one place — `pyproject.toml`, `[project] version`. `chancellor.__version__` derives from it (installed metadata, else the pyproject beside the source tree, else an honest `0.0.0+unknown` sentinel) and is never a typed literal again. The test count is computed from a green suite run's JUnit XML (passing = tests − failures − errors − skipped), never typed.
+- **Generated surfaces, machine-checked.** The README's status line, tests line, badge alts, and current "What's new" heading, plus `CITATION.cff` and both badge SVGs, are generated from the declaration and the computed count by `tools/release_sync.py render` — marker regions in prose files, templates for whole files. `tools/release_surfaces.toml` is the manifest that draws the line between living surfaces and the record; historical text is exempt there by name and is never rewritten.
+- **A fail-closed gate in the publish path.** `publish.yml` runs Gate A on the exact tagged tree before anything builds (tag ↔ declaration, derived surfaces current, changelog head, fresh suite count, the version-literal scan, the dispatch guard) and Gate B on the built wheel and sdist before the upload. A red gate stops the release; there is no override. Manual dispatch is guarded to a tag naming the expected version.
+- **A drift watch on the served side.** A standing loop compares the served PyPI page against the latest release's tag tree daily and speaks only on drift; its loop contract (CONTRACTED under Loop-Contract Spec v0.1) and ledger live with the release machinery. Its first live cycle, run against 1.2.1 after that release, read `in_sync` on every surface.
+- **This changelog exists.** `CHANGELOG.md` was created by the migration (entries for 1.2.1 and earlier assembled from those releases' own words, per the migration note above); from this release on, the gate binds its head entry to the declaration.
+
+The suite stands at **297 passing** — the 287 of 1.2.1 plus the release-sync tool's own 10 — with Ruff format and lint at zero findings and mypy clean, identical commands in pre-commit and CI.
+
+**Calibration posture unchanged:** judge verdicts remain labeled *uncalibrated* under the interim calibration rule, exactly as in 1.2.1. Signatures remain tamper-evidence under the development signer, not non-repudiation, as documented.
+
 ## [1.2.1] — 2026-11-03
 
 Two supervisor correctness fixes. Both were found after 1.2.0 shipped, both are proven by regression tests that ship with them, and the full suite stands at **287 passing** with Ruff and mypy clean.
