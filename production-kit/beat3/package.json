@@ -1,0 +1,2 @@
+{ "name": "bakeoff-b-beat3", "private": true, "type": "module",
+  "scripts": { "render": "npx --yes hyperframes@0.8.45 render" } }

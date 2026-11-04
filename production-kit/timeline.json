@@ -1,0 +1,1517 @@
+{
+ "fps": 24,
+ "total_duration": 39.5,
+ "film_start": 4.5,
+ "film_frames": 720,
+ "film_fps": 24,
+ "viewport": {
+  "x": 192,
+  "y": 132,
+  "w": 1536,
+  "h": 864,
+  "scale": 0.8
+ },
+ "acts": [
+  {
+   "id": "open",
+   "name": "OPEN \u2014 title",
+   "comp": [
+    0.0,
+    4.5
+   ]
+  },
+  {
+   "id": "act1",
+   "name": "ACT I \u2014 THE CYCLE",
+   "film_frames": [
+    1,
+    144
+   ],
+   "comp": [
+    4.5,
+    10.5
+   ]
+  },
+  {
+   "id": "act2",
+   "name": "ACT II \u2014 THE PULL-APART",
+   "film_frames": [
+    145,
+    480
+   ],
+   "comp": [
+    10.5,
+    24.5
+   ]
+  },
+  {
+   "id": "act3",
+   "name": "ACT III \u2014 THE HOLD",
+   "film_frames": [
+    481,
+    552
+   ],
+   "comp": [
+    24.5,
+    27.5
+   ]
+  },
+  {
+   "id": "act4",
+   "name": "ACT IV \u2014 THE RESET",
+   "film_frames": [
+    553,
+    720
+   ],
+   "comp": [
+    27.5,
+    34.49999999999999
+   ]
+  },
+  {
+   "id": "close",
+   "name": "CLOSE \u2014 the kept desk",
+   "comp": [
+    34.49999999999999,
+    39.5
+   ]
+  }
+ ],
+ "steps_out": [
+  {
+   "step": 1,
+   "tier": 0,
+   "group": "A",
+   "part": "Base plinth",
+   "qty": 1,
+   "film_frame": 165.0,
+   "comp_time": 11.3333
+  },
+  {
+   "step": 2,
+   "tier": 0,
+   "group": "A",
+   "part": "Corner post",
+   "qty": 4,
+   "film_frame": 205.0,
+   "comp_time": 13.0
+  },
+  {
+   "step": 3,
+   "tier": 0,
+   "group": "A",
+   "part": "Long side rail",
+   "qty": 2,
+   "film_frame": 245.0,
+   "comp_time": 14.6667
+  },
+  {
+   "step": 4,
+   "tier": 0,
+   "group": "A",
+   "part": "End rail",
+   "qty": 2,
+   "film_frame": 285.0,
+   "comp_time": 16.3333
+  },
+  {
+   "step": 5,
+   "tier": 0,
+   "group": "A",
+   "part": "Plinth foot",
+   "qty": 4,
+   "film_frame": 325.0,
+   "comp_time": 18.0
+  },
+  {
+   "step": 6,
+   "tier": 0,
+   "group": "A",
+   "part": "Deck plate",
+   "qty": 1,
+   "film_frame": 365.0,
+   "comp_time": 19.6667
+  },
+  {
+   "step": 7,
+   "tier": 1,
+   "group": "B",
+   "part": "Front panel (keyway aperture)",
+   "qty": 1,
+   "film_frame": 217.0,
+   "comp_time": 13.5
+  },
+  {
+   "step": 8,
+   "tier": 1,
+   "group": "B",
+   "part": "Rear panel",
+   "qty": 1,
+   "film_frame": 265.0,
+   "comp_time": 15.5
+  },
+  {
+   "step": 9,
+   "tier": 1,
+   "group": "B",
+   "part": "Intake end panel",
+   "qty": 1,
+   "film_frame": 313.0,
+   "comp_time": 17.5
+  },
+  {
+   "step": 10,
+   "tier": 1,
+   "group": "B",
+   "part": "Press end panel",
+   "qty": 1,
+   "film_frame": 361.0,
+   "comp_time": 19.5
+  },
+  {
+   "step": 11,
+   "tier": 1,
+   "group": "B",
+   "part": "Deck hatch plate",
+   "qty": 3,
+   "film_frame": 409.0,
+   "comp_time": 21.5
+  },
+  {
+   "step": 12,
+   "tier": 2,
+   "group": "C",
+   "part": "Intake tray",
+   "qty": 1,
+   "film_frame": 243.13,
+   "comp_time": 14.5889
+  },
+  {
+   "step": 13,
+   "tier": 2,
+   "group": "C",
+   "part": "Tray cheek",
+   "qty": 2,
+   "film_frame": 247.4,
+   "comp_time": 14.7667
+  },
+  {
+   "step": 14,
+   "tier": 2,
+   "group": "C",
+   "part": "Feed roller",
+   "qty": 3,
+   "film_frame": 251.67,
+   "comp_time": 14.9446
+  },
+  {
+   "step": 15,
+   "tier": 2,
+   "group": "C",
+   "part": "Feed roller shaft",
+   "qty": 3,
+   "film_frame": 255.94,
+   "comp_time": 15.1224
+  },
+  {
+   "step": 16,
+   "tier": 2,
+   "group": "C",
+   "part": "Feed drive gear",
+   "qty": 1,
+   "film_frame": 260.21,
+   "comp_time": 15.3002
+  },
+  {
+   "step": 17,
+   "tier": 2,
+   "group": "C",
+   "part": "Feed idler gear",
+   "qty": 2,
+   "film_frame": 264.47,
+   "comp_time": 15.4781
+  },
+  {
+   "step": 18,
+   "tier": 2,
+   "group": "C",
+   "part": "Intake guide rail",
+   "qty": 2,
+   "film_frame": 268.74,
+   "comp_time": 15.6559
+  },
+  {
+   "step": 19,
+   "tier": 2,
+   "group": "D",
+   "part": "Dial cluster housing",
+   "qty": 1,
+   "film_frame": 273.01,
+   "comp_time": 15.8337
+  },
+  {
+   "step": 20,
+   "tier": 2,
+   "group": "D",
+   "part": "Grading dial",
+   "qty": 3,
+   "film_frame": 277.28,
+   "comp_time": 16.0115
+  },
+  {
+   "step": 21,
+   "tier": 2,
+   "group": "D",
+   "part": "Dial needle",
+   "qty": 3,
+   "film_frame": 281.54,
+   "comp_time": 16.1894
+  },
+  {
+   "step": 22,
+   "tier": 2,
+   "group": "D",
+   "part": "Dial bezel",
+   "qty": 3,
+   "film_frame": 285.81,
+   "comp_time": 16.3672
+  },
+  {
+   "step": 23,
+   "tier": 2,
+   "group": "E",
+   "part": "Gate key (the great key)",
+   "qty": 1,
+   "film_frame": 290.08,
+   "comp_time": 16.545
+  },
+  {
+   "step": 24,
+   "tier": 2,
+   "group": "E",
+   "part": "Keyway escutcheon",
+   "qty": 1,
+   "film_frame": 294.35,
+   "comp_time": 16.7228
+  },
+  {
+   "step": 25,
+   "tier": 2,
+   "group": "E",
+   "part": "Gate barrel",
+   "qty": 1,
+   "film_frame": 298.62,
+   "comp_time": 16.9007
+  },
+  {
+   "step": 26,
+   "tier": 2,
+   "group": "E",
+   "part": "Gate cam disc",
+   "qty": 1,
+   "film_frame": 302.88,
+   "comp_time": 17.0785
+  },
+  {
+   "step": 27,
+   "tier": 2,
+   "group": "E",
+   "part": "Approval lever",
+   "qty": 1,
+   "film_frame": 307.15,
+   "comp_time": 17.2563
+  },
+  {
+   "step": 28,
+   "tier": 2,
+   "group": "E",
+   "part": "Interlock bolt",
+   "qty": 1,
+   "film_frame": 311.42,
+   "comp_time": 17.4342
+  },
+  {
+   "step": 29,
+   "tier": 2,
+   "group": "F",
+   "part": "Press column",
+   "qty": 1,
+   "film_frame": 315.69,
+   "comp_time": 17.612
+  },
+  {
+   "step": 30,
+   "tier": 2,
+   "group": "F",
+   "part": "Press pivot bracket",
+   "qty": 1,
+   "film_frame": 319.96,
+   "comp_time": 17.7898
+  },
+  {
+   "step": 31,
+   "tier": 2,
+   "group": "F",
+   "part": "Press arm",
+   "qty": 1,
+   "film_frame": 324.22,
+   "comp_time": 17.9676
+  },
+  {
+   "step": 32,
+   "tier": 2,
+   "group": "F",
+   "part": "Press head housing",
+   "qty": 1,
+   "film_frame": 328.49,
+   "comp_time": 18.1455
+  },
+  {
+   "step": 33,
+   "tier": 2,
+   "group": "F",
+   "part": "Ram",
+   "qty": 1,
+   "film_frame": 332.76,
+   "comp_time": 18.3233
+  },
+  {
+   "step": 34,
+   "tier": 2,
+   "group": "F",
+   "part": "Die chuck",
+   "qty": 1,
+   "film_frame": 337.03,
+   "comp_time": 18.5011
+  },
+  {
+   "step": 35,
+   "tier": 2,
+   "group": "F",
+   "part": "Die body",
+   "qty": 1,
+   "film_frame": 341.29,
+   "comp_time": 18.6789
+  },
+  {
+   "step": 36,
+   "tier": 2,
+   "group": "F",
+   "part": "Press drive gear",
+   "qty": 1,
+   "film_frame": 345.56,
+   "comp_time": 18.8568
+  },
+  {
+   "step": 37,
+   "tier": 2,
+   "group": "F",
+   "part": "Actuator spring pack",
+   "qty": 1,
+   "film_frame": 349.83,
+   "comp_time": 19.0346
+  },
+  {
+   "step": 38,
+   "tier": 2,
+   "group": "G",
+   "part": "Platen pedestal",
+   "qty": 1,
+   "film_frame": 354.1,
+   "comp_time": 19.2124
+  },
+  {
+   "step": 39,
+   "tier": 2,
+   "group": "G",
+   "part": "Platen bearing",
+   "qty": 1,
+   "film_frame": 358.37,
+   "comp_time": 19.3903
+  },
+  {
+   "step": 40,
+   "tier": 2,
+   "group": "G",
+   "part": "Platen radiant ring",
+   "qty": 1,
+   "film_frame": 362.63,
+   "comp_time": 19.5681
+  },
+  {
+   "step": 41,
+   "tier": 2,
+   "group": "G",
+   "part": "Platen disc",
+   "qty": 1,
+   "film_frame": 366.9,
+   "comp_time": 19.7459
+  },
+  {
+   "step": 42,
+   "tier": 2,
+   "group": "G",
+   "part": "Plate magazine",
+   "qty": 1,
+   "film_frame": 371.17,
+   "comp_time": 19.9237
+  },
+  {
+   "step": 43,
+   "tier": 2,
+   "group": "G",
+   "part": "Plate feed shuttle",
+   "qty": 1,
+   "film_frame": 375.44,
+   "comp_time": 20.1016
+  },
+  {
+   "step": 44,
+   "tier": 2,
+   "group": "G",
+   "part": "Link closer",
+   "qty": 1,
+   "film_frame": 379.71,
+   "comp_time": 20.2794
+  },
+  {
+   "step": 45,
+   "tier": 2,
+   "group": "H",
+   "part": "Chain channel cover",
+   "qty": 1,
+   "film_frame": 383.97,
+   "comp_time": 20.4572
+  },
+  {
+   "step": 46,
+   "tier": 2,
+   "group": "H",
+   "part": "Chain exit guide",
+   "qty": 1,
+   "film_frame": 388.24,
+   "comp_time": 20.635
+  },
+  {
+   "step": 47,
+   "tier": 2,
+   "group": "H",
+   "part": "Metering roller",
+   "qty": 2,
+   "film_frame": 392.51,
+   "comp_time": 20.8129
+  },
+  {
+   "step": 48,
+   "tier": 2,
+   "group": "H",
+   "part": "Reel drum",
+   "qty": 1,
+   "film_frame": 396.78,
+   "comp_time": 20.9907
+  },
+  {
+   "step": 49,
+   "tier": 2,
+   "group": "H",
+   "part": "Reel flange",
+   "qty": 2,
+   "film_frame": 401.04,
+   "comp_time": 21.1685
+  },
+  {
+   "step": 50,
+   "tier": 2,
+   "group": "H",
+   "part": "Reel axle",
+   "qty": 1,
+   "film_frame": 405.31,
+   "comp_time": 21.3464
+  },
+  {
+   "step": 51,
+   "tier": 2,
+   "group": "H",
+   "part": "Reel stand upright",
+   "qty": 2,
+   "film_frame": 409.58,
+   "comp_time": 21.5242
+  },
+  {
+   "step": 52,
+   "tier": 2,
+   "group": "H",
+   "part": "Reel drive sprocket",
+   "qty": 1,
+   "film_frame": 413.85,
+   "comp_time": 21.702
+  },
+  {
+   "step": 53,
+   "tier": 2,
+   "group": "H",
+   "part": "Reel pawl",
+   "qty": 1,
+   "film_frame": 418.12,
+   "comp_time": 21.8798
+  },
+  {
+   "step": 54,
+   "tier": 2,
+   "group": "I",
+   "part": "Turret base ring",
+   "qty": 1,
+   "film_frame": 422.38,
+   "comp_time": 22.0577
+  },
+  {
+   "step": 55,
+   "tier": 2,
+   "group": "I",
+   "part": "Turret drum",
+   "qty": 1,
+   "film_frame": 426.65,
+   "comp_time": 22.2355
+  },
+  {
+   "step": 56,
+   "tier": 2,
+   "group": "I",
+   "part": "Governor shaft",
+   "qty": 1,
+   "film_frame": 430.92,
+   "comp_time": 22.4133
+  },
+  {
+   "step": 57,
+   "tier": 2,
+   "group": "I",
+   "part": "Governor flyweight",
+   "qty": 2,
+   "film_frame": 435.19,
+   "comp_time": 22.5911
+  },
+  {
+   "step": 58,
+   "tier": 2,
+   "group": "I",
+   "part": "Watch escapement gear",
+   "qty": 1,
+   "film_frame": 439.46,
+   "comp_time": 22.769
+  },
+  {
+   "step": 59,
+   "tier": 2,
+   "group": "I",
+   "part": "Rule-lamp",
+   "qty": 11,
+   "film_frame": 443.72,
+   "comp_time": 22.9468
+  },
+  {
+   "step": 60,
+   "tier": 2,
+   "group": "I",
+   "part": "Lamp socket",
+   "qty": 11,
+   "film_frame": 447.99,
+   "comp_time": 23.1246
+  },
+  {
+   "step": 61,
+   "tier": 2,
+   "group": "I",
+   "part": "Turret cap",
+   "qty": 1,
+   "film_frame": 452.26,
+   "comp_time": 23.3025
+  },
+  {
+   "step": 62,
+   "tier": 2,
+   "group": "L",
+   "part": "Energy source pack",
+   "qty": 1,
+   "film_frame": 456.53,
+   "comp_time": 23.4803
+  },
+  {
+   "step": 63,
+   "tier": 2,
+   "group": "L",
+   "part": "Main bus bar",
+   "qty": 2,
+   "film_frame": 460.79,
+   "comp_time": 23.6581
+  },
+  {
+   "step": 64,
+   "tier": 2,
+   "group": "L",
+   "part": "Bus branch feeder",
+   "qty": 4,
+   "film_frame": 465.06,
+   "comp_time": 23.8359
+  },
+  {
+   "step": 65,
+   "tier": 2,
+   "group": "L",
+   "part": "Feed inlet",
+   "qty": 1,
+   "film_frame": 469.33,
+   "comp_time": 24.0138
+  },
+  {
+   "step": 66,
+   "tier": 2,
+   "group": "L",
+   "part": "Bus standoff insulator",
+   "qty": 8,
+   "film_frame": 473.6,
+   "comp_time": 24.1916
+  },
+  {
+   "step": 67,
+   "tier": 2,
+   "group": "L",
+   "part": "Master cut-off link",
+   "qty": 1,
+   "film_frame": 477.87,
+   "comp_time": 24.3694
+  },
+  {
+   "step": 68,
+   "tier": 3,
+   "group": "B",
+   "part": "Panel bolt",
+   "qty": 88,
+   "film_frame": 302.64,
+   "comp_time": 17.0685
+  },
+  {
+   "step": 69,
+   "tier": 3,
+   "group": "D",
+   "part": "Rubric finger",
+   "qty": 5,
+   "film_frame": 329.93,
+   "comp_time": 18.2054
+  },
+  {
+   "step": 70,
+   "tier": 3,
+   "group": "D",
+   "part": "Finger rack bar",
+   "qty": 1,
+   "film_frame": 357.21,
+   "comp_time": 19.3423
+  },
+  {
+   "step": 71,
+   "tier": 3,
+   "group": "E",
+   "part": "Lever pivot pin",
+   "qty": 1,
+   "film_frame": 384.5,
+   "comp_time": 20.4792
+  },
+  {
+   "step": 72,
+   "tier": 3,
+   "group": "E",
+   "part": "Interlock linkage rod",
+   "qty": 1,
+   "film_frame": 411.79,
+   "comp_time": 21.6161
+  },
+  {
+   "step": 73,
+   "tier": 3,
+   "group": "E",
+   "part": "Gate return spring",
+   "qty": 1,
+   "film_frame": 439.07,
+   "comp_time": 22.753
+  },
+  {
+   "step": 74,
+   "tier": 3,
+   "group": "F",
+   "part": "Toggle link",
+   "qty": 2,
+   "film_frame": 466.36,
+   "comp_time": 23.8899
+  },
+  {
+   "step": 75,
+   "tier": 4,
+   "group": "J",
+   "part": "N1 node \u2014 die core (ruby)",
+   "qty": 1,
+   "film_frame": 344.15,
+   "comp_time": 18.7979
+  },
+  {
+   "step": 76,
+   "tier": 4,
+   "group": "J",
+   "part": "N2 node \u2014 platen heart (sapphire)",
+   "qty": 1,
+   "film_frame": 358.45,
+   "comp_time": 19.3937
+  },
+  {
+   "step": 77,
+   "tier": 4,
+   "group": "J",
+   "part": "N3 node \u2014 grading reader (sapphire)",
+   "qty": 1,
+   "film_frame": 372.75,
+   "comp_time": 19.9896
+  },
+  {
+   "step": 78,
+   "tier": 4,
+   "group": "J",
+   "part": "N4 node \u2014 gate witness (emerald)",
+   "qty": 1,
+   "film_frame": 387.05,
+   "comp_time": 20.5854
+  },
+  {
+   "step": 79,
+   "tier": 4,
+   "group": "J",
+   "part": "N5 node \u2014 chain counter (emerald)",
+   "qty": 1,
+   "film_frame": 401.35,
+   "comp_time": 21.1813
+  },
+  {
+   "step": 80,
+   "tier": 4,
+   "group": "J",
+   "part": "N6 node \u2014 press load (ruby)",
+   "qty": 1,
+   "film_frame": 415.65,
+   "comp_time": 21.7771
+  },
+  {
+   "step": 81,
+   "tier": 4,
+   "group": "J",
+   "part": "N7 node \u2014 Watch heart (sapphire)",
+   "qty": 1,
+   "film_frame": 429.95,
+   "comp_time": 22.3729
+  },
+  {
+   "step": 82,
+   "tier": 4,
+   "group": "J",
+   "part": "N8 node \u2014 intake presence (emerald)",
+   "qty": 1,
+   "film_frame": 444.25,
+   "comp_time": 22.9688
+  },
+  {
+   "step": 83,
+   "tier": 4,
+   "group": "J",
+   "part": "Node bezel",
+   "qty": 8,
+   "film_frame": 458.55,
+   "comp_time": 23.5646
+  },
+  {
+   "step": 84,
+   "tier": 4,
+   "group": "K",
+   "part": "Tracery run",
+   "qty": 16,
+   "film_frame": 472.85,
+   "comp_time": 24.1604
+  },
+  {
+   "step": 85,
+   "tier": 5,
+   "group": "F",
+   "part": "Die face insert (star-map face)",
+   "qty": 1,
+   "film_frame": 400.83,
+   "comp_time": 21.1597
+  },
+  {
+   "step": 86,
+   "tier": 5,
+   "group": "H",
+   "part": "Receipt plate",
+   "qty": 124,
+   "film_frame": 432.5,
+   "comp_time": 22.4792
+  },
+  {
+   "step": 87,
+   "tier": 5,
+   "group": "H",
+   "part": "Chain link",
+   "qty": 123,
+   "film_frame": 464.17,
+   "comp_time": 23.7986
+  }
+ ],
+ "steps_home": [
+  {
+   "step": 1,
+   "tier": 0,
+   "group": "A",
+   "film_frame": 718.08,
+   "comp_time": 34.3784
+  },
+  {
+   "step": 2,
+   "tier": 0,
+   "group": "A",
+   "film_frame": 716.16,
+   "comp_time": 34.2984
+  },
+  {
+   "step": 3,
+   "tier": 0,
+   "group": "A",
+   "film_frame": 714.24,
+   "comp_time": 34.2184
+  },
+  {
+   "step": 4,
+   "tier": 0,
+   "group": "A",
+   "film_frame": 712.32,
+   "comp_time": 34.1384
+  },
+  {
+   "step": 5,
+   "tier": 0,
+   "group": "A",
+   "film_frame": 710.4,
+   "comp_time": 34.0584
+  },
+  {
+   "step": 6,
+   "tier": 0,
+   "group": "A",
+   "film_frame": 708.48,
+   "comp_time": 33.9784
+  },
+  {
+   "step": 7,
+   "tier": 1,
+   "group": "B",
+   "film_frame": 706.56,
+   "comp_time": 33.8985
+  },
+  {
+   "step": 8,
+   "tier": 1,
+   "group": "B",
+   "film_frame": 704.64,
+   "comp_time": 33.8185
+  },
+  {
+   "step": 9,
+   "tier": 1,
+   "group": "B",
+   "film_frame": 702.72,
+   "comp_time": 33.7385
+  },
+  {
+   "step": 10,
+   "tier": 1,
+   "group": "B",
+   "film_frame": 700.8,
+   "comp_time": 33.6585
+  },
+  {
+   "step": 11,
+   "tier": 1,
+   "group": "B",
+   "film_frame": 698.89,
+   "comp_time": 33.5785
+  },
+  {
+   "step": 12,
+   "tier": 2,
+   "group": "C",
+   "film_frame": 696.97,
+   "comp_time": 33.4986
+  },
+  {
+   "step": 13,
+   "tier": 2,
+   "group": "C",
+   "film_frame": 695.05,
+   "comp_time": 33.4186
+  },
+  {
+   "step": 14,
+   "tier": 2,
+   "group": "C",
+   "film_frame": 693.13,
+   "comp_time": 33.3386
+  },
+  {
+   "step": 15,
+   "tier": 2,
+   "group": "C",
+   "film_frame": 691.21,
+   "comp_time": 33.2586
+  },
+  {
+   "step": 16,
+   "tier": 2,
+   "group": "C",
+   "film_frame": 689.29,
+   "comp_time": 33.1786
+  },
+  {
+   "step": 17,
+   "tier": 2,
+   "group": "C",
+   "film_frame": 687.37,
+   "comp_time": 33.0987
+  },
+  {
+   "step": 18,
+   "tier": 2,
+   "group": "C",
+   "film_frame": 685.45,
+   "comp_time": 33.0187
+  },
+  {
+   "step": 19,
+   "tier": 2,
+   "group": "D",
+   "film_frame": 683.53,
+   "comp_time": 32.9387
+  },
+  {
+   "step": 20,
+   "tier": 2,
+   "group": "D",
+   "film_frame": 681.61,
+   "comp_time": 32.8587
+  },
+  {
+   "step": 21,
+   "tier": 2,
+   "group": "D",
+   "film_frame": 679.69,
+   "comp_time": 32.7787
+  },
+  {
+   "step": 22,
+   "tier": 2,
+   "group": "D",
+   "film_frame": 677.77,
+   "comp_time": 32.6988
+  },
+  {
+   "step": 23,
+   "tier": 2,
+   "group": "E",
+   "film_frame": 675.85,
+   "comp_time": 32.6188
+  },
+  {
+   "step": 24,
+   "tier": 2,
+   "group": "E",
+   "film_frame": 673.93,
+   "comp_time": 32.5388
+  },
+  {
+   "step": 25,
+   "tier": 2,
+   "group": "E",
+   "film_frame": 672.01,
+   "comp_time": 32.4588
+  },
+  {
+   "step": 26,
+   "tier": 2,
+   "group": "E",
+   "film_frame": 670.09,
+   "comp_time": 32.3788
+  },
+  {
+   "step": 27,
+   "tier": 2,
+   "group": "E",
+   "film_frame": 668.17,
+   "comp_time": 32.2989
+  },
+  {
+   "step": 28,
+   "tier": 2,
+   "group": "E",
+   "film_frame": 666.25,
+   "comp_time": 32.2189
+  },
+  {
+   "step": 29,
+   "tier": 2,
+   "group": "F",
+   "film_frame": 664.33,
+   "comp_time": 32.1389
+  },
+  {
+   "step": 30,
+   "tier": 2,
+   "group": "F",
+   "film_frame": 662.41,
+   "comp_time": 32.0589
+  },
+  {
+   "step": 31,
+   "tier": 2,
+   "group": "F",
+   "film_frame": 660.49,
+   "comp_time": 31.9789
+  },
+  {
+   "step": 32,
+   "tier": 2,
+   "group": "F",
+   "film_frame": 658.57,
+   "comp_time": 31.8989
+  },
+  {
+   "step": 33,
+   "tier": 2,
+   "group": "F",
+   "film_frame": 656.66,
+   "comp_time": 31.819
+  },
+  {
+   "step": 34,
+   "tier": 2,
+   "group": "F",
+   "film_frame": 654.74,
+   "comp_time": 31.739
+  },
+  {
+   "step": 35,
+   "tier": 2,
+   "group": "F",
+   "film_frame": 652.82,
+   "comp_time": 31.659
+  },
+  {
+   "step": 36,
+   "tier": 2,
+   "group": "F",
+   "film_frame": 650.9,
+   "comp_time": 31.579
+  },
+  {
+   "step": 37,
+   "tier": 2,
+   "group": "F",
+   "film_frame": 648.98,
+   "comp_time": 31.499
+  },
+  {
+   "step": 38,
+   "tier": 2,
+   "group": "G",
+   "film_frame": 647.06,
+   "comp_time": 31.4191
+  },
+  {
+   "step": 39,
+   "tier": 2,
+   "group": "G",
+   "film_frame": 645.14,
+   "comp_time": 31.3391
+  },
+  {
+   "step": 40,
+   "tier": 2,
+   "group": "G",
+   "film_frame": 643.22,
+   "comp_time": 31.2591
+  },
+  {
+   "step": 41,
+   "tier": 2,
+   "group": "G",
+   "film_frame": 641.3,
+   "comp_time": 31.1791
+  },
+  {
+   "step": 42,
+   "tier": 2,
+   "group": "G",
+   "film_frame": 639.38,
+   "comp_time": 31.0991
+  },
+  {
+   "step": 43,
+   "tier": 2,
+   "group": "G",
+   "film_frame": 637.46,
+   "comp_time": 31.0192
+  },
+  {
+   "step": 44,
+   "tier": 2,
+   "group": "G",
+   "film_frame": 635.54,
+   "comp_time": 30.9392
+  },
+  {
+   "step": 45,
+   "tier": 2,
+   "group": "H",
+   "film_frame": 633.62,
+   "comp_time": 30.8592
+  },
+  {
+   "step": 46,
+   "tier": 2,
+   "group": "H",
+   "film_frame": 631.7,
+   "comp_time": 30.7792
+  },
+  {
+   "step": 47,
+   "tier": 2,
+   "group": "H",
+   "film_frame": 629.78,
+   "comp_time": 30.6992
+  },
+  {
+   "step": 48,
+   "tier": 2,
+   "group": "H",
+   "film_frame": 627.86,
+   "comp_time": 30.6193
+  },
+  {
+   "step": 49,
+   "tier": 2,
+   "group": "H",
+   "film_frame": 625.94,
+   "comp_time": 30.5393
+  },
+  {
+   "step": 50,
+   "tier": 2,
+   "group": "H",
+   "film_frame": 624.02,
+   "comp_time": 30.4593
+  },
+  {
+   "step": 51,
+   "tier": 2,
+   "group": "H",
+   "film_frame": 622.1,
+   "comp_time": 30.3793
+  },
+  {
+   "step": 52,
+   "tier": 2,
+   "group": "H",
+   "film_frame": 620.18,
+   "comp_time": 30.2993
+  },
+  {
+   "step": 53,
+   "tier": 2,
+   "group": "H",
+   "film_frame": 618.26,
+   "comp_time": 30.2193
+  },
+  {
+   "step": 54,
+   "tier": 2,
+   "group": "I",
+   "film_frame": 616.34,
+   "comp_time": 30.1394
+  },
+  {
+   "step": 55,
+   "tier": 2,
+   "group": "I",
+   "film_frame": 614.43,
+   "comp_time": 30.0594
+  },
+  {
+   "step": 56,
+   "tier": 2,
+   "group": "I",
+   "film_frame": 612.51,
+   "comp_time": 29.9794
+  },
+  {
+   "step": 57,
+   "tier": 2,
+   "group": "I",
+   "film_frame": 610.59,
+   "comp_time": 29.8994
+  },
+  {
+   "step": 58,
+   "tier": 2,
+   "group": "I",
+   "film_frame": 608.67,
+   "comp_time": 29.8194
+  },
+  {
+   "step": 59,
+   "tier": 2,
+   "group": "I",
+   "film_frame": 606.75,
+   "comp_time": 29.7395
+  },
+  {
+   "step": 60,
+   "tier": 2,
+   "group": "I",
+   "film_frame": 604.83,
+   "comp_time": 29.6595
+  },
+  {
+   "step": 61,
+   "tier": 2,
+   "group": "I",
+   "film_frame": 602.91,
+   "comp_time": 29.5795
+  },
+  {
+   "step": 62,
+   "tier": 2,
+   "group": "L",
+   "film_frame": 600.99,
+   "comp_time": 29.4995
+  },
+  {
+   "step": 63,
+   "tier": 2,
+   "group": "L",
+   "film_frame": 599.07,
+   "comp_time": 29.4195
+  },
+  {
+   "step": 64,
+   "tier": 2,
+   "group": "L",
+   "film_frame": 597.15,
+   "comp_time": 29.3396
+  },
+  {
+   "step": 65,
+   "tier": 2,
+   "group": "L",
+   "film_frame": 595.23,
+   "comp_time": 29.2596
+  },
+  {
+   "step": 66,
+   "tier": 2,
+   "group": "L",
+   "film_frame": 593.31,
+   "comp_time": 29.1796
+  },
+  {
+   "step": 67,
+   "tier": 2,
+   "group": "L",
+   "film_frame": 591.39,
+   "comp_time": 29.0996
+  },
+  {
+   "step": 68,
+   "tier": 3,
+   "group": "B",
+   "film_frame": 589.47,
+   "comp_time": 29.0196
+  },
+  {
+   "step": 69,
+   "tier": 3,
+   "group": "D",
+   "film_frame": 587.55,
+   "comp_time": 28.9397
+  },
+  {
+   "step": 70,
+   "tier": 3,
+   "group": "D",
+   "film_frame": 585.63,
+   "comp_time": 28.8597
+  },
+  {
+   "step": 71,
+   "tier": 3,
+   "group": "E",
+   "film_frame": 583.71,
+   "comp_time": 28.7797
+  },
+  {
+   "step": 72,
+   "tier": 3,
+   "group": "E",
+   "film_frame": 581.79,
+   "comp_time": 28.6997
+  },
+  {
+   "step": 73,
+   "tier": 3,
+   "group": "E",
+   "film_frame": 579.87,
+   "comp_time": 28.6197
+  },
+  {
+   "step": 74,
+   "tier": 3,
+   "group": "F",
+   "film_frame": 577.95,
+   "comp_time": 28.5398
+  },
+  {
+   "step": 75,
+   "tier": 4,
+   "group": "J",
+   "film_frame": 576.03,
+   "comp_time": 28.4598
+  },
+  {
+   "step": 76,
+   "tier": 4,
+   "group": "J",
+   "film_frame": 574.11,
+   "comp_time": 28.3798
+  },
+  {
+   "step": 77,
+   "tier": 4,
+   "group": "J",
+   "film_frame": 572.2,
+   "comp_time": 28.2998
+  },
+  {
+   "step": 78,
+   "tier": 4,
+   "group": "J",
+   "film_frame": 570.28,
+   "comp_time": 28.2198
+  },
+  {
+   "step": 79,
+   "tier": 4,
+   "group": "J",
+   "film_frame": 568.36,
+   "comp_time": 28.1398
+  },
+  {
+   "step": 80,
+   "tier": 4,
+   "group": "J",
+   "film_frame": 566.44,
+   "comp_time": 28.0599
+  },
+  {
+   "step": 81,
+   "tier": 4,
+   "group": "J",
+   "film_frame": 564.52,
+   "comp_time": 27.9799
+  },
+  {
+   "step": 82,
+   "tier": 4,
+   "group": "J",
+   "film_frame": 562.6,
+   "comp_time": 27.8999
+  },
+  {
+   "step": 83,
+   "tier": 4,
+   "group": "J",
+   "film_frame": 560.68,
+   "comp_time": 27.8199
+  },
+  {
+   "step": 84,
+   "tier": 4,
+   "group": "K",
+   "film_frame": 558.76,
+   "comp_time": 27.7399
+  },
+  {
+   "step": 85,
+   "tier": 5,
+   "group": "F",
+   "film_frame": 556.84,
+   "comp_time": 27.66
+  },
+  {
+   "step": 86,
+   "tier": 5,
+   "group": "H",
+   "film_frame": 554.92,
+   "comp_time": 27.58
+  },
+  {
+   "step": 87,
+   "tier": 5,
+   "group": "H",
+   "film_frame": 553.0,
+   "comp_time": 27.5
+  }
+ ],
+ "tamper": {
+  "ramp_film_frames": [
+   59,
+   72
+  ],
+  "comp": [
+   6.916666666666666,
+   7.458333333333334
+  ]
+ },
+ "break": {
+  "dim_start": 24.5,
+  "word_at": 24.5,
+  "flash_at": 24.5,
+  "stamps_at": [
+   24.95,
+   25.4,
+   25.85
+  ],
+  "word_out": 26.0,
+  "dim_end": 26.5
+ },
+ "cues": {
+  "tamper_crack_film_frame": 72,
+  "tamper_crack_comp": 7.500000000000001,
+  "hold_thump_comp": 24.5,
+  "seal_strike_comp": 34.459999999999994,
+  "close_card_comp": 34.49999999999999,
+  "seal_ring_comp": 37.5,
+  "fade_out": [
+   39.0,
+   39.5
+  ]
+ },
+ "break_figures": {
+  "altered_plate": 62,
+  "first_failure": 62,
+  "seals_invalidated": 63,
+  "downstream": 62
+ },
+ "census": 504
+}
