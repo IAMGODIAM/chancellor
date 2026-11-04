@@ -62,7 +62,18 @@ MONTHS = [
     "Nov",
     "Dec",
 ]
-SKIP_DIRS = {".git", "dist", "build", "__pycache__", ".venv", "node_modules"}
+# Generated tool state is not a living release surface.
+SKIP_DIRS = {
+    ".git",
+    "dist",
+    "build",
+    "__pycache__",
+    ".venv",
+    "node_modules",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".pytest_cache",
+}
 BINARY_SUFFIXES = {
     ".png",
     ".jpg",
