@@ -62,24 +62,24 @@ through judging week — every decision receipted, every halt published, and the
 that keeps the run alive standing in frame.</div>
 <div class="rule"></div>
 <div class="hero">
-  <div class="n">2,617 <span class="den">/ 11,520</span></div>
+  <div class="n">2,667 <span class="den">/ 11,520</span></div>
   <div class="l">segments done · the run advances one segment a minute</div>
 </div>
 <div class="stats">
-  <div class="stat"><div class="n">31,404</div><div class="l">steps executed</div></div>
-  <div class="stat"><div class="n">261 <span style="font-size:22px;color:var(--gold)">/ 1,152</span></div><div class="l">faults injected so far</div></div>
+  <div class="stat"><div class="n">32,004</div><div class="l">steps executed</div></div>
+  <div class="stat"><div class="n">266 <span style="font-size:22px;color:var(--gold)">/ 1,152</span></div><div class="l">faults injected so far</div></div>
   <div class="stat"><div class="n">0</div><div class="l">drift events</div></div>
-  <div class="stat"><div class="n">2,526</div><div class="l">chain entries under checkpoint</div></div>
+  <div class="stat"><div class="n">2,575</div><div class="l">chain entries under checkpoint</div></div>
 </div>
 <div class="river">
-  <div class="riverbar"><div class="c" style="width:92.05%"></div><div class="h" style="width:7.95%"></div></div>
+  <div class="riverbar"><div class="c" style="width:92.01%"></div><div class="h" style="width:7.99%"></div></div>
   <div class="riverlab">
-    <span class="prov">2,409 segments complete</span>
-    <span class="prov">208 halted — fail-closed, by design</span>
+    <span class="prov">2,454 segments complete</span>
+    <span class="prov">213 halted — fail-closed, by design</span>
   </div>
-  <div class="riverbar" style="margin-top:16px"><div class="c" style="width:22.72%"></div><div class="r" style="width:77.28%"></div></div>
+  <div class="riverbar" style="margin-top:16px"><div class="c" style="width:23.15%"></div><div class="r" style="width:76.85%"></div></div>
   <div class="riverlab">
-    <span class="prov">22.7% of the judging-week run</span>
+    <span class="prov">23.2% of the judging-week run</span>
     <span class="prov">launched 2026-11-01 · runs through finals, 2026-11-09</span>
   </div>
 </div>
@@ -94,7 +94,7 @@ that keeps the run alive standing in frame.</div>
 </svg></div>
     <div class="rn">I</div><h3>Graded Work</h3>
     <div class="what">No agent marks its own homework.</div>
-    <div class="fig">31,404</div>
+    <div class="fig">32,004</div>
     <div class="cap">steps of governed work executed, twelve to a segment — each graded at the gate before it was allowed to count, and each grade receipted in the chain</div>
   </div>
   <div class="col haltcol">
@@ -107,7 +107,7 @@ that keeps the run alive standing in frame.</div>
 </svg></div>
     <div class="rn">II</div><h3>Gated Authority</h3>
     <div class="what">Consequential acts wait at the gate.</div>
-    <div class="fig">208</div>
+    <div class="fig">213</div>
     <div class="cap">segments halted fail-closed, in gold because a halt is the product working: the gate refused work a fault had corrupted, counted the refusal in the open, and the run went on</div>
   </div>
   <div class="col">
@@ -120,8 +120,8 @@ that keeps the run alive standing in frame.</div>
 </svg></div>
     <div class="rn">III</div><h3>Kept Receipts</h3>
     <div class="what">Every decision leaves a receipt you can verify offline.</div>
-    <div class="fig">2,526</div>
-    <div class="cap">audit entries under signed checkpoint in the published snapshot · 314 signed checkpoints · corrupted state files: 0 · verified cold at this refresh with the product's own verifier — the live log holds 2,526 entries; the tail past the newest checkpoint is not yet checkpointed, and the verifier says so rather than guessing</div>
+    <div class="fig">2,575</div>
+    <div class="cap">audit entries under signed checkpoint in the published snapshot · 320 signed checkpoints · corrupted state files: 0 · verified cold at this refresh with the product's own verifier — the live log holds 2,575 entries; the tail past the newest checkpoint is not yet checkpointed, and the verifier says so rather than guessing</div>
   </div>
   <div class="col watch">
     <div class="dev watchring"><svg width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="The watch ring">
@@ -135,7 +135,7 @@ that keeps the run alive standing in frame.</div>
     <div class="rn">IV</div><h3>KEEP — The Watch</h3>
     <div class="what">The supervisor that notices, verifies, and resumes.</div>
     <div class="fig">13 interruptions · 13 resumes</div>
-    <div class="cap">1 deliberate proof kill · 12 supervision losses — every one resumed from the last signed checkpoint, the chain verified across the break · the run's own chain verifications stand 314/314 ok · the newest checkpoint was written 7 minutes before this refresh</div>
+    <div class="cap">1 deliberate proof kill · 12 supervision losses — every one resumed from the last signed checkpoint, the chain verified across the break · the run's own chain verifications stand 320/320 ok · the newest checkpoint was written 31 seconds before this refresh</div>
   </div>
 </div>
 <p class="note">Drift is the one true failure this page exists to make visible — a run claiming
@@ -154,5 +154,5 @@ files, and the snapshot published beside the record lets any reader check every 
     <a href="https://github.com/IAMGODIAM/chancellor/blob/judging-soak/LIVE-SOAK.md">the canonical text record — LIVE-SOAK.md</a> · <a href="https://github.com/IAMGODIAM/chancellor">the repository</a>
   </div>
 </div>
-<div class="foot"><span class="prov">Refreshed hourly from the soak's own state · snapshot cut at the newest signed checkpoint and verified cold before publishing · status as of 2026-11-03 19:47 EST · figures are the soak's published snapshot, labeled as such</span></div>
+<div class="foot"><span class="prov">Refreshed hourly from the soak's own state · snapshot cut at the newest signed checkpoint and verified cold before publishing · status as of 2026-11-03 20:47 EST · figures are the soak's published snapshot, labeled as such</span></div>
 </div></body></html>
