@@ -62,7 +62,18 @@ MONTHS = [
     "Nov",
     "Dec",
 ]
-SKIP_DIRS = {".git", "dist", "build", "__pycache__", ".venv", "node_modules"}
+# Generated tool state is not a living release surface.
+SKIP_DIRS = {
+    ".git",
+    "dist",
+    "build",
+    "__pycache__",
+    ".venv",
+    "node_modules",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".pytest_cache",
+}
 BINARY_SUFFIXES = {
     ".png",
     ".jpg",
@@ -563,7 +574,7 @@ def check_g7(ctx: Ctx) -> Check:
         if not path.is_file():
             continue
         rel = path.relative_to(ctx.root).as_posix()
-        if any(part in SKIP_DIRS for part in path.relative_to(ctx.root).parts):
+        if any(part in SKIP_DIRS for part in path.relative_to(ctx.root).parts[:-1]):
             continue
         if path.suffix.lower() in BINARY_SUFFIXES or rel.endswith(".egg-info"):
             continue
