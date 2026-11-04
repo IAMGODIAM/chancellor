@@ -287,3 +287,14 @@ def test_scan_ignores_tool_caches_but_not_new_source(tmp_path):
     result = rs.check_g7(rs.Ctx(root))
     assert not result.ok
     assert "tools/new_surface.py:1:9.8.7" in result.line()
+
+
+def test_scan_does_not_skip_file_named_like_cache_dir(tmp_path):
+    root = make_tree(tmp_path)
+    for rel, content in rs.render_surfaces(root, 42).items():
+        (root / rel).write_text(content, encoding="utf-8")
+    cache_named_file = root / ".pytest_cache"
+    cache_named_file.write_text('release = "9.8.7"\n', encoding="utf-8")
+    result = rs.check_g7(rs.Ctx(root))
+    assert not result.ok
+    assert ".pytest_cache:1:9.8.7" in result.line()
