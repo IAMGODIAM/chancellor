@@ -9,7 +9,7 @@
 <!-- /release-sync:TESTS-BADGE-ALT -->
 <a href="#results-measured-oct-29--nov-2-2026"><img src="docs/media/badge-calibration.svg" alt="Calibration: gate not passed — verdicts labeled"></a>
 <!-- release-sync:RELEASE-BADGE -->
-<a href="https://github.com/IAMGODIAM/chancellor/releases/tag/v1.2.1"><img src="docs/media/badge-release.svg" alt="Release: v1.2.1"></a>
+<a href="https://github.com/IAMGODIAM/chancellor/releases/tag/v1.2.2"><img src="docs/media/badge-release.svg" alt="Release: v1.2.2"></a>
 <!-- /release-sync:RELEASE-BADGE -->
 [![PyPI version](https://img.shields.io/pypi/v/chancellor)](https://pypi.org/project/chancellor/)
 [![PyPI monthly downloads](https://img.shields.io/pypi/dm/chancellor)](https://pypi.org/project/chancellor/)
@@ -59,7 +59,7 @@ Two eval suites test the claims. **Suite A** asks whether the judge grades remed
 Model names in this repo are exact API model IDs only; one naming correction is recorded in [ERRATA.md](ERRATA.md).
 
 <!-- release-sync:STATUS-LINE -->
-**Status — Nov 3, 2026:** v1.2.1. The offline demo is the guaranteed path and needs no key. The live connection to the Meta Model API was established Oct 30 and the transport is validated — the model list returns and both working models answer. Graded live runs are metered and reported in [BUILD-LOG.md](BUILD-LOG.md). The measured record was re-run at 10x volume (RUN-7, Nov 1–2) and the continuity supervisor is now built into the product — see [What's new in 1.1.0](#whats-new-in-110) and [Results](#results-measured-oct-29--nov-2-2026).
+**Status — Nov 3, 2026:** v1.2.2. The offline demo is the guaranteed path and needs no key. The live connection to the Meta Model API was established Oct 30 and the transport is validated — the model list returns and both working models answer. Graded live runs are metered and reported in [BUILD-LOG.md](BUILD-LOG.md). The measured record was re-run at 10x volume (RUN-7, Nov 1–2) and the continuity supervisor is now built into the product — see [What's new in 1.1.0](#whats-new-in-110) and [Results](#results-measured-oct-29--nov-2-2026).
 <!-- /release-sync:STATUS-LINE -->
 
 ## Results (measured, Oct 29 – Nov 2, 2026)
@@ -113,8 +113,19 @@ See it move: [the film](https://www.youtube.com/watch?v=z-2BGfKpuKA) — and liv
 The interactive machine itself is live on the project page — [explode it, cut it away, press TAMPER](https://muse.ai/s/chancellor-landing-page-ixc6runtx0wxw4/ExzrqSkjrxd3Z-Z4k2JdGi-gBRtvWbcZsqkloYmFXpE).
 
 <!-- release-sync:WHATSNEW-HEADING -->
-## What's new in 1.2.1
+## What's new in 1.2.2
 <!-- /release-sync:WHATSNEW-HEADING -->
+
+The release-machinery release — the product itself does not change: no behavior change on any shipped path, no new surface. What changes is how releases are made and watched, so a release can never again ship carrying the previous release's PyPI page (the F-CUE-001 desync, found by an outside reader):
+
+- **One declaration.** The version lives only in `pyproject.toml`; `chancellor.__version__` derives from it, and the test count is computed from a green suite run's JUnit XML, never typed.
+- **Generated surfaces, checked.** This page's status line, tests line, and badge alts, the badge SVGs, and `CITATION.cff` are generated from the declaration by `tools/release_sync.py` and verified against it; a manifest (`tools/release_surfaces.toml`) draws the line between living surfaces and the record, and historical text is never rewritten.
+- **A fail-closed publish gate.** The publish pipeline re-checks the exact tagged tree before anything builds (Gate A) and the built wheel and sdist before upload (Gate B). A red gate stops the release; there is no override.
+- **A drift watch.** A standing loop compares the served PyPI page against the latest release's tag tree daily and speaks only on drift; its first live cycle, against the previous release, read in sync on every surface.
+
+The suite stands at 297 passing — the previous release's 287 plus the release machinery's own 10 — with Ruff and mypy clean. Judge verdicts remain labeled *uncalibrated*, exactly as in 1.2.1.
+
+## What's new in 1.2.1
 
 Two supervisor correctness fixes. Both were found after 1.2.0 shipped, both are proven by regression tests that ship with them, and the full suite stands at 287 passing with Ruff and mypy clean.
 
