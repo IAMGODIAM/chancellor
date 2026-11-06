@@ -13,6 +13,20 @@ a GitHub Release, so its entry is assembled from the README's own
 "What's new in 1.1.0" section. The words are the releases' own in
 every case.*
 
+## [1.2.3] — 2026-11-05
+
+The rectification release: **the 1.2.2 source distribution shipped its test suite without files the suite requires, so the suite could not run from the downloaded artifact at all. 1.2.3 makes the source artifact self-testing.** No product behavior changes on any shipped path, and the hackathon submission is untouched — the portal record stands on 1.2.2 exactly as submitted. This release corrects the public download, not the entry.
+
+- **What was wrong.** The 1.2.2 sdist included `tests/` but omitted `tools/` in full — the tree shipped no `MANIFEST.in`, so setuptools' default file list decided — and also omitted `docs/governance-frame.md`, the `docs/evidence/` tree, and the fixture `tests/fixtures/installs/eight-class-golden.jsonl`. Each of those is read by tests that did ship: the release-sync test loads the tooling by path and copies the whole `tools/` tree; the frame-receipts and installs tests read the frame document, the filed evidence, and the fixture. Run from the unpacked artifact, the suite died at collection (`FileNotFoundError: tools/release_sync.py`) and not one test could run. The defect was found by running the shipped suite from the published artifact itself (the full-product test on a clean machine) and confirmed against the tarball PyPI serves.
+- **The cure — the measured set, nothing more.** A new `MANIFEST.in` ships exactly the files the shipped tests read — `tools/`, `docs/evidence/`, `docs/governance-frame.md`, and the one fixture — with the reason written into the file. The rest of `docs/`, which no shipped test reads, stays out. Verified before publication from the artifact itself: the sdist built from this tree, unpacked into a clean directory, runs its own shipped suite end to end.
+- **The exhibit names its seal.** The headless demo's audit log verifies only with its signed-checkpoint sidecar beside it; lifted alone it reads NOT VERIFIED, and the exhibit — which presents the log as the book — named only a state directory, not the second file. Beat 4 now prints where the seal lives and that the log alone reads NOT VERIFIED (no_checkpoint). The demo already sealed its book at every size; only the label was missing. No behavior change.
+- **The version test measures its own precondition.** The leg that asserts the version fallback requires an environment with no chancellor distribution installed; where one is installed, the leg now skips and names the version it found, instead of failing on an environment it does not control. In an uninstalled environment the original probe and assertion run unchanged.
+- **Release-machinery hardening.** The version-literal gate's exemptions are now scoped to the exact span each exemption matches rather than the whole line, so an unrelated literal sharing a line with an exempt tool version can no longer pass unclassified. Three production-kit literals are classified as what they are — tool versions (the film renderer, the animation library) — not product versions; no literal was edited to make a check pass.
+
+The suite stands at **297 passing** — the same 297 as 1.2.2, now runnable from the source artifact itself — with Ruff format and lint at zero findings and mypy clean.
+
+**Calibration posture unchanged:** judge verdicts remain labeled *uncalibrated* under the interim calibration rule, exactly as in 1.2.2. Signatures remain tamper-evidence under the development signer, not non-repudiation, as documented.
+
 ## [1.2.2] — 2026-11-03
 
 The release-machinery release: **release-sync tooling and the drift watch ship; the product does not change.** No behavior change on any shipped path, no new surface, no second-seat code (that is its own later release). What changes is how releases are made and watched, so the failure that shipped 1.2.0 carrying the previous release's PyPI page (F-CUE-001, found by an outside reader) cannot recur silently.

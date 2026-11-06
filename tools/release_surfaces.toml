@@ -144,3 +144,18 @@ reason = "changelog prose — the release's own human words (SPEC 5)"
 path = "README.md"
 regex = "measured on the v[0-9]+\\.[0-9]+\\.[0-9]+ tree; the install hearing ran on v[0-9]+\\.[0-9]+\\.[0-9]+"
 reason = "evidence attribution (SPEC 5): names the trees the measurements were taken on; rewriting it would falsify the record"
+
+[[exempt_patterns]]
+path = "production-kit/README.md"
+regex = "HyperFrames 0\\.8\\.45"
+reason = "the HyperFrames renderer version named in the production record — a tooling version, not the product version (G-5, classified 2026-11-05)"
+
+[[exempt_patterns]]
+path = "production-kit/beat3/package.json"
+regex = "hyperframes@0\\.8\\.45"
+reason = "pinned HyperFrames tool version in the beat-3 render script — not the product version (G-5, classified 2026-11-05)"
+
+[[exempt_patterns]]
+path = "production-kit/beat3/index.html"
+regex = "gsap@3\\.14\\.2"
+reason = "the GSAP library version in the composition's CDN script tag — a tooling version, not the product version (G-5, classified 2026-11-05)"

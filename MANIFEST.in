@@ -1,0 +1,10 @@
+# The sdist ships tests/ by default; the distributed tree must be
+# self-consistent — every file the shipped tests read must ship.
+# tests/test_release_sync.py loads the release tooling by path and copies
+# the whole tools/ tree into its synthetic roots; tests/test_frame_receipts.py
+# and tests/test_installs.py read the frame document and the filed evidence
+# runs under docs/. Ship exactly those trees. (G-4)
+graft tools
+graft docs/evidence
+include docs/governance-frame.md
+include tests/fixtures/installs/eight-class-golden.jsonl

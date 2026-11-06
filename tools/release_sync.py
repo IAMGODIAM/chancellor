@@ -552,11 +552,20 @@ def check_g7(ctx: Ctx) -> Check:
                 return True
         return False
 
-    def pattern_exempt(rel: str, line: str) -> bool:
-        return any(
-            e.get("path") == rel and re.search(e["regex"], line)
-            for e in exempt_patterns
-        )
+    def exempt_spans(rel: str, line: str) -> list[tuple[int, int]]:
+        # Match-scoped exemptions (R-1): an exempt pattern covers only
+        # the span its regex actually matches on the line — the literal
+        # it names — never the whole line. The previous line-granular
+        # form whitewashed every version literal that happened to share
+        # a line with an exempt one.
+        spans: list[tuple[int, int]] = []
+        for e in exempt_patterns:
+            if e.get("path") == rel:
+                spans.extend(m.span() for m in re.finditer(e["regex"], line))
+        return spans
+
+    def literal_exempt(spans: list[tuple[int, int]], start: int, end: int) -> bool:
+        return any(s <= start and end <= e for s, e in spans)
 
     offenders: list[str] = []
     for path in sorted(ctx.root.rglob("*")):
@@ -578,6 +587,7 @@ def check_g7(ctx: Ctx) -> Check:
             continue
         region_lines = _region_lines(text) if rel == "README.md" else set()
         for lineno, line in enumerate(text.splitlines(), start=1):
+            spans: list[tuple[int, int]] | None = None
             for m in VERSION_RE.finditer(line):
                 value = m.group(0)
                 bare = value[1:] if value.startswith("v") else value
@@ -593,7 +603,9 @@ def check_g7(ctx: Ctx) -> Check:
                     continue  # whole-file generated surface; G2/G3 bind it
                 if lineno in region_lines:
                     continue
-                if pattern_exempt(rel, line):
+                if spans is None:
+                    spans = exempt_spans(rel, line)
+                if literal_exempt(spans, m.start(), m.end()):
                     continue
                 offenders.append(f"{rel}:{lineno}:{value}")
     if offenders:
