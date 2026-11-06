@@ -9,7 +9,7 @@
 <!-- /release-sync:TESTS-BADGE-ALT -->
 <a href="#results-measured-oct-29--nov-2-2026"><img src="docs/media/badge-calibration.svg" alt="Calibration: gate not passed — verdicts labeled"></a>
 <!-- release-sync:RELEASE-BADGE -->
-<a href="https://github.com/IAMGODIAM/chancellor/releases/tag/v1.2.2"><img src="docs/media/badge-release.svg" alt="Release: v1.2.2"></a>
+<a href="https://github.com/IAMGODIAM/chancellor/releases/tag/v1.2.3"><img src="docs/media/badge-release.svg" alt="Release: v1.2.3"></a>
 <!-- /release-sync:RELEASE-BADGE -->
 [![PyPI version](https://img.shields.io/pypi/v/chancellor)](https://pypi.org/project/chancellor/)
 [![PyPI monthly downloads](https://img.shields.io/pypi/dm/chancellor)](https://pypi.org/project/chancellor/)
@@ -59,7 +59,7 @@ Two eval suites test the claims. **Suite A** asks whether the judge grades remed
 Model names in this repo are exact API model IDs only; one naming correction is recorded in [ERRATA.md](ERRATA.md).
 
 <!-- release-sync:STATUS-LINE -->
-**Status — Nov 3, 2026:** v1.2.2. The offline demo is the guaranteed path and needs no key. The live connection to the Meta Model API was established Oct 30 and the transport is validated — the model list returns and both working models answer. Graded live runs are metered and reported in [BUILD-LOG.md](BUILD-LOG.md). The measured record was re-run at 10x volume (RUN-7, Nov 1–2) and the continuity supervisor is now built into the product — see [What's new in 1.1.0](#whats-new-in-110) and [Results](#results-measured-oct-29--nov-2-2026).
+**Status — Nov 5, 2026:** v1.2.3. The offline demo is the guaranteed path and needs no key. The live connection to the Meta Model API was established Oct 30 and the transport is validated — the model list returns and both working models answer. Graded live runs are metered and reported in [BUILD-LOG.md](BUILD-LOG.md). The measured record was re-run at 10x volume (RUN-7, Nov 1–2) and the continuity supervisor is now built into the product — see [What's new in 1.1.0](#whats-new-in-110) and [Results](#results-measured-oct-29--nov-2-2026).
 <!-- /release-sync:STATUS-LINE -->
 
 ## Results (measured, Oct 29 – Nov 2, 2026)
@@ -113,8 +113,19 @@ See it move: [the film](https://www.youtube.com/watch?v=z-2BGfKpuKA) — and liv
 The interactive machine itself is live on the project page — [explode it, cut it away, press TAMPER](https://muse.ai/s/chancellor-landing-page-ixc6runtx0wxw4/ExzrqSkjrxd3Z-Z4k2JdGi-gBRtvWbcZsqkloYmFXpE).
 
 <!-- release-sync:WHATSNEW-HEADING -->
-## What's new in 1.2.2
+## What's new in 1.2.3
 <!-- /release-sync:WHATSNEW-HEADING -->
+
+The rectification release — the product itself does not change: no behavior change on any shipped path, no new surface. What changes is the source distribution the public was directed to download:
+
+- **The previous source artifact could not run its own tests.** It shipped the test suite without the tooling tree the suite loads by path, without the frame document and evidence tree that shipped tests read, and without one test fixture — the suite died at collection, before a single test could run. The defect was found by running the shipped suite from the published artifact itself, on a clean machine.
+- **The artifact is now self-testing.** A packaging manifest ships exactly the measured set the shipped tests read — the tooling tree, the evidence tree, the frame document, the fixture — and nothing more; the rest of the docs, which no shipped test reads, stays out. The suite now runs end to end from the unpacked source distribution.
+- **The exhibit names its seal.** The demo's audit log verifies only with its checkpoint sidecar beside it; the exhibit now prints where the seal lives and that the log alone reads NOT VERIFIED. The version test, in turn, skips with its reason named when the uninstalled environment it requires cannot hold, and runs in full where it can.
+- **The submission is untouched.** The hackathon entry stands on the previous release exactly as submitted; this release corrects the download, not the entry.
+
+The suite stands at 297 passing — the same count as the previous release, now reachable from the source artifact itself — with Ruff and mypy clean. Judge verdicts remain labeled *uncalibrated*, exactly as in 1.2.2.
+
+## What's new in 1.2.2
 
 The release-machinery release — the product itself does not change: no behavior change on any shipped path, no new surface. What changes is how releases are made and watched, so a release can never again ship carrying the previous release's PyPI page (the F-CUE-001 desync, found by an outside reader):
 

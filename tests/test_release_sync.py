@@ -14,6 +14,8 @@ import sys
 import textwrap
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).resolve().parents[1]
 
 
@@ -248,6 +250,34 @@ def test_gate_b_dist_binds_to_root(tmp_path):
 
 def test_version_derivation_uninstalled(tmp_path):
     """SPEC 2.2 leg 2: no dist-info on the path -> pyproject fallback."""
+    env = {"PYTHONPATH": str(REPO / "src"), "PATH": "/usr/bin:/bin"}
+    # Leg 2's precondition is an environment with NO chancellor dist-info
+    # visible. Measure the probe environment itself (same interpreter, same
+    # scrubbed env the probe will run under): where a dist-info is present —
+    # the package installed in the interpreter's site, a user-site install,
+    # an egg-info on the source path — the fallback path cannot be exercised,
+    # so skip with the reason instead of failing on an environment this test
+    # does not control. (G-6)
+    precheck = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import importlib.metadata as m\n"
+            "try:\n"
+            "    print(m.version('chancellor'))\n"
+            "except m.PackageNotFoundError:\n"
+            "    print('')\n",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    found = precheck.stdout.strip()
+    if found:
+        pytest.skip(
+            f"chancellor dist-info present (version {found}): "
+            "leg 2 requires an uninstalled environment"
+        )
     probe = textwrap.dedent(
         """\
         import importlib.metadata
@@ -263,7 +293,6 @@ def test_version_derivation_uninstalled(tmp_path):
     )
     script = tmp_path / "probe.py"
     script.write_text(probe, encoding="utf-8")
-    env = {"PYTHONPATH": str(REPO / "src"), "PATH": "/usr/bin:/bin"}
     proc = subprocess.run(
         [sys.executable, str(script)], capture_output=True, text=True, env=env
     )

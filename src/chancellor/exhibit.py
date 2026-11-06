@@ -486,6 +486,11 @@ def run_exhibit(
     )
     book_verdict = "VERIFIED" if result.ok else "FAILED — " + "; ".join(result.failures)
     emit(f"  verdict of the book: {book_verdict}")
+    emit(
+        f"  the seal lives in the sidecar: {audit.checkpoint_path} — "
+        f"the log verifies only with it beside {audit.path}; "
+        "lifted alone, the book reads NOT VERIFIED (no_checkpoint)"
+    )
     receipt_ok = result.ok and result.chained_entries == entries
 
     tamper_ok = True
