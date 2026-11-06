@@ -11,14 +11,21 @@ Protocol per the proven house flow (backlink-work/justiceforkohen/deploy.py):
 Usage: deploy_pages.py PROJECT served_path=local_file [served_path=local_file ...]
 The JWT is kept in memory only, never printed or persisted.
 """
-import base64, hashlib, json, mimetypes, os, sys, time, urllib.request
+
+import base64
+import hashlib
+import json
+import mimetypes
+import os
+import sys
+import time
+import urllib.request
 
 sys.path.insert(0, "/opt/muse/skills/custom-connector-setup/bin")
 sys.path.insert(0, "/opt/hatch/workflow-skills/custom-connector-setup/bin")
 sys.path.insert(0, "/opt/hatch/skills/skill-creator/bin")
-from dynamic_credentials import add_surrogate_to_request, read_json_response
-
 import blake3
+from dynamic_credentials import add_surrogate_to_request, read_json_response
 
 API = "https://api.cloudflare.com/client/v4"
 ACCOUNT = os.environ.get("CF_ACCOUNT_ID")
@@ -54,7 +61,9 @@ def api_request(method, path, body=None, jwt=None, multipart=None):
     if jwt:
         req.add_header("Authorization", "Bearer " + jwt)
     else:
-        add_surrogate_to_request(req, "custom.cloudflare-personal", allowed_hosts=["api.cloudflare.com"])
+        add_surrogate_to_request(
+            req, "custom.cloudflare-personal", allowed_hosts=["api.cloudflare.com"]
+        )
     resp = urllib.request.urlopen(req, timeout=600)
     return read_json_response(resp)
 
@@ -83,12 +92,16 @@ def main():
         files[served] = (data, file_hash(data, os.path.basename(local)))
         print(f"file {served}: {len(data)} bytes hash {files[served][1]}", flush=True)
 
-    token = api_request("GET", f"/accounts/{ACCOUNT}/pages/projects/{project}/upload-token")
+    token = api_request(
+        "GET", f"/accounts/{ACCOUNT}/pages/projects/{project}/upload-token"
+    )
     jwt = token["result"]["jwt"]
     print("upload token acquired", flush=True)
 
     hashes = [h for _, h in files.values()]
-    missing = api_request("POST", "/pages/assets/check-missing", body={"hashes": hashes}, jwt=jwt)
+    missing = api_request(
+        "POST", "/pages/assets/check-missing", body={"hashes": hashes}, jwt=jwt
+    )
     missing_set = set(missing["result"])
     print(f"missing: {len(missing_set)} of {len(hashes)}", flush=True)
 
@@ -98,12 +111,14 @@ def main():
         served = hash_to_path[h]
         data = files[served][0]
         ctype = mimetypes.guess_type(served)[0] or "application/octet-stream"
-        batch.append({
-            "key": h,
-            "value": base64.b64encode(data).decode(),
-            "metadata": {"contentType": ctype},
-            "base64": True,
-        })
+        batch.append(
+            {
+                "key": h,
+                "value": base64.b64encode(data).decode(),
+                "metadata": {"contentType": ctype},
+                "base64": True,
+            }
+        )
     if batch:
         for attempt in range(5):
             try:
@@ -128,8 +143,16 @@ def main():
         multipart={"manifest": json.dumps(manifest)},
     )
     result = dep["result"]
-    print(json.dumps({"id": result.get("id"), "url": result.get("url"),
-                      "environment": result.get("environment")}, indent=2))
+    print(
+        json.dumps(
+            {
+                "id": result.get("id"),
+                "url": result.get("url"),
+                "environment": result.get("environment"),
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":
