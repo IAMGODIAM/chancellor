@@ -10,6 +10,7 @@ import time
 from chancellor.escalation import ActionClass, AuditLog, Gatekeeper
 from chancellor.grader import OUTPUT_RUBRIC
 from chancellor.instruments import InstrumentPanel
+from chancellor.interception import ToolBroker
 from chancellor.orchestrator import CrewRunner
 from chancellor.task_graph import NodeStatus, TaskGraph
 
@@ -135,7 +136,8 @@ def _gated_worker(action):
 
 def test_gate_actions_never_auto(tmp_path):
     """Fuzz every action class: human-gate classes block with exactly
-    one receipt and zero executions; policy classes complete."""
+    one receipt and zero executions; a policy class declared with no
+    brokered call behind it is denied with one receipt too."""
     human = {
         ActionClass.SPEND,
         ActionClass.EXTERNAL_SEND,
@@ -171,8 +173,41 @@ def test_gate_actions_never_auto(tmp_path):
             assert report.blocked == ["one"] and report.completed == []
             assert entries[0]["approved"] is False
         else:
-            assert report.completed == ["one"]
-            assert entries[0]["approved"] is True
+            assert report.blocked == ["one"] and report.completed == []
+            assert entries[0]["approved"] is False
+            assert entries[0]["refusal_state"] == "declaration-mismatch"
+
+
+def test_policy_classes_complete_with_a_brokered_call(tmp_path):
+    """The same policy classes complete when a brokered call backs them."""
+    for cls, tool in (
+        (ActionClass.READ, "read_file"),
+        (ActionClass.DRAFT, "draft_text"),
+        (ActionClass.COMPUTE, "compute"),
+    ):
+        log = AuditLog(tmp_path / f"audit-{cls.value}.jsonl")
+        gatekeeper = Gatekeeper(audit_log=log)
+        broker = ToolBroker(gatekeeper=gatekeeper)
+        broker.register(tool, lambda **_kw: "ok")
+        g = TaskGraph("t")
+        g.task("one", "One", worker="w")
+
+        def worker(node, broker=broker, tool=tool, cls=cls):
+            broker.call(node.id, tool, {"x": 1})
+            return {
+                "text": "done",
+                "cost_usd": 0.0,
+                "action": {
+                    "action": f"do {cls.value}",
+                    "action_class": cls.value,
+                    "tool": tool,
+                },
+            }
+
+        report = CrewRunner(
+            g, {"w": worker}, gatekeeper=gatekeeper, broker=broker
+        ).run()
+        assert report.completed == ["one"], cls
 
 
 def test_gate_class_string_coerced_and_validated():
@@ -186,12 +221,13 @@ def test_gate_class_string_coerced_and_validated():
         ).run()
         assert report.blocked == ["one"], drifted
         assert g.nodes["one"].status is NodeStatus.BLOCKED
-    # An auto class as a raw string coerces and passes by policy.
+    # An auto class as a raw string coerces, but with no brokered call
+    # behind it the declaration earns no auto-approval.
     g = TaskGraph("t")
     g.task("one", "One", worker="w")
     action = {"action": "compute", "action_class": "compute", "tool": "compute"}
     report = CrewRunner(g, {"w": _gated_worker(action)}, gatekeeper=Gatekeeper()).run()
-    assert report.completed == ["one"]
+    assert report.blocked == ["one"] and report.completed == []
 
 
 def test_malformed_gate_requests_halt_never_crash():

@@ -8,6 +8,7 @@ signature, and a doctored checkpoint root.
 import json
 
 import pytest
+from pinning import operator_signer, pin_args
 
 from chancellor import receipts
 from chancellor.escalation import ActionClass, AuditLog, EscalationRequest, Gatekeeper
@@ -201,14 +202,21 @@ def test_legacy_prefix_anchors_and_is_reported(tmp_path):
     assert verify_log(path, allow_legacy_prefix=True, accept_dev_signer=True).ok
 
 
-def test_verifier_cli_exit_codes(tmp_path, capsys):
+def test_verifier_cli_exit_codes(tmp_path, capsys, monkeypatch):
     path = tmp_path / "audit.jsonl"
-    log = _seed_log(path, n=3)
+    log = AuditLog(path, signer=operator_signer())
+    gk = Gatekeeper(audit_log=log, approver=lambda req: (True, "ok"), human_id="tester")
+    for i in range(3):
+        gk.authorize(_spend(i))
     log.checkpoint()
-    assert verify_main([str(path), "--accept-dev-signer"]) == 0
+    pin = pin_args(monkeypatch)
+    assert verify_main([str(path), *pin]) == 0
+    assert "VERIFIED" in capsys.readouterr().out
+    # No pin: never authentic, whatever the chain looks like.
+    assert verify_main([str(path)]) == 1
     rows = log.read_all()
     rows[0]["approved"] = False
     _rewrite(path, rows)
-    assert verify_main([str(path), "--accept-dev-signer"]) == 1
+    assert verify_main([str(path), *pin]) == 1
     assert "NOT VERIFIED" in capsys.readouterr().out
     assert verify_main([str(tmp_path / "missing.jsonl")]) == 2

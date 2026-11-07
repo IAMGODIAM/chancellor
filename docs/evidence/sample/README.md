@@ -20,20 +20,27 @@ credentials, no network beyond the install itself.
 pip install chancellor
 
 # from the folder holding the two files (or point at the path directly):
-python -m chancellor.verify_log audit-log.jsonl --accept-dev-signer
+python -m chancellor.verify_log audit-log.jsonl
 ```
 
 Expected output:
 
 ```
-SIGNER: dev-hmac (public) — tamper-evidence only
+DEV-SIGNED, NOT AUTHENTIC
+  sealed under the public dev key: the chain can be checked for consistency, but anyone can re-seal it, so it shows nothing about who wrote it
 entries: 5 (chained: 5), checkpoints: 1
-VERIFIED: chain intact, newest checkpoint consistent
+FAIL: dev_signed_not_authentic: DEV-SIGNED, NOT AUTHENTIC — ...
+DEV-SIGNED, NOT AUTHENTIC
 ```
 
-Exit code 0 means every entry's hash recomputes, every link holds, and
-the signed checkpoint is consistent with the log it seals. Change one
-character in the log and the same command exits 1 and names the failure
+The sample is sealed with the public dev key, so the verifier labels it
+and exits 1: its chain can be checked for consistency, but nobody can
+show who sealed it. A log you keep should be sealed with a key you hold
+and verified against that key, which the verifier takes with `--pubkey`
+(an Ed25519 public key, or an operator key id); only a log signed by the
+pinned, non-dev key is reported `VERIFIED`, with exit 0.
+
+Change one character in the log and the same command names the failure
 (`entry_hash_mismatch`, `prev_hash_link_broken`, `tail_truncation`, …).
 A log with no checkpoint is never reported as verified — tail truncation
 is undetectable without one, and the verifier says so rather than
@@ -43,12 +50,8 @@ Inside a clone of this repository the same check is one line from the
 repo root:
 
 ```bash
-python -m chancellor.verify_log docs/evidence/sample/audit-log.jsonl --accept-dev-signer
+python -m chancellor.verify_log docs/evidence/sample/audit-log.jsonl
 ```
-
-The `--accept-dev-signer` flag acknowledges that the checkpoint is
-signed with the development signer: without it the verifier labels the
-signer and exits non-zero.
 
 The checkpoint is signed with the development signer whose key ships in
 the source — deliberately public, and labeled in the code where it sits:

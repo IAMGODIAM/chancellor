@@ -50,7 +50,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from . import receipts
 from .escalation import (
@@ -158,8 +158,12 @@ def verify_at_checkpoint_boundary(
     checkpoint signature, the committed prefix's hash chain, its Merkle
     root and head hash, and truncation (fewer chained entries present
     than the checkpoint commits). Fail-closed: no signed checkpoint
-    means no verified boundary exists, and nothing may resume."""
-    signer = signer if signer is not None else receipts.default_signer()
+    means no verified boundary exists, and nothing may resume.
+
+    The signer is the key the supervisor trusts. With none given the
+    public dev signer is used, and the result carries the DEV-SIGNED
+    label as a warning."""
+    signer = signer if signer is not None else receipts.public_dev_signer()
     log_path = Path(log_path)
     cp_path = (
         Path(checkpoint_path)
@@ -168,6 +172,10 @@ def verify_at_checkpoint_boundary(
     )
     failures: list[str] = []
     warnings: list[str] = []
+    if receipts.is_dev_signer(signer):
+        warnings.append(
+            f"{receipts.DEV_SIGNED_LABEL}: verified under the public dev key"
+        )
 
     if not log_path.exists():
         return BoundaryVerification(
@@ -225,11 +233,17 @@ def verify_at_checkpoint_boundary(
             warnings=warnings,
             entries_present=entries_present,
         )
-    if payload.get("schema") != receipts.CHECKPOINT_SCHEMA:
+    schema = payload.get("schema")
+    if schema not in (receipts.CHECKPOINT_SCHEMA, receipts.CHECKPOINT_SCHEMA_V2):
         failures.append(
-            f"checkpoint_schema: {payload.get('schema')!r} != "
-            f"{receipts.CHECKPOINT_SCHEMA!r}"
+            f"checkpoint_schema: {schema!r} is not "
+            f"{receipts.CHECKPOINT_SCHEMA!r} or {receipts.CHECKPOINT_SCHEMA_V2!r}"
         )
+    root_fn = (
+        receipts.rfc9162_root
+        if schema == receipts.CHECKPOINT_SCHEMA_V2
+        else receipts.merkle_root
+    )
     log_size = payload.get("log_size")
     if not isinstance(log_size, int) or log_size < 0:
         failures.append(f"checkpoint_log_size_invalid: {log_size!r}")
@@ -273,7 +287,7 @@ def verify_at_checkpoint_boundary(
             log_size=log_size,
             entries_present=entries_present,
         )
-    if receipts.merkle_root(state.leaves) != payload.get("merkle_root"):
+    if root_fn(state.leaves) != payload.get("merkle_root"):
         failures.append(
             "checkpoint_root_mismatch: Merkle root over the committed "
             "prefix != checkpoint root"
@@ -379,8 +393,8 @@ def _default_launcher(command: list[str]) -> ProcessHandle:
 
 def launcher_with_env(extra_env: dict[str, str]) -> Launcher:
     """A launcher that starts the agent with ``extra_env`` added to its
-    environment — how the operator's signing key reaches the agent's
-    own log so both sides seal and verify under the same key."""
+    environment. Never a way to hand an agent a signing key: keys reach
+    a supervised agent only as a sign-only channel (chancellor.sealing)."""
 
     def launch(command: list[str]) -> ProcessHandle:
         return _PopenHandle(subprocess.Popen(command, env={**os.environ, **extra_env}))
@@ -452,6 +466,10 @@ ANCHORING_DISCLOSURE = (
 
 
 # ------------------------------------------------------------ supervisor
+class SignerRequiredError(ValueError):
+    """A Supervisor was built without an explicit signer."""
+
+
 class Supervisor:
     """Tier A supervisor: launches the agent as its child, watches its
     signed checkpoints, verifies before every resume, receipts every
@@ -476,7 +494,13 @@ class Supervisor:
         snapshot_fn: Callable[[], CheckpointSnapshot | None] | None = None,
     ):
         self.config = config
-        self._signer = signer if signer is not None else receipts.default_signer()
+        if signer is None:
+            raise SignerRequiredError(
+                "Supervisor requires an explicit signer: pass signer=<Signer>. "
+                "For demos, exhibits and tests that intend the public dev "
+                "signer, say so with Supervisor.with_dev_signer(config, ...)."
+            )
+        self._signer = signer
         self._clock = clock
         self._sleeper = sleeper
         self._launcher = launcher if launcher is not None else _default_launcher
@@ -505,6 +529,13 @@ class Supervisor:
         self._cadence_checkpoint_written_at: float | None = None
         self._cadence_fresh_start = False
         self._cadence_initial_launch = True
+
+    @classmethod
+    def with_dev_signer(cls, config: SupervisorConfig, **kwargs: Any) -> Supervisor:
+        """Explicit opt-in to the public development signer, for demos,
+        exhibits and tests. Its signatures prove consistency only — see
+        the receipts module's signer note. Never the implicit default."""
+        return cls(config, signer=receipts.DevHmacSigner(), **kwargs)
 
     # ------------------------------------------------------------ text
     def anchoring_disclosure(self) -> str:
@@ -594,7 +625,7 @@ class Supervisor:
             },
         )
         assert self._log is not None
-        self._log.checkpoint()
+        self._log.checkpoint_v2()
         self._emit(line)
 
     def _observe_cadence(self, snap: CheckpointSnapshot | None, now: float) -> None:
@@ -681,7 +712,7 @@ class Supervisor:
             detail=json.dumps({"event": "escalation", **detail}, sort_keys=True),
         )
         decision = gatekeeper.authorize(request)
-        self._log.checkpoint()
+        self._log.checkpoint_v2()
         return decision
 
     # -------------------------------------------------------- snapshot
@@ -765,7 +796,7 @@ class Supervisor:
                     "prior_consecutive_failures": self._state.consecutive_failures,
                 },
             )
-            self._log.checkpoint()
+            self._log.checkpoint_v2()
         except (ChainIntegrityError, OSError) as exc:
             return (
                 "persist leg failed: the supervision log cannot be "
@@ -903,7 +934,7 @@ class Supervisor:
                     },
                 )
                 assert self._log is not None
-                self._log.checkpoint()
+                self._log.checkpoint_v2()
                 self._status("agent completed", age)
                 return 0
             return self._on_death(exit_status=status, witnessed=True, snap=snap)
@@ -1003,7 +1034,7 @@ class Supervisor:
                 },
             )
             assert self._log is not None
-            self._log.checkpoint()
+            self._log.checkpoint_v2()
         return None
 
     # ------------------------------------------------------------- death

@@ -9,7 +9,7 @@
                        verify-before-resume, interruption receipts,
                        escalation to the human gate. Needs an operator-
                        supplied signing key (CHANCELLOR_SUPERVISE_KEY or
-                       --signing-key); without one it refuses to run
+                       --signing-key-file); without one it refuses to run
     chancellor eval-a  run Eval Suite A (normative judgment) with stub agents
     chancellor eval-b  run Eval Suite B (long-horizon reliability)
 
@@ -49,24 +49,29 @@ from .instruments import default_panel
 from .judge import Exemplar, Judge
 from .orchestrator import CrewRunner
 from .receipts import (
-    DEV_SIGNER_SECRET,
+    MIN_OPERATOR_SECRET_BYTES,
     DevHmacSigner,
     checkpoint_payload,
+    default_checkpoint_path,
+    operator_secret_problem,
 )
-from .supervise import Supervisor, SupervisorConfig, launcher_with_env
+from .sealing import SealService, agent_environment, sealed_launcher
+from .supervise import Supervisor, SupervisorConfig
 from .task_graph import TaskGraph, TaskNode
 
 SUPERVISE_KEY_ENV = "CHANCELLOR_SUPERVISE_KEY"
 SUPERVISE_USAGE = (
-    "usage: chancellor supervise [--signing-key KEY] [--state-dir DIR] "
+    "usage: chancellor supervise [--signing-key-file PATH] [--state-dir DIR] "
     "[--agent-log PATH] [--cadence SECONDS] [--missed N] "
     "[--budget N] [--poll SECONDS] -- <agent command...>"
 )
 SUPERVISE_KEY_HELP = (
-    f"key: supervise needs an operator-supplied signing key — set "
-    f"{SUPERVISE_KEY_ENV} (preferred: an option value shows in process "
-    "listings) or pass --signing-key. Chancellor does not generate or "
-    "ship one; without it supervise refuses to run."
+    f"key: supervise needs an operator-supplied signing key of at least "
+    f"{MIN_OPERATOR_SECRET_BYTES} bytes — set {SUPERVISE_KEY_ENV}, or give "
+    "--signing-key-file PATH (--signing-key KEY also works, but an option "
+    "value shows in process listings). The key stays with the supervisor; "
+    "the agent is given a sign-only channel, never the key. Chancellor "
+    "does not generate or ship one; without it supervise refuses to run."
 )
 SUPERVISE_CADENCE_HELP = (
     "cadence: --cadence is the agent's signed-checkpoint interval in "
@@ -256,7 +261,7 @@ def run_demo(state_dir: str = ".chancellor") -> int:
     report = runner.run()
     # Seal the run's receipt book with a signed checkpoint, so the
     # shipped demo log proves its own completeness (tail included).
-    envelope = audit.checkpoint()
+    envelope = audit.checkpoint_v2()
     sealed = checkpoint_payload(envelope)["log_size"]
     print(
         f"run: {report.graph_name}  halted={report.halted} reason={report.halt_reason}"
@@ -319,13 +324,53 @@ def _demo_command(args: list[str]) -> int:
         return 2
 
 
-def _supervise_command(args: list[str]) -> int:
+def _read_key_fd(fd: int) -> str | None:
+    """The operator key, read once from an inherited pipe and closed."""
+    try:
+        with os.fdopen(fd, "r", encoding="utf-8") as fh:
+            return fh.read()
+    except (OSError, ValueError):
+        return None
+
+
+def _hand_key_to_fresh_process(
+    opts: list[str], command: list[str], signing_key: str
+) -> None:
+    """Replace this process with a fresh one that receives the key over
+    an inherited pipe. The original process image (whose environment and
+    arguments are visible under /proc/<pid>/) is gone, and the new one
+    carries neither the key nor any other way to find it."""
+    read_fd, write_fd = os.pipe()
+    os.write(write_fd, signing_key.encode("utf-8"))
+    os.close(write_fd)
+    os.set_inheritable(read_fd, True)
+    argv = [
+        sys.executable,
+        "-m",
+        "chancellor.cli",
+        "supervise",
+        *opts,
+        "--signing-key-fd",
+        str(read_fd),
+        "--",
+        *command,
+    ]
+    os.execve(sys.executable, argv, agent_environment())
+
+
+def _supervise_command(args: list[str], *, reexec: bool = False) -> int:
     """`chancellor supervise [options] -- <agent command...>`: the
     KEEP office (Tier A, chancellor.supervise). One command between
     "run my agent" and "my agent is kept" — no cron, no systemd, no
     user-authored scripting. Exit codes: 0 the agent completed;
     1 halted and escalated to the human gate; 2 usage error (including
-    a missing operator key) or a launch-time self-proof refusal."""
+    a missing or too-short operator key) or a launch-time self-proof
+    refusal.
+
+    The key stays with the supervisor: the agent is handed a sign-only
+    channel, never the key, and the key is removed from this process's
+    environment (and, from the command line entry, this process image is
+    replaced so /proc/<pid>/environ no longer holds it)."""
     help_end = args.index("--") if "--" in args else len(args)
     if any(flag in {"--help", "-h"} for flag in args[:help_end]):
         print(SUPERVISE_USAGE)
@@ -351,8 +396,14 @@ def _supervise_command(args: list[str]) -> int:
         "--poll": ("poll_s", float),
         "--heartbeat": ("heartbeat_s", float),
         "--signing-key": ("signing_key", str),
+        "--signing-key-file": ("signing_key_file", Path),
+        "--signing-key-fd": ("signing_key_fd", int),
     }
+    key_opts = {"--signing-key", "--signing-key-file", "--signing-key-fd"}
     signing_key: str | None = None
+    key_file: Path | None = None
+    key_fd: int | None = None
+    kept_opts: list[str] = []
     i = 0
     while i < len(opts):
         flag = opts[i]
@@ -367,30 +418,47 @@ def _supervise_command(args: list[str]) -> int:
             return 2
         if field_name == "signing_key":
             signing_key = value
+        elif field_name == "signing_key_file":
+            key_file = value
+        elif field_name == "signing_key_fd":
+            key_fd = value
         else:
             setattr(config, field_name, value)
+        if flag not in key_opts:
+            kept_opts.extend(opts[i : i + 2])
         i += 2
+    from_pipe = key_fd is not None
+    if key_fd is not None:
+        signing_key = _read_key_fd(key_fd)
+    elif key_file is not None:
+        try:
+            signing_key = key_file.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            print(f"supervise: cannot read the key file: {exc}", file=sys.stderr)
+            return 2
+    # The key never stays in this process's environment, whichever way it
+    # arrived.
+    env_key = os.environ.pop(SUPERVISE_KEY_ENV, None)
+    os.environ.pop("CHANCELLOR_DEV_SIGNER_SECRET", None)
     if signing_key is None:
-        signing_key = os.environ.get(SUPERVISE_KEY_ENV)
-    problem = _signing_key_problem(signing_key)
+        signing_key = env_key
+    problem = operator_secret_problem(signing_key)
     if problem is not None or signing_key is None:
         print(f"supervise: {problem}", file=sys.stderr)
         print(SUPERVISE_KEY_HELP, file=sys.stderr)
         return 2
-    return Supervisor(
-        config,
-        signer=DevHmacSigner(secret=signing_key.encode("utf-8")),
-        launcher=launcher_with_env({"CHANCELLOR_DEV_SIGNER_SECRET": signing_key}),
-    ).run()
-
-
-def _signing_key_problem(key: str | None) -> str | None:
-    """Why an operator key is unusable, or None when it is acceptable."""
-    if key is None or not key.strip():
-        return "no operator signing key supplied — refusing to run"
-    if key.encode("utf-8") == DEV_SIGNER_SECRET:
-        return "the signing key is the public built-in dev value — refusing to run"
-    return None
+    if reexec and not from_pipe and key_file is None:
+        _hand_key_to_fresh_process(kept_opts, command, signing_key)
+    signer = DevHmacSigner(secret=signing_key.encode("utf-8"))
+    service = SealService(
+        signer, config.agent_log_path, default_checkpoint_path(config.agent_log_path)
+    )
+    try:
+        return Supervisor(
+            config, signer=signer, launcher=sealed_launcher(service)
+        ).run()
+    finally:
+        service.close()
 
 
 _EVAL_COMMANDS = {
@@ -419,12 +487,13 @@ def _eval_command(cmd: str, args: list[str]) -> int:
 def main(argv: list[str] | None = None) -> int:
     """Console entry point: dispatch the demo, supervise, verify-log,
     and eval subcommands."""
+    from_command_line = argv is None
     argv = list(sys.argv[1:] if argv is None else argv)
     cmd = argv[0] if argv else "demo"
     if cmd == "demo":
         return _demo_command(argv[1:])
     if cmd == "supervise":
-        return _supervise_command(argv[1:])
+        return _supervise_command(argv[1:], reexec=from_command_line)
     if cmd in _EVAL_COMMANDS:
         return _eval_command(cmd, argv[1:])
     print(

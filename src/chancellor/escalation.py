@@ -78,6 +78,10 @@ REFUSAL_VERIFICATION_FAILED = "verification-failed"
 REFUSAL_UNCLASSIFIED = "unclassified-action"
 REFUSAL_NODE_FAILED = "node-failed"
 REFUSAL_RECONCILE_MISMATCH = "reconcile-mismatch"
+REFUSAL_DECLARATION_MISMATCH = "declaration-mismatch"
+REFUSAL_INERT_VIOLATION = "inert-violation"
+REFUSAL_BROKERED_DENIAL = "brokered-call-denied"
+REFUSAL_UNBROKERED_EFFECT = "unbrokered-effect"
 
 REFUSAL_STATES: frozenset[str] = frozenset(
     {
@@ -93,6 +97,10 @@ REFUSAL_STATES: frozenset[str] = frozenset(
         REFUSAL_UNCLASSIFIED,
         REFUSAL_NODE_FAILED,
         REFUSAL_RECONCILE_MISMATCH,
+        REFUSAL_DECLARATION_MISMATCH,
+        REFUSAL_INERT_VIOLATION,
+        REFUSAL_BROKERED_DENIAL,
+        REFUSAL_UNBROKERED_EFFECT,
     }
 )
 
@@ -114,6 +122,9 @@ class EscalationRequest:
     # The class as declared by the requester, kept for the receipt once
     # the gate has replaced action_class with the decided class.
     declared_class: str | None = None
+    # Set by the broker on a brokered call: binds this decision to the
+    # outcome record written after the call runs.
+    call_id: str | None = None
 
 
 @dataclass
@@ -138,17 +149,19 @@ Approver = Callable[[EscalationRequest], tuple[bool, str]]
 # is keyed by tool name and by effect axis; a requester's self-declared
 # class can only tighten the result. Anything the table cannot classify is
 # denied (fail-closed).
-_STRICTNESS: dict[ActionClass, int] = {
-    ActionClass.NONE: 0,
-    ActionClass.READ: 1,
-    ActionClass.DRAFT: 2,
-    ActionClass.COMPUTE: 3,
-    ActionClass.EXTERNAL_SEND: 10,
-    ActionClass.PUBLISH: 11,
-    ActionClass.SPEND: 12,
-    ActionClass.CREDENTIAL: 13,
-    ActionClass.IRREVERSIBLE: 14,
-}
+_STRICTNESS: Mapping[ActionClass, int] = MappingProxyType(
+    {
+        ActionClass.NONE: 0,
+        ActionClass.READ: 1,
+        ActionClass.DRAFT: 2,
+        ActionClass.COMPUTE: 3,
+        ActionClass.EXTERNAL_SEND: 10,
+        ActionClass.PUBLISH: 11,
+        ActionClass.SPEND: 12,
+        ActionClass.CREDENTIAL: 13,
+        ActionClass.IRREVERSIBLE: 14,
+    }
+)
 
 
 def strictest(classes: list[ActionClass]) -> ActionClass:
@@ -218,12 +231,27 @@ class Classification:
 
 @dataclass(frozen=True)
 class ActionPolicy:
+    """The policy table. Tables passed in are copied into read-only
+    mappings at construction, so nothing that holds the original (or this
+    policy) can change a class afterwards."""
+
     tools: Mapping[str, ActionClass] = field(
         default_factory=lambda: DEFAULT_TOOL_POLICY
     )
     effects: Mapping[str, ActionClass] = field(
         default_factory=lambda: DEFAULT_EFFECT_POLICY
     )
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "tools", MappingProxyType(dict(self.tools)))
+        object.__setattr__(self, "effects", MappingProxyType(dict(self.effects)))
+
+    def tool_class(self, tool: object) -> ActionClass | None:
+        """The table's class for a tool name, or None when the table does
+        not know it."""
+        if not isinstance(tool, str):
+            return None
+        return self.tools.get(tool.strip().lower())
 
     @staticmethod
     def _deny(reason: str) -> Classification:
@@ -364,6 +392,7 @@ class AuditLog:
             "effects": list(decision.request.effects),
             "declared_class": decision.request.declared_class,
             "args_sha256": decision.request.args_sha256,
+            "call_id": decision.request.call_id,
             "detail": decision.request.detail,
             "cost_usd": decision.request.cost_usd,
             "node_id": decision.request.node_id,
@@ -389,7 +418,7 @@ class AuditLog:
         interval since the last seal."""
         every = self.checkpoint_every
         if every is not None and self._state.chained % every == 0:
-            self.checkpoint()
+            self.checkpoint_v2()
 
     # Chain-owned fields a caller-supplied body may never set itself.
     # The frame citation is chain-owned for the same reason the schema
@@ -430,9 +459,28 @@ class AuditLog:
         self._maybe_seal()
         return entry
 
+    def _sidecar_has_v2(self) -> bool:
+        if not self.checkpoint_path.exists():
+            return False
+        for line in self.checkpoint_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                schema = _receipts.checkpoint_payload(json.loads(line)).get("schema")
+            except Exception:
+                continue
+            if schema == _receipts.CHECKPOINT_SCHEMA_V2:
+                return True
+        return False
+
     def checkpoint(self) -> dict:
         """Sign a Merkle checkpoint over every chained entry so far and
-        append it to the checkpoint sidecar. Returns the envelope."""
+        append it to the checkpoint sidecar. Returns the envelope. A
+        sidecar that already holds a v2 checkpoint never takes a v1 one
+        (the verifier rejects that order), so the checkpoint is written as
+        v2 in that case."""
+        if self._sidecar_has_v2():
+            return self.checkpoint_v2()
         envelope = _receipts.build_checkpoint(
             signer=self.signer,
             log_size=self._state.chained,
@@ -492,7 +540,13 @@ class Gatekeeper:
         self.audit_log = audit_log
         self.approver = approver
         self.human_id = human_id
-        self.policy = policy if policy is not None else DEFAULT_POLICY
+        self._policy = policy if policy is not None else DEFAULT_POLICY
+
+    @property
+    def policy(self) -> ActionPolicy:
+        """The policy table in force (read-only: the policy's tables are
+        immutable mappings, and this attribute has no setter)."""
+        return self._policy
 
     def authorize(self, request: EscalationRequest) -> Decision:
         """Decide a gate request and receipt the decision.
@@ -552,6 +606,20 @@ class Gatekeeper:
         )
         self._record(decision)
         return decision
+
+    def record_outcome(self, fields: dict[str, Any]) -> None:
+        """Write a tool_outcome entry (see receipts.tool_outcome_fields)
+        onto the hash chain. Record-or-halt like every decision."""
+        if self.audit_log is None:
+            return
+        try:
+            self.audit_log.record_entry(fields)
+        except Exception as exc:
+            raise AuditWriteError(
+                f"audit write failed for the outcome of call "
+                f"{fields.get('call_id')!r} on {fields.get('tool')!r} "
+                f"(record-or-halt): {type(exc).__name__}: {exc}"
+            ) from exc
 
     def _record(self, decision: Decision) -> None:
         if self.audit_log is None:

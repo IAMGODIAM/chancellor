@@ -22,7 +22,8 @@ from __future__ import annotations
 
 import copy
 import json
-from collections.abc import Callable, Mapping
+import uuid
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -57,10 +58,22 @@ class InterceptRecord:
     action_class: str
     approved_args_sha256: str
     approved: bool
+    call_id: str = ""
     started: bool = False
     executed_args_sha256: str | None = None
     result_sha256: str | None = None
     error: str | None = None
+
+
+@dataclass(frozen=True)
+class ObservedEffect:
+    """A side effect the runner saw happen (through an effect observer),
+    whether or not it went through the broker: the tool it corresponds
+    to and, when known, the digest of the arguments it ran with."""
+
+    tool: str
+    args_sha256: str | None = None
+    description: str = ""
 
 
 @dataclass
@@ -81,6 +94,32 @@ class ToolBroker:
         """A position in the ledger; pass it to reconcile to look only at
         calls made after this point."""
         return len(self.ledger)
+
+    def rows_for(self, node_id: str, since: int) -> list[InterceptRecord]:
+        """This node's ledger rows since a mark."""
+        return [r for r in self.ledger[since:] if r.node_id == node_id]
+
+    def unbrokered(
+        self, node_id: str, since: int, observed: Iterable[ObservedEffect]
+    ) -> list[str]:
+        """Observed effects with no approved, started brokered call for
+        this node behind them (same tool and, when the observer knows it,
+        the same argument digest). Each unmatched effect is one message."""
+        ran = [r for r in self.rows_for(node_id, since) if r.approved and r.started]
+        unmatched: list[str] = []
+        for effect in observed:
+            tool = str(effect.tool).strip().lower()
+            if not any(
+                r.tool == tool
+                and (
+                    effect.args_sha256 is None
+                    or r.executed_args_sha256 == effect.args_sha256
+                )
+                for r in ran
+            ):
+                what = effect.description or tool
+                unmatched.append(f"{what}: effect seen with no brokered call behind it")
+        return unmatched
 
     def has_tool(self, name: object) -> bool:
         return isinstance(name, str) and name.strip().lower() in self.tools
@@ -129,6 +168,8 @@ class ToolBroker:
                 )
             )
             raise ToolDenied(decision.rationale)
+        call_id = uuid.uuid4().hex
+        request.call_id = call_id
         decision = self.gatekeeper.authorize(request)
         record = InterceptRecord(
             node_id,
@@ -138,25 +179,54 @@ class ToolBroker:
             else ActionClass.UNCLASSIFIED.value,
             args_digest,
             approved=decision.approved,
+            call_id=call_id,
         )
         self.ledger.append(record)
         if not decision.approved:
             raise ToolDenied(decision.rationale)
-        # Run with a private copy of exactly what was approved, after
-        # re-checking it still matches the approved digest.
-        run_args = copy.deepcopy(call_args)
-        record.executed_args_sha256 = digest(run_args)
-        if record.executed_args_sha256 != args_digest:
-            record.error = "arguments changed between approval and execution"
-            raise ToolDenied(record.error)
-        record.started = True
+
+        # The tool is entered through a probe: the digest recorded as
+        # "executed" is taken of the keyword arguments the call boundary
+        # delivers, and execution stops there if they are not the
+        # approved ones.
+        def probe(**received: Any) -> Any:
+            record.executed_args_sha256 = digest(received)
+            if record.executed_args_sha256 != args_digest:
+                record.error = "arguments changed between approval and execution"
+                raise ToolDenied(record.error)
+            record.started = True
+            return fn(**received)
+
+        status = receipts.OUTCOME_OK
         try:
-            result = fn(**run_args)
+            result = probe(**copy.deepcopy(call_args))
+        except ToolDenied:
+            status = receipts.OUTCOME_REFUSED
+            raise
         except Exception as exc:
+            status = receipts.OUTCOME_ERROR
             record.error = f"{type(exc).__name__}: {exc}"
             raise
-        record.result_sha256 = digest(result)
-        return result
+        else:
+            record.result_sha256 = digest(result)
+            return result
+        finally:
+            self._write_outcome(record, status)
+
+    def _write_outcome(self, record: InterceptRecord, status: str) -> None:
+        """Put what the call did onto the hash chain beside its decision."""
+        self.gatekeeper.record_outcome(
+            receipts.tool_outcome_fields(
+                call_id=record.call_id,
+                node_id=record.node_id,
+                tool=record.tool,
+                approved_args_sha256=record.approved_args_sha256,
+                executed_args_sha256=record.executed_args_sha256,
+                result_status=status,
+                result_sha256=record.result_sha256,
+                error=record.error,
+            )
+        )
 
     def reconcile(
         self,

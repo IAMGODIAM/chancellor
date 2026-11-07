@@ -49,6 +49,9 @@ import hashlib
 import hmac
 import json
 import os
+import socket
+import struct
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -345,24 +348,45 @@ class Signer(Protocol):
 
 # DEV ONLY — a well-known secret, printed here on purpose. Anyone can
 # recompute these signatures; that is fine for a self-contained demo
-# and worthless for production. Override via CHANCELLOR_DEV_SIGNER_SECRET
-# for a marginally-less-public dev secret; graduate to the issuer
-# signer for anything real.
+# and worthless for production. A different secret (an operator's, via
+# the constructor or CHANCELLOR_DEV_SIGNER_SECRET) gets its own key id,
+# derived from a fingerprint of the secret, so it is never labelled as
+# the public dev key and can be pinned by a verifier.
 DEV_SIGNER_SECRET = b"CHANCELLOR-DEV-SIGNER-NOT-A-REAL-KEY"
 DEV_SIGNER_KEY_ID = "chancellor-dev-hmac-sha256"
+HMAC_KEY_ID_PREFIX = "hmac-sha256:"
+
+# The shortest operator secret the product accepts (bytes).
+MIN_OPERATOR_SECRET_BYTES = 32
+
+# Where a verifier's operator supplies the secret for a pinned HMAC key id.
+VERIFY_KEY_ENV = "CHANCELLOR_VERIFY_KEY"
 
 
-class DevHmacSigner:
-    """HMAC-SHA256 dev signer. See module docstring: consistency
-    evidence for the demo, never non-repudiation."""
+def hmac_key_id(secret: bytes) -> str:
+    """The key id of an operator HMAC secret: a truncated sha256
+    fingerprint under a fixed prefix. The fingerprint does not reveal the
+    secret."""
+    return HMAC_KEY_ID_PREFIX + hashlib.sha256(b"key-id:" + secret).hexdigest()[:16]
 
-    key_id = DEV_SIGNER_KEY_ID
+
+class HmacSigner:
+    """HMAC-SHA256 signer. With the built-in secret it is the public dev
+    signer (consistency evidence for the demo, never non-repudiation).
+    With any other secret it signs under that secret's own key id."""
 
     def __init__(self, secret: bytes | None = None):
         if secret is None:
             env = os.environ.get("CHANCELLOR_DEV_SIGNER_SECRET")
             secret = env.encode("utf-8") if env else DEV_SIGNER_SECRET
         self._secret = secret
+        self.key_id = (
+            DEV_SIGNER_KEY_ID if secret == DEV_SIGNER_SECRET else hmac_key_id(secret)
+        )
+
+    @property
+    def is_dev(self) -> bool:
+        return self.key_id == DEV_SIGNER_KEY_ID
 
     def sign(self, data: bytes) -> bytes:
         return hmac.new(self._secret, data, hashlib.sha256).digest()
@@ -371,10 +395,246 @@ class DevHmacSigner:
         return hmac.compare_digest(self.sign(data), sig)
 
 
+# Environment variable carrying the inherited descriptor of a sign-only
+# channel to a supervisor (see PipeSigner and chancellor.sealing).
+SIGN_FD_ENV = "CHANCELLOR_SIGN_FD"
+
+_OP_KEY_ID = b"\x01"
+_OP_SIGN = b"\x02"
+_REPLY_OK = b"\x00"
+_MAX_FRAME = 1 << 20
+
+
+def _recv_exact(sock: socket.socket, n: int) -> bytes:
+    chunks: list[bytes] = []
+    while n > 0:
+        chunk = sock.recv(n)
+        if not chunk:
+            raise ConnectionError("sign channel closed")
+        chunks.append(chunk)
+        n -= len(chunk)
+    return b"".join(chunks)
+
+
+def send_frame(sock: socket.socket, head: bytes, body: bytes = b"") -> None:
+    """One length-prefixed frame: a one-byte op/status, then the body."""
+    sock.sendall(head + struct.pack(">I", len(body)) + body)
+
+
+def recv_frame(sock: socket.socket) -> tuple[bytes, bytes]:
+    head = _recv_exact(sock, 1)
+    (length,) = struct.unpack(">I", _recv_exact(sock, 4))
+    if length > _MAX_FRAME:
+        raise ConnectionError("sign channel frame too large")
+    return head, _recv_exact(sock, length)
+
+
+class SigningRefused(RuntimeError):
+    """The signing service declined a request."""
+
+
+class PipeSigner:
+    """A sign-only Signer backed by an inherited channel to the process
+    that holds the key. The holder decides what it will sign; this side
+    never sees the key and cannot verify (``verify`` is always False)."""
+
+    def __init__(self, fd: int):
+        self._sock = socket.socket(fileno=fd)
+        self._lock = threading.Lock()
+        head, body = self._ask(_OP_KEY_ID)
+        if head != _REPLY_OK:
+            raise SigningRefused(body.decode("utf-8", "replace"))
+        self.key_id = body.decode("utf-8")
+
+    def _ask(self, op: bytes, body: bytes = b"") -> tuple[bytes, bytes]:
+        with self._lock:
+            send_frame(self._sock, op, body)
+            return recv_frame(self._sock)
+
+    def sign(self, data: bytes) -> bytes:
+        head, body = self._ask(_OP_SIGN, data)
+        if head != _REPLY_OK:
+            raise SigningRefused(body.decode("utf-8", "replace"))
+        return body
+
+    def verify(self, data: bytes, sig: bytes) -> bool:
+        del data, sig  # this side holds no key, so it cannot check
+        return False
+
+
+# The name the dev signer has always had; with the built-in secret it is
+# exactly that, with an operator's secret it is an operator signer.
+DevHmacSigner = HmacSigner
+
+
 def default_signer() -> Signer:
-    """The development signer. A demo credential by design; production
-    custody replaces it, not extends it."""
+    """The signer a process gets when it names none. Under a supervisor
+    it is the sign-only channel the supervisor handed down (the process
+    never holds the key); otherwise it is the public development signer,
+    a demo credential by design — production custody replaces it, not
+    extends it. Callers that mean the dev signer should say so, and
+    verifiers label its output."""
+    fd = os.environ.get(SIGN_FD_ENV)
+    if fd:
+        try:
+            return PipeSigner(int(fd))
+        except (ValueError, OSError) as exc:
+            raise RuntimeError(f"{SIGN_FD_ENV} is not a usable channel: {exc}") from exc
     return DevHmacSigner()
+
+
+def public_dev_signer() -> Signer:
+    """The public dev signer, named explicitly (never the environment's
+    override, never a channel): what a verifier falls back to when it is
+    given no pin. Its checks are labelled DEV-SIGNED, NOT AUTHENTIC."""
+    return DevHmacSigner(secret=DEV_SIGNER_SECRET)
+
+
+def operator_secret_problem(secret: str | None) -> str | None:
+    """Why an operator secret is unusable, or None when it is acceptable."""
+    if secret is None or not secret.strip():
+        return "no operator signing key supplied — refusing to run"
+    raw = secret.encode("utf-8")
+    if raw == DEV_SIGNER_SECRET:
+        return "the signing key is the public built-in dev value — refusing to run"
+    if len(raw) < MIN_OPERATOR_SECRET_BYTES:
+        return (
+            f"the signing key is shorter than {MIN_OPERATOR_SECRET_BYTES} bytes "
+            "— refusing to run"
+        )
+    return None
+
+
+# ------------------------------------------------------- pinned public key
+# Verification-only support for a pinned Ed25519 public key (RFC 8032,
+# stdlib arithmetic). Holding a public key lets a verifier check
+# signatures without being able to make them; nothing here signs.
+_P = 2**255 - 19
+_L = 2**252 + 27742317777372353535851937790883648493
+_D = -121665 * pow(121666, _P - 2, _P) % _P
+_I = pow(2, (_P - 1) // 4, _P)
+
+
+def _recover_x(y: int, sign: int) -> int | None:
+    if y >= _P:
+        return None
+    x2 = (y * y - 1) * pow(_D * y * y + 1, _P - 2, _P) % _P
+    if x2 == 0:
+        return None if sign else 0
+    x = pow(x2, (_P + 3) // 8, _P)
+    if (x * x - x2) % _P != 0:
+        x = x * _I % _P
+    if (x * x - x2) % _P != 0:
+        return None
+    if (x & 1) != sign:
+        x = _P - x
+    return x
+
+
+_Point = tuple[int, int, int, int]
+
+
+def _point_add(p: _Point, q: _Point) -> _Point:
+    a = (p[1] - p[0]) * (q[1] - q[0]) % _P
+    b = (p[1] + p[0]) * (q[1] + q[0]) % _P
+    c = 2 * p[3] * q[3] * _D % _P
+    d = 2 * p[2] * q[2] % _P
+    e, f, g, h = b - a, d - c, d + c, b + a
+    return (e * f % _P, g * h % _P, f * g % _P, e * h % _P)
+
+
+def _point_mul(scalar: int, point: _Point) -> _Point:
+    result: _Point = (0, 1, 1, 0)
+    while scalar > 0:
+        if scalar & 1:
+            result = _point_add(result, point)
+        point = _point_add(point, point)
+        scalar >>= 1
+    return result
+
+
+def _point_equal(p: _Point, q: _Point) -> bool:
+    return (p[0] * q[2] - q[0] * p[2]) % _P == 0 and (
+        p[1] * q[2] - q[1] * p[2]
+    ) % _P == 0
+
+
+def _decompress(data: bytes) -> _Point | None:
+    if len(data) != 32:
+        return None
+    y = int.from_bytes(data, "little")
+    sign = y >> 255
+    y &= (1 << 255) - 1
+    x = _recover_x(y, sign)
+    if x is None:
+        return None
+    return (x, y, 1, x * y % _P)
+
+
+_GY = 4 * pow(5, _P - 2, _P) % _P
+_GX = _recover_x(_GY, 0) or 0
+ED25519_BASE: _Point = (_GX, _GY, 1, _GX * _GY % _P)
+
+
+def ed25519_verify(public_key: bytes, message: bytes, signature: bytes) -> bool:
+    """RFC 8032 Ed25519 verification. Fail-closed: any malformation is
+    False."""
+    try:
+        if len(public_key) != 32 or len(signature) != 64:
+            return False
+        a_point = _decompress(public_key)
+        r_point = _decompress(signature[:32])
+        s = int.from_bytes(signature[32:], "little")
+        if a_point is None or r_point is None or s >= _L:
+            return False
+        h = (
+            int.from_bytes(
+                hashlib.sha512(signature[:32] + public_key + message).digest(),
+                "little",
+            )
+            % _L
+        )
+        return _point_equal(
+            _point_mul(s, ED25519_BASE), _point_add(r_point, _point_mul(h, a_point))
+        )
+    except Exception:
+        return False
+
+
+ED25519_KEY_ID_PREFIX = "ed25519:"
+
+
+def ed25519_key_id(public_key: bytes) -> str:
+    """The key id of a pinned Ed25519 public key: a fingerprint under a
+    fixed prefix."""
+    return (
+        ED25519_KEY_ID_PREFIX + hashlib.sha256(b"key-id:" + public_key).hexdigest()[:16]
+    )
+
+
+class PinnedEd25519Verifier:
+    """A verify-only Signer for a pinned Ed25519 public key. ``sign``
+    refuses: a verifier never holds signing authority."""
+
+    def __init__(self, public_key: bytes):
+        if len(public_key) != 32:
+            raise ValueError("an Ed25519 public key is 32 bytes")
+        self.public_key = public_key
+        self.key_id = ed25519_key_id(public_key)
+
+    def sign(self, data: bytes) -> bytes:
+        raise RuntimeError(f"a pinned verifier cannot sign ({len(data)} bytes)")
+
+    def verify(self, data: bytes, sig: bytes) -> bool:
+        return ed25519_verify(self.public_key, data, sig)
+
+
+DEV_SIGNED_LABEL = "DEV-SIGNED, NOT AUTHENTIC"
+
+
+def is_dev_signer(signer: object) -> bool:
+    """True for the public dev key id (the label verifiers print)."""
+    return getattr(signer, "key_id", None) == DEV_SIGNER_KEY_ID
 
 
 # --------------------------------------------------------------------- checkpoint
@@ -466,6 +726,14 @@ def checkpoint_signature_valid(envelope: dict, signer: Signer) -> bool:
 # trusting a filing cabinet of separate reports.
 ENTRY_TYPE_FREEZE_MANIFEST = "freeze_manifest"
 ENTRY_TYPE_TEST_RUN = "test_run"
+ENTRY_TYPE_TOOL_OUTCOME = "tool_outcome"
+
+# What a brokered call did once approved. "ok" and "error" mean the tool
+# was started; "refused" means execution was stopped after approval.
+OUTCOME_OK = "ok"
+OUTCOME_ERROR = "error"
+OUTCOME_REFUSED = "refused"
+OUTCOME_STATUSES = frozenset({OUTCOME_OK, OUTCOME_ERROR, OUTCOME_REFUSED})
 
 _HEX64 = frozenset("0123456789abcdef")
 
@@ -557,6 +825,40 @@ def test_run_fields(
         "passed": passed,
         "failed": failed,
         "seat": seat,
+    }
+
+
+def tool_outcome_fields(
+    *,
+    call_id: str,
+    node_id: str | None,
+    tool: str,
+    approved_args_sha256: str,
+    executed_args_sha256: str | None,
+    result_status: str,
+    result_sha256: str | None = None,
+    error: str | None = None,
+    ts: float | None = None,
+) -> dict:
+    """Field body for a tool_outcome entry: the brokered call as it ran —
+    tool, the digest of the arguments approved and of the arguments the
+    tool received, and the result's status and digest. The call_id binds
+    it to the decision entry that approved it."""
+    if not isinstance(call_id, str) or not call_id:
+        raise ValueError("call_id must be a non-empty string")
+    if result_status not in OUTCOME_STATUSES:
+        raise ValueError(f"result_status must be one of {sorted(OUTCOME_STATUSES)}")
+    return {
+        "entry_type": ENTRY_TYPE_TOOL_OUTCOME,
+        "ts": time.time() if ts is None else ts,
+        "call_id": call_id,
+        "node_id": node_id,
+        "tool": tool,
+        "approved_args_sha256": approved_args_sha256,
+        "executed_args_sha256": executed_args_sha256,
+        "result_status": result_status,
+        "result_sha256": result_sha256,
+        "error": error,
     }
 
 
