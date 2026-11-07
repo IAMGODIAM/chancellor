@@ -304,7 +304,8 @@ class NodeTools:
     tools through the broker's check and ask whether a tool is registered;
     it exposes no tool callables and cannot name another node. The runner
     revokes it when the node's worker returns, after which every call is
-    refused."""
+    refused. This separation holds by convention inside one Python process;
+    it is not full enforcement, and calls are audited afterward."""
 
     __slots__ = ("_dispatch", "_has_tool", "_revoke", "_node_id")
 
