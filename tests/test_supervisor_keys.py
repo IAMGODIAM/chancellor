@@ -280,6 +280,12 @@ report = {
     "parent_cmdline_names_key_file": "--signing-key-file" in proc_text("cmdline"),
     "channel_named": receipts.SIGN_FD_ENV in os.environ,
 }
+try:
+    memory_fd = os.open(f"/proc/{ppid}/mem", os.O_RDONLY)
+    os.close(memory_fd)
+    report["parent_memory_open"] = True
+except OSError:
+    report["parent_memory_open"] = False
 log = AuditLog(log_path)
 for i in range(3):
     request = EscalationRequest(
@@ -361,6 +367,7 @@ def test_agent_never_holds_or_reads_the_operator_key(tmp_path, key_mode):
     assert report["parent_environ_holds_key"] is False
     assert report["parent_cmdline_holds_key"] is False
     assert report["parent_cmdline_names_key_file"] is False
+    assert report["parent_memory_open"] is False
     assert report["channel_named"] is True
     assert report["signer"] == "PipeSigner"
     assert report["junk_signed"] is False
@@ -377,3 +384,44 @@ def test_signer_required_error_is_exported_from_package():
     import chancellor
 
     assert getattr(chancellor, "SignerRequiredError", None) is SignerRequiredError
+
+
+def test_process_launch_preparation_on_linux(monkeypatch):
+    from chancellor import supervise
+
+    calls = []
+
+    class Library:
+        def prctl(self, *args):
+            calls.append(args)
+            return 0
+
+    monkeypatch.setattr(supervise.sys, "platform", "linux")
+    monkeypatch.setattr(supervise.ctypes, "CDLL", lambda *a, **kw: Library())
+    supervise.prepare_process_launch()
+    assert calls == [(4, 0, 0, 0, 0)]
+
+
+def test_process_launch_preparation_elsewhere(monkeypatch):
+    from chancellor import supervise
+
+    monkeypatch.setattr(supervise.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        supervise.ctypes, "CDLL", lambda *a, **kw: pytest.fail("unexpected")
+    )
+    supervise.prepare_process_launch()
+
+
+def test_process_preparation_precedes_agent_launch(tmp_path, monkeypatch):
+    from chancellor import supervise
+
+    events = []
+    monkeypatch.setattr(
+        supervise, "prepare_process_launch", lambda: events.append("prepare")
+    )
+    supervisor = Supervisor.with_dev_signer(
+        SupervisorConfig(agent_command=["agent"], state_dir=tmp_path),
+        launcher=lambda command: events.append("launch"),
+    )
+    supervisor._launch()
+    assert events == ["prepare", "launch"]

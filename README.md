@@ -5,7 +5,7 @@
 [![gates](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml/badge.svg)](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml)
 <a href="docs/evidence/run-7/"><img src="docs/media/badge-drift.svg" alt="Suite B: drift 0 / 18,000 — bounds printed"></a>
 <!-- release-sync:TESTS-BADGE-ALT -->
-<a href="https://github.com/IAMGODIAM/chancellor/actions"><img src="docs/media/badge-tests.svg" alt="Tests: 297 passing — gates green"></a>
+<a href="https://github.com/IAMGODIAM/chancellor/actions"><img src="docs/media/badge-tests.svg" alt="Tests: 442 passing — gates green"></a>
 <!-- /release-sync:TESTS-BADGE-ALT -->
 <a href="#results-measured-oct-29--nov-2-2026"><img src="docs/media/badge-calibration.svg" alt="Calibration: gate not passed — verdicts labeled"></a>
 <!-- release-sync:RELEASE-BADGE -->
@@ -87,7 +87,7 @@ Governance is not free, and the price is printed, not hidden: the governed arm c
 **Kill-resume gate (T3):** **3,000 / 3,000** gates in RUN-7 — a 10-box reproduction of the same 300-gate instrument, *not* 3,000 independent trials; the label travels with the figure in the record. The fixed harness's original 300 / 300 (6,000 trials, RUN-5) and the first harness's 290 / 300 stand in [BUILD-LOG.md](BUILD-LOG.md) — the 290 was a defect in the test harness, not the product, and the diagnosis is recorded there in full.
 
 <!-- release-sync:TESTS-LINE -->
-**Tests:** 297 passing, 0 failing — which also passes its own presentation gates: Ruff format and lint at zero findings, mypy clean, identical commands in pre-commit and CI (see the badge above).
+**Tests:** 442 passing, 0 failing — which also passes its own presentation gates: Ruff format and lint at zero findings, mypy clean, identical commands in pre-commit and CI (see the badge above).
 <!-- /release-sync:TESTS-LINE -->
 
 **Suite A:** the calibration gate has been run twice under pre-registration and has not passed — and no Suite A score is claimed anywhere in this submission. The calibration of record measured band κ 0.667 and Spearman ρ 0.881, with precedent-consistency (κ 0.294) and reversibility (κ 0.575) below the 0.6 criterion floor. The pre-registered remedy run then failed its own completeness gate — 35 of 36 references scored, one lost to two transport failures — and an incomplete run earns no gate statistics; its diagnostics (not gate statistics) put every criterion above threshold, and the judge's blind self-agreement, measured for the first time, satisfied its gate on all four criteria. What ships is the labeled fallback: live judge verdicts carry the label *uncalibrated* until a pre-registered run passes in full. The gate catching our own judge — twice — is the method working as designed.
@@ -184,7 +184,7 @@ export CHANCELLOR_SUPERVISE_KEY=<your signing key>   # operator-supplied
 chancellor supervise -- <agent command...>
 ```
 
-`supervise` needs a signing key that you supply (at least 32 bytes), from `CHANCELLOR_SUPERVISE_KEY` or `--signing-key-file PATH`. Chancellor does not generate or ship one; without a key, or with a short one, the command refuses to run (usage error, exit 2). The key stays with the supervisor: it is removed from the supervisor's environment and the agent is never given it. The agent gets a sign-only channel instead, and the supervisor signs a checkpoint only when it matches the agent's log as it stands on disk and does not rewrite history already sealed. The `Supervisor` class takes an explicit signer; `Supervisor.with_dev_signer(...)` is the named opt-in for demos and tests.
+`supervise` needs a signing key that you supply (at least 32 bytes), from `CHANCELLOR_SUPERVISE_KEY` or `--signing-key-file PATH`. Chancellor does not generate or ship one; without a key, or with a short one, the command refuses to run (usage error, exit 2). The key stays with the supervisor: it is removed from the supervisor's environment and the agent is never given it. The agent gets a sign-only channel instead, and the supervisor signs a checkpoint only when it matches the agent's log as it stands on disk and does not rewrite history already sealed. The `Supervisor` class takes an explicit signer; `Supervisor.with_dev_signer(...)` is the named opt-in for demos and tests. Same-user process isolation is not key custody; production custody requires a separately isolated supervisor identity or host.
 
 `--cadence` is the agent's **signed-checkpoint interval in seconds**, not its work or segment rate; the stale threshold is `--cadence × --missed` (default 60 × 3 = 180 seconds). If a healthy agent repeatedly draws `stall_anomaly` receipts, match `--cadence` to the interval between its signed checkpoints. The supervisor emits one advisory-only `cadence_advisory` when observed checkpoint timing makes that mismatch likely. Full guidance, including the RUN-9 field case: [docs/supervision-cadence.md](docs/supervision-cadence.md).
 

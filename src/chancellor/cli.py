@@ -588,8 +588,7 @@ def _installs_command(args: list[str]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Console entry point: dispatch the demo, supervise, verify-log,
-    and eval subcommands."""
+    """Console entry point for demo, supervise, installs and evaluation."""
     from_command_line = argv is None
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv:

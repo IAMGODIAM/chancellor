@@ -41,10 +41,12 @@ named legs, R11 anchoring disclosure.
 
 from __future__ import annotations
 
+import ctypes
 import json
 import os
 import shutil
 import subprocess
+import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -415,6 +417,13 @@ class _PopenHandle:
 
 
 Launcher = Callable[[list[str]], ProcessHandle]
+
+
+def prepare_process_launch() -> None:
+    if sys.platform.startswith("linux"):
+        library = ctypes.CDLL(None, use_errno=True)
+        if library.prctl(4, 0, 0, 0, 0) != 0:
+            raise OSError(ctypes.get_errno(), "process launch preparation failed")
 
 
 def _default_launcher(command: list[str]) -> ProcessHandle:
@@ -865,6 +874,7 @@ class Supervisor:
             # this classification.
             self._cadence_fresh_start = not self.agent_checkpoints.exists()
             self._cadence_initial_launch = False
+        prepare_process_launch()
         self._child = self._launcher(self.config.agent_command)
         self._agent_started_at = self._clock()
         self._stall_open = False

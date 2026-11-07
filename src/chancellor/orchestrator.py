@@ -41,6 +41,7 @@ test-only paths use them), and a scores-less artifact still halts.
 from __future__ import annotations
 
 import contextlib
+import logging
 from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -182,6 +183,11 @@ class CrewRunner:
             raw_tool_handles=raw_tool_handles,
         )
         runner.is_governed = True
+        if not runner.effect_observers and not runner._raw_tool_handles:
+            logging.getLogger(__name__).warning(
+                "governed runner has no effect observer or raw tool registration; "
+                "effects outside the broker may not be detected"
+            )
         return runner
 
     @classmethod

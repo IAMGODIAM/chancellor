@@ -492,3 +492,9 @@ def test_eval_help_does_not_hide_unknown_arguments(command, capsys):
 
     assert main([command, "--help", "--unknown"]) == 2
     assert "unknown argument" in capsys.readouterr().err
+
+
+def test_governed_runner_reports_missing_effect_coverage(tmp_path, caplog):
+    _, gatekeeper, _, _ = _setup(tmp_path)
+    _runner(_graph(), {"w": lambda node: _artifact()}, gatekeeper)
+    assert "no effect observer or raw tool registration" in caplog.text
