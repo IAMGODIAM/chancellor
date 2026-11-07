@@ -419,10 +419,13 @@ class _PopenHandle:
 Launcher = Callable[[list[str]], ProcessHandle]
 
 
+PR_SET_DUMPABLE = 4  # from <linux/prctl.h>
+
+
 def prepare_process_launch() -> None:
     if sys.platform.startswith("linux"):
         library = ctypes.CDLL(None, use_errno=True)
-        if library.prctl(4, 0, 0, 0, 0) != 0:
+        if library.prctl(PR_SET_DUMPABLE, 0, 0, 0, 0) != 0:
             raise OSError(ctypes.get_errno(), "process launch preparation failed")
 
 
