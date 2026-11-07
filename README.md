@@ -5,7 +5,7 @@
 [![gates](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml/badge.svg)](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml)
 <a href="docs/evidence/run-7/"><img src="docs/media/badge-drift.svg" alt="Suite B RUN-7: drift 0 / 18,000, bounds printed"></a>
 <!-- release-sync:TESTS-BADGE-ALT -->
-<a href="https://github.com/IAMGODIAM/chancellor/actions"><img src="docs/media/badge-tests.svg" alt="Tests: 442 passing — gates green"></a>
+<a href="https://github.com/IAMGODIAM/chancellor/actions"><img src="docs/media/badge-tests.svg" alt="Tests: 458 passing — gates green"></a>
 <!-- /release-sync:TESTS-BADGE-ALT -->
 <a href="#results-measured-oct-29--nov-2-2026"><img src="docs/media/badge-calibration.svg" alt="Calibration: gate not passed — verdicts labeled"></a>
 <!-- release-sync:RELEASE-BADGE -->
@@ -87,7 +87,7 @@ Governance is not free, and the price is printed, not hidden: the governed arm c
 **Kill-resume gate (T3):** **3,000 / 3,000** gates in RUN-7 — a 10-box reproduction of the same 300-gate instrument, *not* 3,000 independent trials; the label travels with the figure in the record. The fixed harness's original 300 / 300 (6,000 trials, RUN-5) and the first harness's 290 / 300 stand in [BUILD-LOG.md](BUILD-LOG.md) — the 290 was a defect in the test harness, not the product, and the diagnosis is recorded there in full.
 
 <!-- release-sync:TESTS-LINE -->
-**Tests:** 442 passing, 0 failing — which also passes its own presentation gates: Ruff format and lint at zero findings, mypy clean, identical commands in pre-commit and CI (see the badge above).
+**Tests:** 458 passing, 0 failing — which also passes its own presentation gates: Ruff format and lint at zero findings, mypy clean, identical commands in pre-commit and CI (see the badge above).
 <!-- /release-sync:TESTS-LINE -->
 
 **Suite A:** the calibration gate has been run twice under pre-registration and has not passed — and no Suite A score is claimed anywhere in this submission. The calibration of record measured band κ 0.667 and Spearman ρ 0.881, with precedent-consistency (κ 0.294) and reversibility (κ 0.575) below the 0.6 criterion floor. The pre-registered remedy run then failed its own completeness gate — 35 of 36 references scored, one lost to two transport failures — and an incomplete run earns no gate statistics; its diagnostics (not gate statistics) put every criterion above threshold, and the judge's blind self-agreement, measured for the first time, satisfied its gate on all four criteria. What ships is the labeled fallback: live judge verdicts carry the label *uncalibrated* until a pre-registered run passes in full. The gate catching our own judge — twice — is the method working as designed.
@@ -218,7 +218,7 @@ What the dev signer proves, and what it does not: its key ships in the source an
 
 The action class of a node comes from the tool it called through the broker and a policy table that workers cannot reach or change. A node's own declaration is checked against what it actually ran: when the two disagree, the node is denied with a receipt. A node with a denied brokered call is denied, even if the worker caught the denial. A node marked inert is checked too: an inert node that made a brokered call is denied, and a worker registered as holding raw tool handles cannot be marked inert. A declaration with no brokered call behind it never earns auto-approval. Where the runner can observe side effects (through an effect observer), any effect without an approved brokered call behind it halts the run.
 
-What this does not do: the checks apply to calls made through the broker. Actions taken through direct tool handles outside the broker are not stopped, and are detected only when an effect observer covers them. The gate reviews brokered calls; an uncovered direct action may leave no audit evidence. Handing tools to workers only through the broker is a separate follow-up.
+What this does not do: the checks apply to calls made through the broker. Actions taken through direct tool handles outside the broker are not stopped, and are detected only when an effect observer covers them. The gate reviews brokered calls; an uncovered direct action may leave no audit evidence. The runner supplies revocable per-node handles to brokered workers; other actions remain outside this mediation.
 
 Two further notes on what the checks cover. The payload-integrity check verifies a stamp that an upstream tool attached; it cannot create one, so a tool payload that carries a value but no stamp is rejected rather than passed. And anything the policy table cannot classify is denied.
 
