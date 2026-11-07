@@ -395,3 +395,20 @@ def test_outcome_with_no_approved_decision_fails_verification(tmp_path):
     AuditLog(log.path, signer=operator_signer()).checkpoint_v2()
     result = verify_log(log.path, signer=operator_signer())
     assert any("outcome_without_approval" in f for f in result.failures)
+
+
+def test_dev_id_pin_uses_public_key_independent_of_environment(monkeypatch):
+    from chancellor.verify_log import load_pinned_signer
+
+    monkeypatch.setenv("CHANCELLOR_DEV_SIGNER_SECRET", "throwaway-override-" * 3)
+    signer = load_pinned_signer(receipts.DEV_SIGNER_KEY_ID)
+    assert signer.key_id == receipts.DEV_SIGNER_KEY_ID
+    assert signer.sign(b"test") == receipts.public_dev_signer().sign(b"test")
+
+
+def test_resolved_key_id_must_match_literal_id_pin(monkeypatch):
+    from chancellor.verify_log import load_pinned_signer
+
+    monkeypatch.setattr(receipts, "public_dev_signer", operator_signer)
+    with pytest.raises(ValueError, match="pinned key id"):
+        load_pinned_signer(receipts.DEV_SIGNER_KEY_ID)

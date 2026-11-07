@@ -912,7 +912,10 @@ def load_pinned_signer(spec: str) -> receipts.Signer:
     except OSError:
         pass
     if text == receipts.DEV_SIGNER_KEY_ID:
-        return receipts.default_signer()
+        signer = receipts.public_dev_signer()
+        if signer.key_id != text:
+            raise ValueError("resolved signer does not match the pinned key id")
+        return signer
     if text.startswith(receipts.HMAC_KEY_ID_PREFIX):
         secret = os.environ.get(receipts.VERIFY_KEY_ENV)
         if not secret:
