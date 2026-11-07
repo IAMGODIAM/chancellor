@@ -12,6 +12,12 @@
                        --signing-key-file); without one it refuses to run
     chancellor eval-a  run Eval Suite A (normative judgment) with stub agents
     chancellor eval-b  run Eval Suite B (long-horizon reliability)
+    chancellor installs status
+                       the capability-install office (frame v2): fold
+                       probation state from an audit log and print it
+                       (there is no install verb in the product CLI —
+                       installs run through the governed arc in
+                       chancellor.installs, never as a bare command)
 
 Everything runs offline against stub workers until the live API is
 wired (Stage W5).
@@ -45,6 +51,7 @@ from .escalation import ActionClass, AuditLog, EscalationRequest, Gatekeeper
 from .evals import suite_a, suite_b
 from .exhibit import DEFAULT_SEED, run_exhibit
 from .grader import OUTPUT_RUBRIC
+from .installs import fold_all_probation, format_status_lines
 from .instruments import default_panel
 from .judge import Exemplar, Judge
 from .orchestrator import CrewRunner
@@ -278,16 +285,61 @@ def run_demo(state_dir: str = ".chancellor") -> int:
     return 0 if report.ok else 1
 
 
+USAGE = """usage: chancellor <command> [options]
+
+commands:
+  demo        the exhibit, offline: graded work, a halted fault, a human
+              gate, a verified receipt chain (about two minutes; --fast)
+  supervise   run an agent under supervision: chancellor supervise -- <cmd>
+  eval-a      run Eval Suite A (normative judgment), JSON to stdout
+  eval-b      run Eval Suite B (long-horizon reliability), JSON to stdout
+
+options:
+  -h, --help     show this help (also: chancellor <command> --help)
+  --version      show the installed version
+
+verify a receipt log offline: python -m chancellor.verify_log <audit-log.jsonl>"""
+
+DEMO_USAGE = """usage: chancellor demo [--fast] [--auto] [--tamper] [--live] [--seed N]
+                       [--classic]
+
+  --fast     compress the stage pauses (chosen automatically when output
+             is not a terminal)
+  --auto     unattended run: the human gate approves itself after a
+             visible pause; without it the gate waits for Enter, and with
+             no terminal attached it denies (fail-closed, exit 1)
+  --tamper   finally show the verifier an altered copy of the log
+  --live     use the real models (needs CHANCELLOR_META_API_BASE and
+             CHANCELLOR_META_API_KEY)
+  --seed N   integer seed for the scripted run
+  --classic  the original scripted governed run (state in ./.chancellor)
+
+exit code: 0 only on the full, honest path (drift 0, chain verified);
+1 when the run did not complete that path; 2 on a usage error."""
+
+EVAL_USAGE = (
+    "usage: chancellor {name}\n\n  runs the suite offline and prints its JSON report"
+)
+
+
+def _version() -> str:
+    try:
+        from importlib.metadata import PackageNotFoundError, version
+    except ImportError:  # pragma: no cover - stdlib on 3.11+
+        return "unknown"
+    try:
+        return version("chancellor")
+    except PackageNotFoundError:
+        return "unknown (not installed)"
+
+
 def _demo_command(args: list[str]) -> int:
     """`chancellor demo` is the exhibit (chancellor.exhibit): the
     hearing, live in the terminal. The original scripted run remains
     available as `chancellor demo --classic`. Unknown flags and stray
     arguments are usage errors, never silently ignored."""
     if args in (["--help"], ["-h"]):
-        print(
-            "usage: chancellor demo [--fast] [--auto] [--tamper] [--live] "
-            "[--seed N] | --classic"
-        )
+        print(DEMO_USAGE)
         return 0
     flags = {"--fast", "--auto", "--tamper", "--live", "--classic"}
     chosen: set[str] = set()
@@ -317,9 +369,15 @@ def _demo_command(args: list[str]) -> int:
             print("--classic takes no other options", file=sys.stderr)
             return 2
         return run_demo()
+    fast = "--fast" in chosen
+    if not fast and not sys.stdout.isatty():
+        # Stage pacing is for a live audience; piped or logged output
+        # gets the same run, compressed.
+        print("output is not a terminal: running with --fast", file=sys.stderr)
+        fast = True
     try:
         return run_exhibit(
-            fast="--fast" in chosen,
+            fast=fast,
             auto="--auto" in chosen,
             tamper="--tamper" in chosen,
             live="--live" in chosen,
@@ -480,7 +538,7 @@ def _eval_command(cmd: str, args: list[str]) -> int:
     """`chancellor eval-a|eval-b`: takes no arguments. Anything else is a
     usage error — an unknown flag must never be silently ignored."""
     if args in (["--help"], ["-h"]):
-        print(f"usage: chancellor {cmd}  (takes no arguments)")
+        print(EVAL_USAGE.format(name=cmd))
         return 0
     if args:
         print(
@@ -493,22 +551,71 @@ def _eval_command(cmd: str, args: list[str]) -> int:
     return 0
 
 
+def _installs_command(args: list[str]) -> int:
+    """`chancellor installs status [--log PATH]`: print the probation
+    fold from an audit log — per capability: standing, uses in the
+    window, strikes, and the chain head the fold was taken at. A read
+    surface only; the governed arc itself lives in chancellor.installs."""
+    if not args or args[0] != "status":
+        print("usage: chancellor installs status [--log PATH]", file=sys.stderr)
+        return 2
+    log_path = Path(".chancellor/audit-log.jsonl")
+    rest = args[1:]
+    i = 0
+    while i < len(rest):
+        if rest[i] == "--log" and i + 1 < len(rest):
+            log_path = Path(rest[i + 1])
+            i += 2
+        else:
+            print(f"unknown installs flag: {rest[i]}", file=sys.stderr)
+            return 2
+    if not log_path.exists():
+        print(f"installs: no audit log at {log_path}", file=sys.stderr)
+        return 2
+    entries = [
+        json.loads(line)
+        for line in log_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    states = fold_all_probation(entries)
+    if not states:
+        print("installs: no capability records in this chain")
+        return 0
+    head = entries[-1].get("entry_hash") if entries else None
+    for line in format_status_lines(states, head=head):
+        print(line)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Console entry point: dispatch the demo, supervise, verify-log,
     and eval subcommands."""
     from_command_line = argv is None
     argv = list(sys.argv[1:] if argv is None else argv)
-    cmd = argv[0] if argv else "demo"
+    if not argv:
+        print(USAGE)
+        return 0
+    cmd = argv[0]
+    if cmd in {"-h", "--help", "help"}:
+        print(USAGE)
+        return 0
+    if cmd in {"--version", "-V", "version"}:
+        print(f"chancellor {_version()}")
+        return 0
     if cmd == "demo":
         return _demo_command(argv[1:])
     if cmd == "supervise":
         return _supervise_command(argv[1:], reexec=from_command_line)
     if cmd in _EVAL_COMMANDS:
         return _eval_command(cmd, argv[1:])
+    if cmd == "installs":
+        return _installs_command(argv[1:])
     print(
-        f"unknown command: {cmd} (expected demo | supervise | eval-a | eval-b)",
+        f"unknown command: {cmd} (expected demo | supervise | installs | "
+        "eval-a | eval-b)",
         file=sys.stderr,
     )
+    print("run `chancellor --help` for usage", file=sys.stderr)
     return 2
 
 

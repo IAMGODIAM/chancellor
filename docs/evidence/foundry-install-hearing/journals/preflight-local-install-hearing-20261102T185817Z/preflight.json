@@ -1,0 +1,62 @@
+{
+  "act_id": "preflight-local-install-hearing-20261102T185817Z",
+  "verb": "install",
+  "bundle_id": "local-install-hearing",
+  "at": "2026-11-02T18:58:18Z",
+  "precedence": {
+    "cited_decision": "b83be417a927f67c514116619f8d093439e02d46b17777c0bca11719cc5adec1",
+    "cited_log_index": 22,
+    "rule": "G-8.1: the cited decision's log index strictly pre-dates this pre-flight (commission minted before the act began)"
+  },
+  "checks": [
+    {
+      "check": "manifest+pin",
+      "ok": true,
+      "detail": "pin sha256:580eb8c0279570456266d755a106a8cbe8390c50bd9eb63825d47828f1edbd31 over 2 files; excluded ['bundle.manifest.json']"
+    },
+    {
+      "check": "doc-only-perimeter",
+      "ok": true,
+      "detail": "no bin/ files, no executable modes"
+    },
+    {
+      "check": "substrate",
+      "ok": true,
+      "detail": "layer=atlas"
+    },
+    {
+      "check": "provenance",
+      "ok": true,
+      "detail": "house, taint none"
+    },
+    {
+      "check": "path-discipline",
+      "ok": true,
+      "detail": "no escaping symlinks, no absolute/.. paths"
+    },
+    {
+      "check": "field",
+      "ok": true,
+      "detail": "target /home/hatch/workspace/hackathon-2026/scratch/foundry-build/sandbox-home/workspace/custom-skills/local-install-hearing is a governed A1 location for kind skill"
+    },
+    {
+      "check": "scope+novelty",
+      "ok": true,
+      "detail": "bundle enumerated in scope artifact; novel capabilities ['governed-capability-install'] all in-scope"
+    }
+  ],
+  "novelty_diff": {
+    "capability_classes_novel": [
+      "governed-capability-install"
+    ],
+    "data_classes_novel": [],
+    "external_surfaces_novel": [],
+    "standing_triggers_novel": [],
+    "cost_novel": null,
+    "disposition": "every novel class is inside the scope artifact's enumeration (the bundle is named in bundles_in_scope); the standing line holds"
+  },
+  "verdict": "PASS",
+  "pin": "sha256:580eb8c0279570456266d755a106a8cbe8390c50bd9eb63825d47828f1edbd31",
+  "file_count": 2,
+  "kind": "skill"
+}

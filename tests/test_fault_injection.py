@@ -144,6 +144,9 @@ def test_gate_actions_never_auto(tmp_path):
         ActionClass.PUBLISH,
         ActionClass.IRREVERSIBLE,
         ActionClass.CREDENTIAL,
+        # Frame v2's ninth class gates like the other five (spec
+        # SPEC-FOUNDRY-CHANCELLOR §1.2: HUMAN_GATES += capability_install).
+        ActionClass.CAPABILITY_INSTALL,
     }
     tools = {
         ActionClass.READ: "read_file",

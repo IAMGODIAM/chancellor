@@ -50,3 +50,20 @@ def test_cli_eval_suites_run(capsys):
     assert cli_main(["eval-b"]) == 0
     out = capsys.readouterr().out
     assert "normative" in out and "reliability" in out
+
+
+def test_cli_help_and_version(capsys):
+    for argv in ([], ["--help"], ["-h"], ["help"]):
+        assert cli_main(argv) == 0
+        assert "usage: chancellor" in capsys.readouterr().out
+    assert cli_main(["--version"]) == 0
+    assert capsys.readouterr().out.startswith("chancellor ")
+    assert cli_main(["demo", "--help"]) == 0
+    assert "--auto" in capsys.readouterr().out
+    assert cli_main(["eval-a", "--help"]) == 0
+    assert "usage: chancellor eval-a" in capsys.readouterr().out
+
+
+def test_cli_unknown_command_points_to_help(capsys):
+    assert cli_main(["nope"]) == 2
+    assert "chancellor --help" in capsys.readouterr().err

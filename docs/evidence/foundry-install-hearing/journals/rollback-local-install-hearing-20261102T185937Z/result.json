@@ -1,0 +1,27 @@
+{
+  "act_id": "rollback-local-install-hearing-20261102T185937Z",
+  "verb": "rollback",
+  "rollback_of": "install-local-install-hearing-20261102T185819Z",
+  "bundle_id": "local-install-hearing",
+  "removed_pin": "sha256:580eb8c0279570456266d755a106a8cbe8390c50bd9eb63825d47828f1edbd31",
+  "restored_pin": null,
+  "restore": {
+    "snapshot_state": "ABSENT",
+    "files_checked": 0,
+    "files_expected": 0,
+    "hash_equal": true,
+    "restored_hashes": {}
+  },
+  "receipts": {
+    "remove": "6103eb23d16495ebe3afa578ababa0e107ce29f2b4d05db07aa00ecd8c3dfa87",
+    "install": "cb8ad0f294418a45aa74260b37ba94c14d1a58afb0a05a20344caea9808659f4"
+  },
+  "effects": [
+    {
+      "effect": "discovery/doc-surface window",
+      "detail": "the installed tree (pin sha256:580eb8c0279570456266d755a106a8cbe8390c50bd9eb63825d47828f1edbd31) was the live, discoverable state between act install-local-install-hearing-20261102T185819Z and this rollback; its receipted uses stand in the Chancellor chain and are not recalled",
+      "mark": "residual-accepted",
+      "reason": "G-3.3 (ratified): reads during the window are not recalled; the window is named, not erased. For a doc-only bundle there are no other effects to reconcile \u2014 the reconciliation is honestly vacuous beyond this named window."
+    }
+  ]
+}

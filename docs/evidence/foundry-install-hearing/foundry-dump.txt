@@ -1,0 +1,17 @@
+FOUNDRY DUMP — composed capability tree (registry fold)
+posture:          Foundry (documentation-grade; confers and removes no permissions — S7.1)
+registry_events:  26
+registry_head:    708556387f3a74bd93d0c9d069ebe1401bd861149f109241c90dcdd92d359f3c
+registry_log:     LIVE folded_to=26 records_in_file=26
+skill_dirs:       LIVE custom=100 system=56
+connector_dirs:   LIVE custom=24
+scheduler:        LIVE age=2.9s jobs_listed=153
+foundry_state:    LIVE staging=['custom.foundry-fred', 'foundry-heartbeat', 'local-foundry-authoring', 'local-install-hearing', 'local-install-hearing-probation'] disabled=['custom.foundry-fred', 'foundry-heartbeat', 'local-foundry-authoring', 'local-install-hearing-probation']
+completeness:     COMPLETE
+field:            attested as header (S2.5) — never a node
+
+custom.foundry-fred · connector · A1 · sha256:72bc77ec166539e01311e4b21575964bb6f06b9f3e804eaf7022b2f47761a44d (manifest) · deprecated · bindings test-grade
+foundry-heartbeat · schedule · A1 · sha256:0cafe64be0258b83eb6718650aa1a9d14a0e7929bb6bd30b925c4d4ea5a5962f (manifest) · deprecated · bindings test-grade · jobs ['foundry-phase1-heartbeat']
+local-foundry-authoring · skill · A1 · sha256:e1ec850928d269502745ca24432188e2294ea9b3d4fd58b936c1ee99c51e9b0e (manifest) · deprecated · bindings test-grade
+local-install-hearing · skill · A1 · sha256:580eb8c0279570456266d755a106a8cbe8390c50bd9eb63825d47828f1edbd31 (manifest) · deprecated · bindings test-grade
+local-install-hearing-probation · skill · A1 · sha256:98d7c346c4bd55374560bab55d0d16713c8fc7dd6217fa8718d01dd8adc9d3a6 (manifest) · active · bindings test-grade

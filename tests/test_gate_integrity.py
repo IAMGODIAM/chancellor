@@ -484,3 +484,11 @@ def test_supervise_help_does_not_hide_unknown_arguments(capsys):
 
     assert main(["supervise", "--help", "--unknown"]) == 2
     assert "--help takes no other options" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("command", ["eval-a", "eval-b"])
+def test_eval_help_does_not_hide_unknown_arguments(command, capsys):
+    from chancellor.cli import main
+
+    assert main([command, "--help", "--unknown"]) == 2
+    assert "unknown argument" in capsys.readouterr().err

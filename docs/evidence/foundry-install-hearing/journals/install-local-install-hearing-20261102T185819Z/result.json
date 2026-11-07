@@ -1,0 +1,14 @@
+{
+  "act_id": "install-local-install-hearing-20261102T185819Z",
+  "verb": "install",
+  "bundle_id": "local-install-hearing",
+  "pin": "sha256:580eb8c0279570456266d755a106a8cbe8390c50bd9eb63825d47828f1edbd31",
+  "beat1": {
+    "catalog_applied": true,
+    "readback_pin": "sha256:580eb8c0279570456266d755a106a8cbe8390c50bd9eb63825d47828f1edbd31",
+    "registry_events": 23,
+    "registry_head": "0d75edef19c82b19324dd0c020b436db99d6561daaa0fd5835dc45d566253551",
+    "receipt_id": "58418cf598fd98c348e1feab7f7373c101c319735272fb65ccf03f4c4965eb6b",
+    "receipt_seq": 23
+  }
+}

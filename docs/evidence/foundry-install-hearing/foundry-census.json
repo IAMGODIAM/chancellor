@@ -1,0 +1,99 @@
+{
+  "registry": {
+    "count": 26,
+    "head": "708556387f3a74bd93d0c9d069ebe1401bd861149f109241c90dcdd92d359f3c",
+    "signature_failures": []
+  },
+  "bundles": {
+    "local-foundry-authoring": {
+      "pin": "sha256:e1ec850928d269502745ca24432188e2294ea9b3d4fd58b936c1ee99c51e9b0e",
+      "kind": "skill",
+      "status": "deprecated",
+      "present_where": "disabled"
+    },
+    "custom.foundry-fred": {
+      "pin": "sha256:72bc77ec166539e01311e4b21575964bb6f06b9f3e804eaf7022b2f47761a44d",
+      "kind": "connector",
+      "status": "deprecated",
+      "present_where": "disabled"
+    },
+    "foundry-heartbeat": {
+      "pin": "sha256:0cafe64be0258b83eb6718650aa1a9d14a0e7929bb6bd30b925c4d4ea5a5962f",
+      "kind": "schedule",
+      "components": [
+        {
+          "job_id": "foundry-phase1-heartbeat",
+          "definition_sha256": "sha256:d5fd6bddcbc13f30c4987299eccfa82e2d498a965f2f623f5d4a3fa3cf12f55d"
+        }
+      ],
+      "status": "deprecated",
+      "present_where": "disabled",
+      "job_check": {
+        "foundry-phase1-heartbeat": {
+          "expected": "absent",
+          "present": false
+        }
+      }
+    },
+    "local-install-hearing": {
+      "pin": "sha256:580eb8c0279570456266d755a106a8cbe8390c50bd9eb63825d47828f1edbd31",
+      "kind": "skill",
+      "status": "deprecated",
+      "present_where": "MISSING"
+    },
+    "local-install-hearing-probation": {
+      "pin": "sha256:98d7c346c4bd55374560bab55d0d16713c8fc7dd6217fa8718d01dd8adc9d3a6",
+      "kind": "skill",
+      "status": "active",
+      "present_where": "MISSING"
+    }
+  },
+  "library_skill_count": 100,
+  "connector_dirs": [
+    "custom.legacy-buttondown",
+    "custom.legacy-cloudflare",
+    "custom.legacy-codemagic",
+    "custom.legacy-contrado",
+    "custom.legacy-elevenlabs",
+    "custom.legacy-fred",
+    "custom.legacy-github",
+    "custom.legacy-google-ads",
+    "custom.legacy-groq",
+    "custom.legacy-huggingface",
+    "custom.legacy-nvidia",
+    "custom.legacy-prodigi",
+    "custom.legacy-raisely",
+    "custom.legacy-resend",
+    "custom.legacy-sam-gov",
+    "custom.legacy-simpler-grants-gov",
+    "custom.legacy-stripe",
+    "custom.legacy-telegram-bot",
+    "custom.legacy-zeffy",
+    "custom.legacy-zenodo",
+    "custom.meta-model-api",
+    "custom.past-dev",
+    "custom.semanticscholar",
+    "custom.telegram-serverless"
+  ],
+  "schedule_store_dirs": [],
+  "scheduler_export": {
+    "state": "PRESENT",
+    "sha256": "sha256:348f3ef8cd1a66472ffc16be85e49d0e934e5909758b4588029d2aeec0160a1f",
+    "exported_at": "2026-11-02T19:02:12Z",
+    "age_s": 3.0,
+    "jobs_listed": 153
+  },
+  "disabled_dirs": [
+    "custom.foundry-fred",
+    "foundry-heartbeat",
+    "local-foundry-authoring",
+    "local-install-hearing-probation"
+  ],
+  "staging_dirs": [
+    "custom.foundry-fred",
+    "foundry-heartbeat",
+    "local-foundry-authoring",
+    "local-install-hearing",
+    "local-install-hearing-probation"
+  ]
+}
