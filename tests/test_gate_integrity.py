@@ -442,3 +442,45 @@ def test_outcome_write_failure_halts(tmp_path):
 
 def test_request_carries_a_call_id_only_for_brokered_calls():
     assert EscalationRequest(action="x").call_id is None
+
+
+def test_approval_shows_broker_generated_arguments(tmp_path):
+    import json
+
+    seen = []
+    _, _, broker, _ = _setup(
+        tmp_path, approver=lambda request: seen.append(request) or (True, "ok")
+    )
+    args = {"to": "reader@example.test", "body": "report"}
+    broker.call("n", "send_email", args, action="caller summary", detail="caller note")
+    assert seen[0].action == "call send_email"
+    assert seen[0].detail.startswith("Canonical arguments: ")
+    encoded = seen[0].detail.splitlines()[0].removeprefix("Canonical arguments: ")
+    assert json.loads(encoded) == args
+    assert seen[0].args_sha256 == digest(json.loads(encoded))
+
+
+def test_each_observed_effect_needs_a_distinct_broker_call(tmp_path):
+    _, _, broker, _ = _setup(tmp_path)
+    args = {"value": 1}
+    broker.call("n", "compute", args)
+    observed = [ObservedEffect("compute", digest(args))] * 2
+    assert len(broker.unbrokered("n", 0, observed)) == 1
+
+
+def test_demo_help_does_not_run_the_demo(monkeypatch, capsys):
+    from chancellor import cli
+
+    def unexpected(**kwargs):
+        pytest.fail("help must not run the demo")
+
+    monkeypatch.setattr(cli, "run_exhibit", unexpected)
+    assert cli.main(["demo", "--help"]) == 0
+    assert "usage: chancellor demo" in capsys.readouterr().out
+
+
+def test_supervise_help_does_not_hide_unknown_arguments(capsys):
+    from chancellor.cli import main
+
+    assert main(["supervise", "--help", "--unknown"]) == 2
+    assert "--help takes no other options" in capsys.readouterr().err

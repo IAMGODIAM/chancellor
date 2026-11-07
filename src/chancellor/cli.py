@@ -283,6 +283,12 @@ def _demo_command(args: list[str]) -> int:
     hearing, live in the terminal. The original scripted run remains
     available as `chancellor demo --classic`. Unknown flags and stray
     arguments are usage errors, never silently ignored."""
+    if args in (["--help"], ["-h"]):
+        print(
+            "usage: chancellor demo [--fast] [--auto] [--tamper] [--live] "
+            "[--seed N] | --classic"
+        )
+        return 0
     flags = {"--fast", "--auto", "--tamper", "--live", "--classic"}
     chosen: set[str] = set()
     seed = DEFAULT_SEED
@@ -373,6 +379,9 @@ def _supervise_command(args: list[str], *, reexec: bool = False) -> int:
     replaced so /proc/<pid>/environ no longer holds it)."""
     help_end = args.index("--") if "--" in args else len(args)
     if any(flag in {"--help", "-h"} for flag in args[:help_end]):
+        if args[:help_end] not in (["--help"], ["-h"]):
+            print("supervise: --help takes no other options", file=sys.stderr)
+            return 2
         print(SUPERVISE_USAGE)
         print(SUPERVISE_KEY_HELP)
         print(SUPERVISE_CADENCE_HELP)
@@ -447,7 +456,7 @@ def _supervise_command(args: list[str], *, reexec: bool = False) -> int:
         print(f"supervise: {problem}", file=sys.stderr)
         print(SUPERVISE_KEY_HELP, file=sys.stderr)
         return 2
-    if reexec and not from_pipe and key_file is None:
+    if reexec and not from_pipe:
         _hand_key_to_fresh_process(kept_opts, command, signing_key)
     signer = DevHmacSigner(secret=signing_key.encode("utf-8"))
     service = SealService(

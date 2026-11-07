@@ -151,7 +151,7 @@ What the dev signer proves, and what it does not: its key ships in the source an
 
 ## What the gate covers
 
-The action class of a node comes from the tool it called through the broker and a policy table that workers cannot reach or change. A node's own declaration is checked against what it actually ran: when the two disagree, the node is denied with a receipt. A node with a denied brokered call is denied, even if the worker caught the denial. A node marked inert is checked too: an inert node that made a brokered call is denied, and a worker that holds raw tool handles cannot be marked inert. A declaration with no brokered call behind it never earns auto-approval. Where the runner can observe side effects (through an effect observer), any effect without an approved brokered call behind it halts the run.
+The action class of a node comes from the tool it called through the broker and a policy table that workers cannot reach or change. A node's own declaration is checked against what it actually ran: when the two disagree, the node is denied with a receipt. A node with a denied brokered call is denied, even if the worker caught the denial. A node marked inert is checked too: an inert node that made a brokered call is denied, and a worker registered as holding raw tool handles cannot be marked inert. A declaration with no brokered call behind it never earns auto-approval. Where the runner can observe side effects (through an effect observer), any effect without an approved brokered call behind it halts the run.
 
 What this does not do: the checks apply to calls made through the broker. A worker that holds a direct handle to a tool and bypasses the broker is audited afterward, not stopped — the gate reviews what was brokered, and the runner halts on any unbrokered effect it can detect. Handing tools to workers only through the broker is a separate follow-up.
 
@@ -161,7 +161,7 @@ Two further notes on what the checks cover. The payload-integrity check verifies
 
 - **Bare `compute` / `read` declarations are denied.** A node that declares only an auto-approved class (`compute`, `read`, `draft`) with no brokered call behind it is denied with a receipt. To migrate, call the tool through `ToolBroker` and declare the same tool, or mark a node that does nothing `inert`.
 - **A declaration that does not match the brokered call is denied.** The class, tool and effects a node declares must agree with what it called through the broker.
-- **Inert nodes are checked.** An inert node that makes a brokered call, or whose worker holds raw tool handles, is denied.
+- **Inert nodes are checked.** An inert node that makes a brokered call, or whose worker is registered as holding raw tool handles, is denied.
 - **Verification needs a pinned key.** `verify_log` exits 0 only for a log signed by a key you pinned with `--pubkey`; dev-signed logs print `DEV-SIGNED, NOT AUTHENTIC`.
 - **`supervise` and `Supervisor`.** A signing key of at least 32 bytes is required; `Supervisor(...)` without a signer raises `SignerRequiredError`.
 - **Checkpoints are v2.** Auto-sealed checkpoints are written as v2, and a v1 checkpoint after a v2 one fails verification.

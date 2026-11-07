@@ -277,6 +277,7 @@ report = {
     "env_values_hold_key": any(key in v for v in os.environ.values()),
     "parent_environ_holds_key": key in proc_text("environ"),
     "parent_cmdline_holds_key": key in proc_text("cmdline"),
+    "parent_cmdline_names_key_file": "--signing-key-file" in proc_text("cmdline"),
     "channel_named": receipts.SIGN_FD_ENV in os.environ,
 }
 log = AuditLog(log_path)
@@ -359,6 +360,7 @@ def test_agent_never_holds_or_reads_the_operator_key(tmp_path, key_mode):
     assert report["env_values_hold_key"] is False
     assert report["parent_environ_holds_key"] is False
     assert report["parent_cmdline_holds_key"] is False
+    assert report["parent_cmdline_names_key_file"] is False
     assert report["channel_named"] is True
     assert report["signer"] == "PipeSigner"
     assert report["junk_signed"] is False

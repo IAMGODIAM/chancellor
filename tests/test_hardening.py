@@ -346,7 +346,10 @@ def test_stamped_and_non_tool_payloads_pass_integrity_check():
     assert not check_payload_integrity(
         {"data": {"value": 6, "checksum": checksum_of(5)}}
     ).ok
-    assert check_payload_integrity({"data": {"key": "k", "value": 1}}).ok
+    assert not check_payload_integrity({"data": {"key": "k", "value": 1}}).ok
+    assert check_payload_integrity(
+        {"data": {"key": "k", "value": 1}}, trusted_write=True
+    ).ok
     assert check_payload_integrity({"data": {"skipped": True}}).ok
     assert check_payload_integrity({"text": "no data"}).ok
 
@@ -548,3 +551,16 @@ def test_runner_halts_when_brokered_call_was_denied_but_declared(tmp_path):
     report = _runner(g, w, broker.gatekeeper, broker).run()
     assert report.halted and not report.completed
     assert ran == []
+
+
+def test_payload_key_does_not_select_integrity_exemption():
+    assert not check_payload_integrity({"data": {"key": "result", "value": 1}}).ok
+
+
+def test_only_runner_registered_write_records_get_the_exemption():
+    from chancellor.evals.suite_b import _governed_panel
+
+    write_record = {"text": "stored", "data": {"key": "result", "value": 1}}
+    panel = _governed_panel([write_record])
+    assert panel.run_all(write_record).ok
+    assert not panel.run_all(dict(write_record)).ok

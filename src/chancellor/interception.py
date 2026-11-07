@@ -109,16 +109,23 @@ class ToolBroker:
         unmatched: list[str] = []
         for effect in observed:
             tool = str(effect.tool).strip().lower()
-            if not any(
-                r.tool == tool
-                and (
-                    effect.args_sha256 is None
-                    or r.executed_args_sha256 == effect.args_sha256
-                )
-                for r in ran
-            ):
+            match = next(
+                (
+                    i
+                    for i, r in enumerate(ran)
+                    if r.tool == tool
+                    and (
+                        effect.args_sha256 is None
+                        or r.executed_args_sha256 == effect.args_sha256
+                    )
+                ),
+                None,
+            )
+            if match is None:
                 what = effect.description or tool
                 unmatched.append(f"{what}: effect seen with no brokered call behind it")
+            else:
+                ran.pop(match)
         return unmatched
 
     def has_tool(self, name: object) -> bool:
@@ -139,9 +146,20 @@ class ToolBroker:
         key = tool.strip().lower()
         call_args = dict(args or {})
         args_digest = digest(call_args)
+        rendered_args = json.dumps(
+            call_args,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            default=repr,
+        )
         request = EscalationRequest(
-            action=action or f"call {key}",
-            detail=detail,
+            action=f"call {key}",
+            detail=(
+                f"Canonical arguments: {rendered_args}"
+                f"\nCaller summary (untrusted): {action or ''}"
+                f"\nCaller detail (untrusted): {detail}"
+            ),
             cost_usd=cost_usd,
             node_id=node_id,
             tool=key,
