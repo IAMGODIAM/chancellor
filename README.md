@@ -3,7 +3,7 @@
 <img src="docs/media/banner.png" alt="Chancellor — the governance-and-eval harness for long-running agents" width="880">
 
 [![gates](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml/badge.svg)](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml)
-<a href="docs/evidence/run-7/"><img src="docs/media/badge-drift.svg" alt="Suite B: drift 0 / 18,000 — bounds printed"></a>
+<a href="docs/evidence/run-7/"><img src="docs/media/badge-drift.svg" alt="Suite B RUN-7: drift 0 / 18,000, bounds printed"></a>
 <!-- release-sync:TESTS-BADGE-ALT -->
 <a href="https://github.com/IAMGODIAM/chancellor/actions"><img src="docs/media/badge-tests.svg" alt="Tests: 442 passing — gates green"></a>
 <!-- /release-sync:TESTS-BADGE-ALT -->
@@ -288,7 +288,7 @@ The code cites its governing amendments inline (AM-2, EA-5, …) — the key is 
 
 ## How it maps to the judging criteria
 
-- **Impact (30%)** — for anyone who runs long-running agents with real authority: every consequential act that goes through the broker is checked before it runs, graded after it lands, and receipted either way (acts outside the broker are not stopped and are detected only when an effect observer covers them) — and the run itself is kept by the fourth element, a supervisor that verifies the chain before it resumes anything — so an operator can hand an agent real work (spend, sends, publishing, irreversible acts) and inspect the recorded actions, costs and approval claims afterward. The log does not authenticate who approved an action.
+- **Impact (30%)** — for anyone who runs long-running agents with real authority: every consequential act that goes through the broker is checked at the broker, graded after it lands, and receipted either way (acts outside the broker are not stopped and are detected only when an effect observer covers them) — and the run itself is kept by the fourth element, a supervisor that verifies the chain before it resumes anything — so an operator can hand an agent real work (spend, sends, publishing, irreversible acts) and inspect the recorded actions, costs and approval claims afterward. The log does not authenticate who approved an action.
 - **Tooling — creative use of Meta's tools (25%)** — the Meta Model API supplies both halves of the separation of powers: `muse-spark-1.3` does the work and `muse-wonder-1.0` grades it, so no run is scored by the model that produced it. Exact, versioned IDs only — see [ERRATA.md](ERRATA.md) E-1.
 - **Demo (25%)** — `chancellor demo` runs end-to-end offline today; the identical run executes on the live Meta models through the same client (connection validated Oct 30), so the demo cannot drift from the product. (Video: see the Demo section above.)
 - **Technical Depth (20%)** — durable, crash-atomic task graphs proven under kill-resume gates (300 / 300 at 1x; 3,000 / 3,000 as a labeled 10-box reproduction at 10x), an in-product supervisor that verifies before it resumes, rubric-graded outputs from an independent judge, failure-injected reliability measurement with the cost printed beside the frontier, and a hash-chained audit log verifiable offline.

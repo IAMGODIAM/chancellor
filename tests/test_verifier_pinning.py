@@ -3,6 +3,7 @@ signer; dev-signed logs are labelled and never verified; checkpoint
 history, key ids and outcome records are checked."""
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -218,12 +219,23 @@ def test_accept_dev_signer_appears_only_in_help(capsys):
     assert "--pubkey" in help_text
 
 
+def _src_env() -> dict[str, str]:
+    """Child env that imports chancellor from this checkout (CI does not install it)."""
+    import chancellor
+
+    src = str(Path(chancellor.__file__).resolve().parent.parent)
+    env = dict(os.environ)
+    env["PYTHONPATH"] = src + os.pathsep + env.get("PYTHONPATH", "")
+    return env
+
+
 def test_demo_prints_no_flag_guidance(tmp_path):
     proc = subprocess.run(
         [sys.executable, "-m", "chancellor.cli", "demo", "--fast", "--auto"],
         capture_output=True,
         text=True,
         cwd=tmp_path,
+        env=_src_env(),
         timeout=120,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
