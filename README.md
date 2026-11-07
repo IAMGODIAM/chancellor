@@ -3,9 +3,9 @@
 <img src="docs/media/banner.png" alt="Chancellor — the governance-and-eval harness for long-running agents" width="880">
 
 [![gates](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml/badge.svg)](https://github.com/IAMGODIAM/chancellor/actions/workflows/gates.yml)
-<a href="docs/evidence/run-7/"><img src="docs/media/badge-drift.svg" alt="Suite B: drift 0 / 18,000 — bounds printed"></a>
+<a href="docs/evidence/run-7/"><img src="docs/media/badge-drift.svg" alt="Suite B RUN-7: drift 0 / 18,000, bounds printed"></a>
 <!-- release-sync:TESTS-BADGE-ALT -->
-<a href="https://github.com/IAMGODIAM/chancellor/actions"><img src="docs/media/badge-tests.svg" alt="Tests: 297 passing — gates green"></a>
+<a href="https://github.com/IAMGODIAM/chancellor/actions"><img src="docs/media/badge-tests.svg" alt="Tests: 442 passing — gates green"></a>
 <!-- /release-sync:TESTS-BADGE-ALT -->
 <a href="#results-measured-oct-29--nov-2-2026"><img src="docs/media/badge-calibration.svg" alt="Calibration: gate not passed — verdicts labeled"></a>
 <!-- release-sync:RELEASE-BADGE -->
@@ -30,9 +30,11 @@ pip install chancellor
 #  pip install git+https://github.com/IAMGODIAM/chancellor)
 
 chancellor demo                # the exhibit, offline — graded work, a halted
-                               # fault, a human gate, a verified receipt
+                               # fault, a human gate, a receipt chain
 python -m chancellor.verify_log .chancellor-exhibit/audit-log.jsonl
-                               # the demo's own receipt book, verified cold
+                               # the demo's own receipt book, checked cold; it
+                               # prints DEV-SIGNED, NOT AUTHENTIC (the demo seals
+                               # with the public dev key) and exits non-zero
 ```
 
 - **The evidence:** [docs/evidence/run-7/](docs/evidence/run-7/) — the 10x record (RUN-7) with its bounds printed, verified by an independent recount; the first measurement (RUN-5) stands at [docs/evidence/run-5/](docs/evidence/run-5/); a two-file sample you can verify in isolation lives in [docs/evidence/sample/](docs/evidence/sample/).
@@ -52,7 +54,7 @@ Long-running agents fail quietly: they drift, mis-grade their own work, trust br
 - **Work is a graph, not a vibe.** Every run is an explicit, durable task graph that persists to disk and resumes after a crash.
 - **Output is graded, not trusted.** Every consequential output is scored against a weighted rubric before acceptance.
 - **Instruments fail closed.** If Chancellor's own checks error, the run halts. A broken gauge is a stop signal, never a pass — and there is no flag to turn this off.
-- **Authority escalates; capability doesn't.** Spend, external sends, publishing, irreversible acts, and credential use stop at a human gate. Every gate decision — human or policy — leaves an append-only receipt.
+- **Authority escalates; capability doesn't.** Spend, external sends, publishing, irreversible acts, and credential use stop at a human gate when the call goes through Chancellor's broker. Every gate decision — human or policy — leaves an append-only receipt. Actions outside the broker are not stopped and are detected only when an effect observer covers them (see [What the gate covers](#what-the-gate-covers)).
 
 Two eval suites test the claims. **Suite A** asks whether the judge grades remedies for invented harms the way the approved key grades them — consistently, and for the stated reasons. **Suite B** breaks long runs on purpose — crashes, dropped steps, corrupted values — and counts how often an agent claims success for work that did not happen.
 
@@ -85,7 +87,7 @@ Governance is not free, and the price is printed, not hidden: the governed arm c
 **Kill-resume gate (T3):** **3,000 / 3,000** gates in RUN-7 — a 10-box reproduction of the same 300-gate instrument, *not* 3,000 independent trials; the label travels with the figure in the record. The fixed harness's original 300 / 300 (6,000 trials, RUN-5) and the first harness's 290 / 300 stand in [BUILD-LOG.md](BUILD-LOG.md) — the 290 was a defect in the test harness, not the product, and the diagnosis is recorded there in full.
 
 <!-- release-sync:TESTS-LINE -->
-**Tests:** 297 passing, 0 failing — which also passes its own presentation gates: Ruff format and lint at zero findings, mypy clean, identical commands in pre-commit and CI (see the badge above).
+**Tests:** 442 passing, 0 failing — which also passes its own presentation gates: Ruff format and lint at zero findings, mypy clean, identical commands in pre-commit and CI (see the badge above).
 <!-- /release-sync:TESTS-LINE -->
 
 **Suite A:** the calibration gate has been run twice under pre-registration and has not passed — and no Suite A score is claimed anywhere in this submission. The calibration of record measured band κ 0.667 and Spearman ρ 0.881, with precedent-consistency (κ 0.294) and reversibility (κ 0.575) below the 0.6 criterion floor. The pre-registered remedy run then failed its own completeness gate — 35 of 36 references scored, one lost to two transport failures — and an incomplete run earns no gate statistics; its diagnostics (not gate statistics) put every criterion above threshold, and the judge's blind self-agreement, measured for the first time, satisfied its gate on all four criteria. What ships is the labeled fallback: live judge verdicts carry the label *uncalibrated* until a pre-registered run passes in full. The gate catching our own judge — twice — is the method working as designed.
@@ -178,30 +180,56 @@ The exhibit writes its state to `./.chancellor-exhibit` in the current directory
 ## Supervise a long-running agent
 
 ```bash
+export CHANCELLOR_SUPERVISE_KEY=<your signing key>   # operator-supplied
 chancellor supervise -- <agent command...>
 ```
+
+`supervise` needs a signing key that you supply (at least 32 bytes), from `CHANCELLOR_SUPERVISE_KEY` or `--signing-key-file PATH`. Chancellor does not generate or ship one; without a key, or with a short one, the command refuses to run (usage error, exit 2). The key stays with the supervisor: it is removed from the supervisor's environment and the agent is never given it. The agent gets a sign-only channel instead, and the supervisor signs a checkpoint only when it matches the agent's log as it stands on disk and does not rewrite history already sealed. The `Supervisor` class takes an explicit signer; `Supervisor.with_dev_signer(...)` is the named opt-in for demos and tests. Same-user process isolation is not key custody; production custody requires a separately isolated supervisor identity or host.
 
 `--cadence` is the agent's **signed-checkpoint interval in seconds**, not its work or segment rate; the stale threshold is `--cadence × --missed` (default 60 × 3 = 180 seconds). If a healthy agent repeatedly draws `stall_anomaly` receipts, match `--cadence` to the interval between its signed checkpoints. The supervisor emits one advisory-only `cadence_advisory` when observed checkpoint timing makes that mismatch likely. Full guidance, including the RUN-9 field case: [docs/supervision-cadence.md](docs/supervision-cadence.md).
 
 ## Demo
 
-<img src="docs/media/exhibit.gif" alt="The exhibit, animated: the four beats of a governed run — graded work, a halted fault, a human gate, and a receipt chain verified cold" width="880">
+<img src="docs/media/exhibit.gif" alt="The exhibit, animated: the four beats of a governed run — graded work, a halted fault, a human gate, and a receipt chain checked cold" width="880">
 
 *The exhibit in half a minute — real output of `chancellor demo`, typeset from the verified capture. The full hearing is the three-minute narrated film:*
 
 [![Chancellor — a hearing in three exhibits](docs/media/film-plate.png)](https://www.youtube.com/watch?v=z-2BGfKpuKA)
 
-The demo is the exhibit — `chancellor demo` (Quickstart above) runs the hearing live in the terminal: graded work with a revision, an injected fault halted fail-closed, a human gate the run waits at, and a receipt chain verified cold (with `--tamper`, a quietly altered copy is rejected on screen, the entry named). Its verdict block is byte-identical across clean runs, so the video above is a capture of a fixed target, not a lucky take.
+The demo is the exhibit — `chancellor demo` (Quickstart above) runs the hearing live in the terminal: graded work with a revision, an injected fault halted fail-closed, a human gate the run waits at, and a receipt chain checked cold and labelled DEV-SIGNED, NOT AUTHENTIC (with `--tamper`, a quietly altered copy is rejected on screen, the entry named). Its verdict block is byte-identical across clean runs, so the video above is a capture of a fixed target, not a lucky take.
 
 ## Verify the audit log
 
-Every governed run writes a hash-chained audit log with signed checkpoints. Verify one offline — no credentials, no network:
+Every governed run writes a hash-chained audit log with signed checkpoints. Verify one offline — no network — against the key you pinned:
 
 ```bash
-python -m chancellor.verify_log .chancellor/audit-log.jsonl
+python -m chancellor.verify_log audit-log.jsonl --pubkey <public key or file>
 ```
 
-Exit 0 means the chain is intact and the newest signed checkpoint checks out. Exit 1 names the failure — a mid-log edit, a reordering, a truncated tail, a forged checkpoint. A log with no checkpoint is never reported as verified: tail truncation is undetectable without one, and the verifier says so rather than guessing. The checkpoints are signed with the development signer whose key ships in the source — deliberately public, and labeled in the code where it sits: those signatures prove the chain is internally consistent and unaltered since signing (tamper-evidence), not who signed it (non-repudiation). Separating the signer — a production key held apart from the code — is the named hardening step before any deployment that needs attribution.
+`--pubkey` takes an Ed25519 public key (`ed25519:<base64>`, 64 hex characters, or a file holding one), or the key id of an operator HMAC key (`hmac-sha256:<id>`, checked with the secret in `CHANCELLOR_VERIFY_KEY`). The log is reported **VERIFIED** only when its checkpoints are signed by that pinned key and the key is not the built-in dev key; the exit status is 0 only then. A log sealed under the built-in dev key prints `DEV-SIGNED, NOT AUTHENTIC` and exits non-zero: its chain can be checked for consistency, but anyone can re-seal it, so it says nothing about who wrote it. The demo's log is dev-signed, so it always prints that label.
+
+Exit 0 means the chain is intact, every checkpoint agrees with the log it seals, and the newest one is signed by your pinned key. Exit 1 names the failure — a mid-log edit, a reordering, a truncated tail, a forged or unpinned checkpoint, a v1 checkpoint after a v2 one, a brokered call approved but never recorded as run. A log with no checkpoint is never reported as verified: tail truncation is undetectable without one, and the verifier says so rather than guessing. Checkpoints are written as v2 (`e5.receipt_checkpoint.v2`); `verify_log resolve` reads both v1 and v2.
+
+Brokered calls leave two records on the chain: the decision, and after it an outcome naming the tool, the digest of the approved arguments, the digest of the arguments the tool received, and the result status and digest. An approved decision with no matching outcome fails verification.
+
+What the dev signer proves, and what it does not: its key ships in the source and is public, so its signatures show the chain is internally consistent and unaltered since signing, not who signed it. A production signer, held apart from the code, is the named step before any deployment that needs attribution.
+
+## What the gate covers
+
+The action class of a node comes from the tool it called through the broker and a policy table that workers cannot reach or change. A node's own declaration is checked against what it actually ran: when the two disagree, the node is denied with a receipt. A node with a denied brokered call is denied, even if the worker caught the denial. A node marked inert is checked too: an inert node that made a brokered call is denied, and a worker registered as holding raw tool handles cannot be marked inert. A declaration with no brokered call behind it never earns auto-approval. Where the runner can observe side effects (through an effect observer), any effect without an approved brokered call behind it halts the run.
+
+What this does not do: the checks apply to calls made through the broker. Actions taken through direct tool handles outside the broker are not stopped, and are detected only when an effect observer covers them. The gate reviews brokered calls; an uncovered direct action may leave no audit evidence. Handing tools to workers only through the broker is a separate follow-up.
+
+Two further notes on what the checks cover. The payload-integrity check verifies a stamp that an upstream tool attached; it cannot create one, so a tool payload that carries a value but no stamp is rejected rather than passed. And anything the policy table cannot classify is denied.
+
+## Migration notes
+
+- **Bare `compute` / `read` declarations are denied.** A node that declares only an auto-approved class (`compute`, `read`, `draft`) with no brokered call behind it is denied with a receipt. To migrate, call the tool through `ToolBroker` and declare the same tool, or mark a node that does nothing `inert`.
+- **A declaration that does not match the brokered call is denied.** The class, tool and effects a node declares must agree with what it called through the broker.
+- **Inert nodes are checked.** An inert node that makes a brokered call, or whose worker is registered as holding raw tool handles, is denied.
+- **Verification needs a pinned key.** `verify_log` exits 0 only for a log signed by a key you pinned with `--pubkey`; dev-signed logs print `DEV-SIGNED, NOT AUTHENTIC`.
+- **`supervise` and `Supervisor`.** A signing key of at least 32 bytes is required; `Supervisor(...)` without a signer raises `SignerRequiredError`.
+- **Checkpoints are v2.** Auto-sealed checkpoints are written as v2, and a v1 checkpoint after a v2 one fails verification.
 
 A ready-made pair to try it on — one exhibit run's log and its signed checkpoint, with the exact commands — lives in [docs/evidence/sample/](docs/evidence/sample/).
 
@@ -260,7 +288,7 @@ The code cites its governing amendments inline (AM-2, EA-5, …) — the key is 
 
 ## How it maps to the judging criteria
 
-- **Impact (30%)** — for anyone who runs long-running agents with real authority: every consequential act is gated before it happens, graded after it lands, and receipted either way — and the run itself is kept by the fourth element, a supervisor that verifies the chain before it resumes anything — so an operator can hand an agent real work (spend, sends, publishing, irreversible acts) and prove afterward exactly what it did, what it cost, and who approved it.
+- **Impact (30%)** — for anyone who runs long-running agents with real authority: every consequential act that goes through the broker is checked at the broker, graded after it lands, and receipted either way (acts outside the broker are not stopped and are detected only when an effect observer covers them) — and the run itself is kept by the fourth element, a supervisor that verifies the chain before it resumes anything — so an operator can hand an agent real work (spend, sends, publishing, irreversible acts) and inspect the recorded actions, costs and approval claims afterward. The log does not authenticate who approved an action.
 - **Tooling — creative use of Meta's tools (25%)** — the Meta Model API supplies both halves of the separation of powers: `muse-spark-1.3` does the work and `muse-wonder-1.0` grades it, so no run is scored by the model that produced it. Exact, versioned IDs only — see [ERRATA.md](ERRATA.md) E-1.
 - **Demo (25%)** — `chancellor demo` runs end-to-end offline today; the identical run executes on the live Meta models through the same client (connection validated Oct 30), so the demo cannot drift from the product. (Video: see the Demo section above.)
 - **Technical Depth (20%)** — durable, crash-atomic task graphs proven under kill-resume gates (300 / 300 at 1x; 3,000 / 3,000 as a labeled 10-box reproduction at 10x), an in-product supervisor that verifies before it resumes, rubric-graded outputs from an independent judge, failure-injected reliability measurement with the cost printed beside the frontier, and a hash-chained audit log verifiable offline.

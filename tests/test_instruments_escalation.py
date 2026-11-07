@@ -24,8 +24,15 @@ def test_banned_terms_check():
     assert not panel.run_all({"text": "Lorem ipsum"}).ok
 
 
+_TOOL_FOR = {
+    ActionClass.READ: "read_file",
+    ActionClass.DRAFT: "draft_text",
+    ActionClass.COMPUTE: "compute",
+}
+
+
 def _req(cls, action="do the thing"):
-    return EscalationRequest(action=action, action_class=cls)
+    return EscalationRequest(action=action, action_class=cls, tool=_TOOL_FOR.get(cls))
 
 
 def test_auto_classes_pass_by_policy():

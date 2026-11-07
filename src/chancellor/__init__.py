@@ -20,6 +20,7 @@ from .instruments import CheckResult, InstrumentPanel, default_panel
 from .judge import Judge, JudgeError
 from .orchestrator import CrewRunner, RunReport
 from .supervise import (
+    SignerRequiredError,
     SupervisionState,
     Supervisor,
     SupervisorConfig,
@@ -94,6 +95,7 @@ __all__ = [
     "Judge",
     "JudgeError",
     "Supervisor",
+    "SignerRequiredError",
     "SupervisorConfig",
     "SupervisionState",
     "verify_at_checkpoint_boundary",

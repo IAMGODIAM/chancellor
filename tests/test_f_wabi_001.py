@@ -48,7 +48,7 @@ def _run(tmp_path: Path, launcher: _Launcher) -> int:
         poll_s=0.01,
         heartbeat_s=10_000.0,
     )
-    sup = Supervisor(
+    sup = Supervisor.with_dev_signer(
         config,
         launcher=launcher,
         snapshot_fn=lambda: None,

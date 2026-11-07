@@ -312,7 +312,8 @@ def test_install_arc_and_probation_open(tmp_path):
     assert state.standing == "probation"
     assert state.uses == 0 and state.strikes == 0
     result = verify_log(log.path)
-    assert result.ok, result.failures
+    assert result.consistent, result.failures
+    assert not result.authentic  # this fixture intentionally uses the public dev key
 
 
 def test_beat2_failure_rolls_back_and_counts_an_attempt(tmp_path):
@@ -441,6 +442,7 @@ def test_gated_uses_count_and_refusals_strike(tmp_path):
         EscalationRequest(
             action="use the capability to compute",
             action_class=ActionClass.COMPUTE,
+            tool="compute",
         ),
     )
     assert decision.approved is True

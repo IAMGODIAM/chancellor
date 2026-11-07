@@ -55,8 +55,8 @@ from ..instruments import (
     check_non_empty,
     check_required_keys,
 )
-from ..orchestrator import CrewRunner
-from ..task_graph import TaskGraph
+from ..orchestrator import CrewRunner, Worker
+from ..task_graph import TaskGraph, TaskNode
 from .suite_b_tasks import TASKS, TaskSpec
 from .suite_b_world import (
     FAULT_CRASH,
@@ -210,13 +210,29 @@ def score_state(task: TaskSpec, state: dict) -> tuple[bool, float]:
     return predicate_pass, round(100.0 * earned / total, 2)
 
 
-def check_payload_integrity(artifact: object) -> CheckResult:
+def check_payload_integrity(
+    artifact: object, *, trusted_write: bool = False
+) -> CheckResult:
     """Governed-arm instrument: a tool payload whose checksum does not
-    match its stamped value was corrupted in transit — reject it."""
+    match its stamped value was corrupted in transit — reject it. A tool
+    payload that carries a value but no stamp cannot be checked and is
+    rejected too (fail-closed). Integrity needs an upstream stamp: this
+    instrument verifies a stamp, it does not create one. Write records
+    (identified by the runner's trusted step type) and skipped steps are
+    not tool payloads. A payload's own fields cannot select an exemption."""
     if isinstance(artifact, dict):
         data = artifact.get("data")
-        if isinstance(data, dict) and "value" in data and "checksum" in data:
-            ok = checksum_of(data["value"]) == data["checksum"]
+        if isinstance(data, dict) and (
+            "checksum" in data or ("value" in data and not trusted_write)
+        ):
+            stamp = data.get("checksum")
+            if "value" not in data or not isinstance(stamp, str) or not stamp:
+                return CheckResult(
+                    "payload_integrity",
+                    False,
+                    "tool payload is unstamped — stamp missing (fail-closed)",
+                )
+            ok = checksum_of(data["value"]) == stamp
             return CheckResult(
                 "payload_integrity",
                 ok,
@@ -228,11 +244,18 @@ def check_payload_integrity(artifact: object) -> CheckResult:
     return CheckResult("payload_integrity", True, "no stamped payload")
 
 
-def _governed_panel() -> InstrumentPanel:
+def _governed_panel(write_records: list[object] | None = None) -> InstrumentPanel:
     panel = InstrumentPanel(timeout_s=None)  # pure local checks; no hang risk
     panel.register("non_empty_output", check_non_empty)
     panel.register("required_keys", check_required_keys("text"))
-    panel.register("payload_integrity", check_payload_integrity)
+
+    def payload_check(artifact: object) -> CheckResult:
+        return check_payload_integrity(
+            artifact,
+            trusted_write=any(artifact is record for record in (write_records or ())),
+        )
+
+    panel.register("payload_integrity", payload_check)
     return panel
 
 
@@ -297,14 +320,24 @@ def run_configuration(
             depends_on=[previous] if previous else [],
             worker="agent",
             requires_grade=False,
+            inert=True,
         )
         previous = step.name
-    workers = {"agent": lambda node: agent.run_step(steps_by_name[node.id])}
+    write_records: list[object] = []
+
+    def run_step(node: TaskNode) -> dict:
+        step = steps_by_name[node.id]
+        artifact = agent.run_step(step)
+        if step.kind in ("store", "summarize"):
+            write_records.append(artifact)
+        return artifact
+
+    workers: dict[str, Worker] = {"agent": run_step}
     if arm == "governed":
         runner = CrewRunner.governed(
             graph,
             workers,
-            panel=_governed_panel(),
+            panel=_governed_panel(write_records),
             rubric=OUTPUT_RUBRIC,
             gatekeeper=Gatekeeper(),
         )

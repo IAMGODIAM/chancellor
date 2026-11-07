@@ -20,7 +20,7 @@ MEDIOCRE = {"correctness": 6, "completeness": 6, "clarity": 6, "safety": 6}
 
 def _graph():
     g = TaskGraph("t")
-    g.task("one", "One", worker="w")
+    g.task("one", "One", worker="w", inert=True)
     return g
 
 

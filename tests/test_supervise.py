@@ -23,6 +23,7 @@ from chancellor.escalation import (
     Decision,
     EscalationRequest,
 )
+from chancellor.receipts import DevHmacSigner
 from chancellor.supervise import (
     CAUSE_PLAUSIBLE,
     CAUSE_PROVEN,
@@ -39,6 +40,10 @@ from chancellor.supervise import (
 from chancellor.verify_log import verify_log
 
 SRC = str(Path(chancellor.__file__).resolve().parent.parent)
+
+# A throwaway value for the subprocess tests — not a real key.
+TEST_SUPERVISE_KEY = "throwaway-test-value-for-supervise-tests"
+TEST_SIGNER = DevHmacSigner(secret=TEST_SUPERVISE_KEY.encode("utf-8"))
 
 
 # ---------------------------------------------------------------- helpers
@@ -123,7 +128,7 @@ def _supervisor(
     emitted: list[str] | None = None,
     **overrides,
 ) -> Supervisor:
-    return Supervisor(
+    return Supervisor.with_dev_signer(
         _config(tmp_path, **overrides),
         clock=clock or (lambda: 1_000.0),
         sleeper=lambda _s: None,
@@ -321,7 +326,7 @@ def test_rebuild_supervision_state_survives_restart():
 # --------------------------------------------------------- self-proof
 def test_self_proof_refuses_unlaunchable_command(tmp_path):
     launcher = _FakeLauncher([])
-    supervisor = Supervisor(
+    supervisor = Supervisor.with_dev_signer(
         SupervisorConfig(
             agent_command=["/nonexistent/chancellor-test-binary"],
             state_dir=tmp_path,
@@ -344,7 +349,7 @@ def test_self_proof_refuses_corrupt_supervision_log(tmp_path):
     lines[0] = lines[0].replace('"segment"', '"segmenX"').replace('"x"', '"y"')
     log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     emitted: list[str] = []
-    supervisor = Supervisor(
+    supervisor = Supervisor.with_dev_signer(
         _config(tmp_path),
         launcher=_FakeLauncher([]),
         emit=emitted.append,
@@ -595,7 +600,7 @@ while done < total:
         detail=f"segment {done}",
     )
     log.record(Decision(request, True, "agent", "segment committed", time.time()))
-    log.checkpoint()
+    log.checkpoint_v2()
     done += 1
     if done < total:
         time.sleep(interval)
@@ -609,7 +614,7 @@ def _spawn_supervisor(
     agent_py = tmp_path / "agent.py"
     agent_py.write_text(AGENT, encoding="utf-8")
     pidfile = tmp_path / "agent.pid"
-    env = dict(os.environ, PYTHONPATH=SRC)
+    env = dict(os.environ, PYTHONPATH=SRC, CHANCELLOR_SUPERVISE_KEY=TEST_SUPERVISE_KEY)
     proc = subprocess.Popen(
         [
             sys.executable,
@@ -696,7 +701,7 @@ def test_fault_injection_kill_verify_resume(tmp_path):
     assert _segment_count(agent_log) == 40
 
     # The agent's chain verifies cold, end to end.
-    result = verify_log(agent_log)
+    result = verify_log(agent_log, signer=TEST_SIGNER, accept_dev_signer=True)
     assert result.ok, result.failures
     seqs = [e["seq"] for e in AuditLog(agent_log).read_all()]
     assert seqs == list(range(len(seqs)))
@@ -712,7 +717,9 @@ def test_fault_injection_kill_verify_resume(tmp_path):
     assert verification["detail"]["ok"] is True
     assert "resume_launched" in kinds
     assert "agent_completed" in kinds
-    assert verify_log(state_dir / "supervision-log.jsonl").ok
+    assert verify_log(
+        state_dir / "supervision-log.jsonl", signer=TEST_SIGNER, accept_dev_signer=True
+    ).ok
 
 
 def test_fault_injection_corrupt_chain_refused_and_escalated(tmp_path):
@@ -778,4 +785,6 @@ def test_fault_injection_corrupt_chain_refused_and_escalated(tmp_path):
     assert refused_at_resume or refused_live, (
         f"no verification-refusal record in {kinds}"
     )
-    assert verify_log(state_dir / "supervision-log.jsonl").ok
+    assert verify_log(
+        state_dir / "supervision-log.jsonl", signer=TEST_SIGNER, accept_dev_signer=True
+    ).ok

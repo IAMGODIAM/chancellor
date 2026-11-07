@@ -1,9 +1,10 @@
 """Offline verifier for Chancellor's hash-chained audit log.
 
-    python -m chancellor.verify_log <audit-log.jsonl> [--checkpoints <file>]
+    python -m chancellor.verify_log <audit-log.jsonl> --pubkey <key|file>
+                                [--checkpoints <file>]
                                 [--allow-legacy-prefix] [--allow-uncheckpointed]
     python -m chancellor.verify_log resolve <audit-log.jsonl> <manifest_sha256>
-                                [--checkpoints <file>]
+                                --pubkey <key|file> [--checkpoints <file>]
 
 The ``resolve`` verb walks freeze provenance (receipts.freeze_manifest /
 test_run entries): given a manifest hash it prints the freeze_manifest
@@ -29,8 +30,17 @@ root, head hash). Tamper classes detected, each with a named failure:
                            governing frame this verifier holds, by id
                            and hash, inside its committed body)
 
-Exit codes: 0 = verified, 1 = verification failed (named failures on
-stdout), 2 = usage / IO error.
+Authenticity: a log is VERIFIED only when its checkpoints are signed by
+a key the user pinned with ``--pubkey`` (an Ed25519 public key, or the
+key id of an operator HMAC key whose secret the verifier holds) and that
+key is not the built-in dev key. A log sealed under the public dev key
+(``chancellor-dev-hmac-sha256``, which anyone can recompute) prints
+``DEV-SIGNED, NOT AUTHENTIC``: its chain can be checked for consistency,
+but nobody can show who sealed it. A log with no pinned signer is never
+reported as authentic.
+
+Exit codes: 0 = verified AND authentic (pinned, non-dev signer), 1 = not
+verified or not authentic (named failures on stdout), 2 = usage / IO error.
 
 Without any checkpoint, tail truncation is undetectable *by
 construction* — the verifier refuses to call such a log verified
@@ -50,7 +60,9 @@ checkpoint's log_size is refused (``proof_count_mismatch``).
 from __future__ import annotations
 
 import argparse
+import base64
 import json
+import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -67,6 +79,129 @@ class VerificationResult:
     chained_entries: int = 0  # entries carrying a hash-chain link
     checkpoints: int = 0  # checkpoint envelopes seen
     checkpoint_log_size: int | None = None
+    dev_signer: bool = False  # a checkpoint was sealed under the dev key
+    # The chain and checkpoints are internally consistent, whatever the
+    # signer. Consistency is not authenticity.
+    consistent: bool = False
+    # Consistent AND sealed under the pinned, non-dev signer. Only this
+    # may be reported as VERIFIED.
+    authentic: bool = False
+    signer_key_id: str | None = None
+
+
+DEV_SIGNER_LABEL = receipts.DEV_SIGNED_LABEL
+DEV_SIGNER_NOTE = (
+    "sealed under the public dev key: the chain can be checked for "
+    "consistency, but anyone can re-seal it, so it shows nothing about who "
+    "wrote it"
+)
+NOT_AUTHENTIC_LABEL = "NOT AUTHENTIC"
+
+
+def verdict_of(result: VerificationResult | ResolveResult) -> str:
+    """The one-line verdict a CLI or demo may print. VERIFIED/RESOLVED
+    wording is reserved for authentic results."""
+    if result.authentic:
+        return "authentic"
+    if result.dev_signer:
+        return DEV_SIGNER_LABEL
+    if result.ok:
+        return NOT_AUTHENTIC_LABEL
+    return "not verified"
+
+
+def _sidecar_has_checkpoint(cp_path: Path) -> bool:
+    if not cp_path.exists():
+        return False
+    return any(
+        line.strip()
+        for line in cp_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    )
+
+
+def _dev_signer_seen(cp_path: Path, signer: receipts.Signer) -> bool:
+    """True when the sidecar carries the dev key id (in a signature or as
+    a payload issuer), or the verifying signer is the dev signer and a
+    checkpoint exists. Reads leniently: a malformed sidecar is the
+    verifier's failure to name elsewhere."""
+    if not cp_path.exists():
+        return False
+    seen = False
+    for line in cp_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        seen = True
+        try:
+            env = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(env, dict):
+            continue
+        sigs = env.get("signatures")
+        if isinstance(sigs, list) and any(
+            isinstance(sg, dict) and sg.get("keyid") == receipts.DEV_SIGNER_KEY_ID
+            for sg in sigs
+        ):
+            return True
+        try:
+            if receipts.checkpoint_payload(env).get("issuer") == (
+                receipts.DEV_SIGNER_KEY_ID
+            ):
+                return True
+        except Exception:
+            continue
+    return seen and signer.key_id == receipts.DEV_SIGNER_KEY_ID
+
+
+def _apply_signer_gate(result, cp_path: Path, signer: receipts.Signer, accept: bool):
+    """Decide authenticity. The verifying ``signer`` is the pin: a result
+    is authentic only when it is consistent, a checkpoint exists, and
+    the pinned signer is not the public dev key. A dev-signed result is
+    labelled and fails unless the caller acknowledged the non-production
+    signer; even then it is never authentic."""
+    result.consistent = result.ok
+    result.signer_key_id = signer.key_id
+    dev = _dev_signer_seen(cp_path, signer)
+    result.dev_signer = dev
+    if dev:
+        if accept:
+            result.warnings.append(DEV_SIGNER_LABEL)
+        else:
+            result.failures.append(
+                f"dev_signed_not_authentic: {DEV_SIGNER_LABEL} — {DEV_SIGNER_NOTE}"
+            )
+            result.ok = False
+        return result
+    result.authentic = result.ok and _sidecar_has_checkpoint(cp_path)
+    return result
+
+
+def _checkpoint_envelope_keyids(envelope: dict) -> list[str]:
+    sigs = envelope.get("signatures") if isinstance(envelope, dict) else None
+    if not isinstance(sigs, list):
+        return []
+    return [str(sg.get("keyid")) for sg in sigs if isinstance(sg, dict)]
+
+
+def _signature_failures(
+    envelope: dict, signer: receipts.Signer, which: str
+) -> list[str]:
+    """Named failures for one envelope's signature under the pinned
+    signer: a key id that is not the pinned one, then the signature
+    itself."""
+    out: list[str] = []
+    ids = _checkpoint_envelope_keyids(envelope)
+    if ids != [signer.key_id]:
+        out.append(
+            f"signer_not_pinned: {which} checkpoint is signed by "
+            f"{ids or 'no key'}, not the pinned signer {signer.key_id!r}"
+        )
+    if not receipts.checkpoint_signature_valid(envelope, signer):
+        out.append(
+            f"checkpoint_signature_invalid: {which} checkpoint signature "
+            "does not verify"
+        )
+    return out
 
 
 def _load_jsonl(path: Path, failures: list[str]) -> list[dict] | None:
@@ -95,11 +230,38 @@ def verify_log(
     signer: receipts.Signer | None = None,
     allow_legacy_prefix: bool = False,
     allow_uncheckpointed: bool = False,
+    accept_dev_signer: bool = False,
+) -> VerificationResult:
+    """Verify a receipt chain offline (see _verify_log_core).
+
+    ``signer`` is the pin: the key the checkpoints must be signed by. A
+    result is ``authentic`` only when it is consistent and pinned to a
+    non-dev signer. With no ``signer`` the public dev signer is used, so
+    a dev-signed log is labelled and FAILS unless ``accept_dev_signer``
+    acknowledges the non-production signer — and even then it is never
+    authentic."""
+    signer = signer if signer is not None else receipts.public_dev_signer()
+    result = _verify_log_core(
+        log_path, checkpoint_path, signer, allow_legacy_prefix, allow_uncheckpointed
+    )
+    cp_path = (
+        Path(checkpoint_path)
+        if checkpoint_path is not None
+        else receipts.default_checkpoint_path(log_path)
+    )
+    return _apply_signer_gate(result, cp_path, signer, accept_dev_signer)
+
+
+def _verify_log_core(
+    log_path: str | Path,
+    checkpoint_path: str | Path | None,
+    signer: receipts.Signer,
+    allow_legacy_prefix: bool,
+    allow_uncheckpointed: bool,
 ) -> VerificationResult:
     """Verify a receipt chain offline: hashes, signatures, checkpoints,
     and the authority invariants. Failures are named per class; an
     unreadable log is a failed verification, never an exception."""
-    signer = signer if signer is not None else receipts.default_signer()
     failures: list[str] = []
     warnings: list[str] = []
 
@@ -113,6 +275,7 @@ def verify_log(
     prev_entry: dict | None = None
     legacy = 0
     chain_started = False
+    frame_era = False
     for pos, entry in enumerate(rows):
         if "entry_hash" not in entry:
             if chain_started:
@@ -135,7 +298,19 @@ def verify_log(
             failures.append(f"prev_hash_link_broken: seq {pos}")
         if receipts.entry_hash(entry) != entry["entry_hash"]:
             failures.append(f"entry_hash_mismatch: seq {pos} (entry edited)")
-        if entry.get("schema") == receipts.SCHEMA:
+        schema = entry.get("schema")
+        if schema not in (receipts.SCHEMA_V1, receipts.SCHEMA):
+            failures.append(
+                f"frame_fields_missing: seq {pos} carries schema={schema!r}, "
+                f"not a receipt schema this verifier holds (no frame stamp)"
+            )
+        elif schema == receipts.SCHEMA_V1 and frame_era:
+            failures.append(
+                f"schema_downgrade: seq {pos} declares {receipts.SCHEMA_V1} "
+                f"after the chain entered the frame era"
+            )
+        if schema == receipts.SCHEMA:
+            frame_era = True
             # Frame-era entries (receipt schema v2) must name their
             # governing frame, and the citation must be a frame this
             # verifier holds. Pre-frame (v1) entries skip the check:
@@ -211,11 +386,7 @@ def verify_log(
                     f"tree={payload.get('tree')!r}, expected "
                     f"{receipts.TREE_RFC9162!r}"
                 )
-            if not receipts.checkpoint_signature_valid(newest, signer):
-                failures.append(
-                    "checkpoint_signature_invalid: newest "
-                    "checkpoint signature does not verify"
-                )
+            failures.extend(_signature_failures(newest, signer, "newest"))
             checkpoint_log_size = payload.get("log_size")
             if checkpoint_log_size != len(chained_hashes):
                 if isinstance(checkpoint_log_size, int) and checkpoint_log_size > len(
@@ -231,7 +402,13 @@ def verify_log(
                         f"checkpoint_size_mismatch: checkpoint log_size="
                         f"{checkpoint_log_size!r}, log holds "
                         f"{len(chained_hashes)} chained entries (log grew "
-                        f"past the newest checkpoint — re-checkpoint)"
+                        f"past the newest checkpoint — re-checkpoint"
+                        + (
+                            f"; unsealed tail: "
+                            f"{len(chained_hashes) - checkpoint_log_size} entries)"
+                            if isinstance(checkpoint_log_size, int)
+                            else ")"
+                        )
                     )
             if (
                 chained_hashes
@@ -247,6 +424,9 @@ def verify_log(
                     "log's entry hashes != checkpoint root"
                 )
 
+    _check_checkpoint_history(cp_rows, chained_hashes, signer, failures)
+    _check_outcomes([r for r in rows if "entry_hash" in r], failures)
+
     return VerificationResult(
         ok=not failures,
         failures=failures,
@@ -258,10 +438,142 @@ def verify_log(
     )
 
 
+def _check_checkpoint_history(
+    cp_rows: list[dict],
+    chained_hashes: list[str],
+    signer: receipts.Signer,
+    failures: list[str],
+) -> None:
+    """Every checkpoint in the sidecar, not only the newest, must agree
+    with the log: a signature from the pinned signer, a size that never
+    shrinks, a root and head that recompute over the prefix it claims,
+    and no v1 checkpoint after a v2 one."""
+    seen_v2 = False
+    previous_size = 0
+    last = len(cp_rows) - 1
+    for idx, envelope in enumerate(cp_rows):
+        try:
+            payload = receipts.checkpoint_payload(envelope)
+        except Exception:
+            if idx != last:
+                failures.append(
+                    f"checkpoint_malformed: checkpoint {idx} does not decode"
+                )
+            continue
+        schema = payload.get("schema")
+        if schema == receipts.CHECKPOINT_SCHEMA_V2:
+            seen_v2 = True
+        elif schema == receipts.CHECKPOINT_SCHEMA and seen_v2:
+            failures.append(
+                f"checkpoint_schema_downgrade: checkpoint {idx} is v1 after "
+                "a v2 checkpoint"
+            )
+        size = payload.get("log_size")
+        if isinstance(size, int) and size < previous_size:
+            failures.append(
+                f"checkpoint_size_regressed: checkpoint {idx} commits {size} "
+                f"entries after one that committed {previous_size}"
+            )
+        if isinstance(size, int):
+            previous_size = max(previous_size, size)
+        if idx == last:
+            continue  # the newest is checked in full by the caller
+        if schema not in (receipts.CHECKPOINT_SCHEMA, receipts.CHECKPOINT_SCHEMA_V2):
+            failures.append(f"checkpoint_schema: checkpoint {idx} is {schema!r}")
+            continue
+        failures.extend(_signature_failures(envelope, signer, f"checkpoint {idx}"))
+        if not isinstance(size, int) or size < 0 or size > len(chained_hashes):
+            failures.append(
+                f"checkpoint_history_inconsistent: checkpoint {idx} commits "
+                f"{size!r} entries, log holds {len(chained_hashes)}"
+            )
+            continue
+        root_fn = (
+            receipts.rfc9162_root
+            if schema == receipts.CHECKPOINT_SCHEMA_V2
+            else receipts.merkle_root
+        )
+        head = chained_hashes[size - 1] if size else None
+        if payload.get("merkle_root") != root_fn(chained_hashes[:size]) or (
+            payload.get("head_receipt_hash") != head
+        ):
+            failures.append(
+                f"checkpoint_history_inconsistent: checkpoint {idx} does not "
+                "match the log prefix it seals"
+            )
+
+
+def _check_outcomes(chained: list[dict], failures: list[str]) -> None:
+    """Brokered calls leave two records: the decision (carrying a
+    ``call_id``) and, after it, the outcome. An approved decision with no
+    matching outcome, an outcome with no approved decision, or an outcome
+    whose executed arguments differ from the approved ones, fails."""
+    decisions: dict[str, tuple[int, dict]] = {}
+    outcomes: dict[str, list[tuple[int, dict]]] = {}
+    for pos, entry in enumerate(chained):
+        call_id = entry.get("call_id")
+        if entry.get("entry_type") == receipts.ENTRY_TYPE_TOOL_OUTCOME:
+            outcomes.setdefault(str(call_id), []).append((pos, entry))
+        elif isinstance(call_id, str) and "approved" in entry:
+            decisions[call_id] = (pos, entry)
+    for call_id, (pos, decision) in decisions.items():
+        found = outcomes.get(call_id, [])
+        if not decision.get("approved"):
+            if found:
+                failures.append(
+                    f"outcome_for_denied_call: seq {pos} was denied but call "
+                    f"{call_id} has an outcome"
+                )
+            continue
+        if len(found) != 1 or found[0][0] < pos:
+            failures.append(
+                f"approval_without_outcome: seq {pos} approved call {call_id} "
+                f"({decision.get('tool')!r}) with "
+                f"{'no' if not found else len(found)} matching outcome"
+            )
+            continue
+        outcome = found[0][1]
+        if (
+            outcome.get("tool") != decision.get("tool")
+            or outcome.get("node_id") != decision.get("node_id")
+            or outcome.get("approved_args_sha256") != decision.get("args_sha256")
+        ):
+            failures.append(
+                f"outcome_mismatch: call {call_id} outcome does not match "
+                f"the approved decision at seq {pos}"
+            )
+        elif outcome.get("result_status") in ("ok", "error") and outcome.get(
+            "executed_args_sha256"
+        ) != outcome.get("approved_args_sha256"):
+            failures.append(
+                f"outcome_args_mismatch: call {call_id} ran with arguments "
+                f"other than the approved ones (seq {pos})"
+            )
+    for call_id, group in outcomes.items():
+        if call_id not in decisions:
+            failures.append(
+                f"outcome_without_approval: outcome at seq {group[0][0]} "
+                f"names call {call_id}, which no decision in this log carries"
+            )
+
+
 def verify_holder_proof(
     checkpoint_path: str | Path,
     proof: dict,
     signer: receipts.Signer | None = None,
+    accept_dev_signer: bool = False,
+) -> VerificationResult:
+    """Verify a holder-presented proof (see _verify_holder_proof_core);
+    dev-signed checkpoints are labelled and fail unless accepted."""
+    signer = signer if signer is not None else receipts.public_dev_signer()
+    result = _verify_holder_proof_core(checkpoint_path, proof, signer)
+    return _apply_signer_gate(result, Path(checkpoint_path), signer, accept_dev_signer)
+
+
+def _verify_holder_proof_core(
+    checkpoint_path: str | Path,
+    proof: dict,
+    signer: receipts.Signer,
 ) -> VerificationResult:
     """Verify a HOLDER-PRESENTED v2 inclusion proof against the newest
     checkpoint in a sidecar — standalone: the log itself is neither
@@ -270,7 +582,6 @@ def verify_holder_proof(
     exactly (proof_count_mismatch REFUSES the proof outright — an
     anchor without a count verifies nothing, as a rule), and the path
     must fold to the checkpoint root."""
-    signer = signer if signer is not None else receipts.default_signer()
     failures: list[str] = []
 
     cp_rows: list[dict] = []
@@ -306,10 +617,7 @@ def verify_holder_proof(
             f"checkpoint_tree: tree={payload.get('tree')!r} != "
             f"{receipts.TREE_RFC9162!r}"
         )
-    if not receipts.checkpoint_signature_valid(newest, signer):
-        failures.append(
-            "checkpoint_signature_invalid: newest checkpoint signature does not verify"
-        )
+    failures.extend(_signature_failures(newest, signer, "newest"))
     if failures:
         return VerificationResult(
             ok=False,
@@ -370,6 +678,11 @@ class ResolveResult:
     manifest_entry: dict | None = None  # the freeze_manifest entry
     test_runs: list[dict] = field(default_factory=list)  # covering test_run entries
     checkpoint: dict | None = None  # payload of the sealing checkpoint
+    warnings: list[str] = field(default_factory=list)
+    dev_signer: bool = False  # a checkpoint was sealed under the dev key
+    consistent: bool = False
+    authentic: bool = False
+    signer_key_id: str | None = None
 
 
 # CC 24 (radon) — one branch per gap resolve must fail closed on.
@@ -378,13 +691,31 @@ def resolve_manifest(
     manifest_sha256: str,
     checkpoint_path: str | Path | None = None,
     signer: receipts.Signer | None = None,
+    accept_dev_signer: bool = False,
+) -> ResolveResult:
+    """Resolve a manifest hash (see _resolve_manifest_core); dev-signed
+    checkpoints are labelled and fail unless accepted."""
+    signer = signer if signer is not None else receipts.public_dev_signer()
+    result = _resolve_manifest_core(log_path, manifest_sha256, checkpoint_path, signer)
+    cp_path = (
+        Path(checkpoint_path)
+        if checkpoint_path is not None
+        else receipts.default_checkpoint_path(log_path)
+    )
+    return _apply_signer_gate(result, cp_path, signer, accept_dev_signer)
+
+
+def _resolve_manifest_core(
+    log_path: str | Path,
+    manifest_sha256: str,
+    checkpoint_path: str | Path | None,
+    signer: receipts.Signer,
 ) -> ResolveResult:
     """Resolve a freeze manifest hash to its covering test_run receipts
     and the checkpoint that seals them. Fail-closed: a broken chain, an
     absent manifest, a manifest with no covering test run, ANY test run
     bound to a manifest that appears nowhere in the log, or the absence
     of a sealing checkpoint each fail the resolution by name."""
-    signer = signer if signer is not None else receipts.default_signer()
     failures: list[str] = []
 
     rows = _load_jsonl(Path(log_path), failures)
@@ -483,6 +814,7 @@ def resolve_manifest(
         )
     else:
         leaves = [e["entry_hash"] for e in chained]
+        seen_v2_checkpoint = False
         for envelope in cp_rows:
             try:
                 payload = receipts.checkpoint_payload(envelope)
@@ -491,10 +823,22 @@ def resolve_manifest(
                     "checkpoint_malformed: a checkpoint envelope does not decode"
                 )
                 continue
-            if payload.get("schema") != receipts.CHECKPOINT_SCHEMA:
+            schema = payload.get("schema")
+            if schema not in (
+                receipts.CHECKPOINT_SCHEMA,
+                receipts.CHECKPOINT_SCHEMA_V2,
+            ):
                 failures.append(
-                    f"checkpoint_schema: {payload.get('schema')!r} != "
-                    f"{receipts.CHECKPOINT_SCHEMA!r}"
+                    f"checkpoint_schema: {schema!r} is not "
+                    f"{receipts.CHECKPOINT_SCHEMA!r} or "
+                    f"{receipts.CHECKPOINT_SCHEMA_V2!r}"
+                )
+                continue
+            if schema == receipts.CHECKPOINT_SCHEMA_V2:
+                seen_v2_checkpoint = True
+            elif seen_v2_checkpoint:
+                failures.append(
+                    "checkpoint_schema_downgrade: a v1 checkpoint follows a v2 one"
                 )
                 continue
             if not receipts.checkpoint_signature_valid(envelope, signer):
@@ -503,10 +847,15 @@ def resolve_manifest(
                     "does not verify"
                 )
                 continue
+            root_fn = (
+                receipts.rfc9162_root
+                if schema == receipts.CHECKPOINT_SCHEMA_V2
+                else receipts.merkle_root
+            )
             size = payload.get("log_size")
             if not isinstance(size, int) or size < needed or size > len(leaves):
                 continue  # valid, but does not seal these entries (yet)
-            if payload.get("merkle_root") != receipts.merkle_root(leaves[:size]):
+            if payload.get("merkle_root") != root_fn(leaves[:size]):
                 failures.append(
                     "checkpoint_root_mismatch: checkpoint root does not "
                     "recompute over the entries it claims to seal"
@@ -534,6 +883,99 @@ def resolve_manifest(
         test_runs=covering,
         checkpoint=sealing,
     )
+
+
+PUBKEY_HELP = (
+    "pin the signer: an Ed25519 public key ('ed25519:<base64>' or 64 hex "
+    "characters, or a file holding one), or an operator HMAC key id "
+    "('hmac-sha256:<id>', verified with the secret in "
+    f"{receipts.VERIFY_KEY_ENV}). A log is reported authentic only when "
+    "its checkpoints are signed by the pinned, non-dev key"
+)
+ACCEPT_DEV_HELP = (
+    "acknowledge a non-production signer: the output stays "
+    "'DEV-SIGNED, NOT AUTHENTIC' and the exit status stays non-zero"
+)
+
+
+def load_pinned_signer(spec: str) -> receipts.Signer:
+    """Build the verifying signer for a ``--pubkey`` value (a literal or
+    the path of a file holding one). Raises ValueError when the value is
+    not a usable pin. Nothing here reads a private signing key: an
+    Ed25519 pin is public, and an HMAC pin is checked against the secret
+    the verifier's operator supplies in the environment."""
+    text = spec.strip()
+    candidate = Path(text)
+    try:
+        if candidate.is_file():
+            text = candidate.read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+    if text == receipts.DEV_SIGNER_KEY_ID:
+        signer = receipts.public_dev_signer()
+        if signer.key_id != text:
+            raise ValueError("resolved signer does not match the pinned key id")
+        return signer
+    if text.startswith(receipts.HMAC_KEY_ID_PREFIX):
+        secret = os.environ.get(receipts.VERIFY_KEY_ENV)
+        if not secret:
+            raise ValueError(
+                "an HMAC key id needs the verifying secret in "
+                f"{receipts.VERIFY_KEY_ENV}"
+            )
+        signer = receipts.DevHmacSigner(secret=secret.encode("utf-8"))
+        if signer.key_id != text:
+            raise ValueError(
+                f"the secret in {receipts.VERIFY_KEY_ENV} does not match the "
+                "pinned key id"
+            )
+        return signer
+    raw = (
+        text[len(receipts.ED25519_KEY_ID_PREFIX) :]
+        if text.startswith(receipts.ED25519_KEY_ID_PREFIX)
+        else text
+    )
+    key: bytes | None = None
+    if len(raw) == 64:
+        try:
+            key = bytes.fromhex(raw)
+        except ValueError:
+            key = None
+    if key is None:
+        try:
+            key = base64.b64decode(raw, validate=True)
+        except Exception:
+            key = None
+    if key is None or len(key) != 32:
+        raise ValueError(
+            "not a usable pin: give an Ed25519 public key (32 bytes, base64 or "
+            "hex) or an operator key id; a key id alone cannot check an "
+            "Ed25519 signature"
+        )
+    return receipts.PinnedEd25519Verifier(key)
+
+
+def _signer_from_args(pubkey: str | None) -> receipts.Signer | None:
+    return load_pinned_signer(pubkey) if pubkey is not None else None
+
+
+def _add_signer_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--pubkey", default=None, metavar="KEY_OR_FILE", help=PUBKEY_HELP
+    )
+    parser.add_argument(
+        "--accept-dev-signer", action="store_true", help=ACCEPT_DEV_HELP
+    )
+
+
+def _print_signer_status(result: VerificationResult | ResolveResult) -> None:
+    if result.dev_signer:
+        print(DEV_SIGNER_LABEL)
+        print(f"  {DEV_SIGNER_NOTE}")
+    elif result.consistent and not result.authentic:
+        print(f"{NOT_AUTHENTIC_LABEL}: no signed checkpoint to pin")
+    if result.authentic:
+        print(f"signer: {result.signer_key_id} (pinned)")
 
 
 # ------------------------------------------------- the install bridge audit
@@ -899,12 +1341,25 @@ def _resolve_main(argv: list[str]) -> int:
         default=None,
         help="checkpoint sidecar path (default: <log>.checkpoints.jsonl)",
     )
+    _add_signer_args(parser)
     args = parser.parse_args(argv)
 
     if not Path(args.log).exists():
         print(f"error: log not found: {args.log}", file=sys.stderr)
         return 2
-    result = resolve_manifest(args.log, args.manifest, checkpoint_path=args.checkpoints)
+    try:
+        signer = _signer_from_args(args.pubkey)
+    except ValueError as exc:
+        print(f"error: --pubkey: {exc}", file=sys.stderr)
+        return 2
+    result = resolve_manifest(
+        args.log,
+        args.manifest,
+        checkpoint_path=args.checkpoints,
+        signer=signer,
+        accept_dev_signer=args.accept_dev_signer,
+    )
+    _print_signer_status(result)
     if result.manifest_entry is not None:
         m = result.manifest_entry
         print(
@@ -927,10 +1382,10 @@ def _resolve_main(argv: list[str]) -> int:
         )
     for failure in result.failures:
         print(f"FAIL: {failure}")
-    if result.ok:
+    if result.authentic:
         print("RESOLVED: manifest, covering test runs, and sealing checkpoint")
         return 0
-    print("NOT RESOLVED")
+    print("NOT RESOLVED" if not result.consistent else f"{verdict_of(result)}")
     return 1
 
 
@@ -943,7 +1398,9 @@ def main(argv: list[str] | None = None) -> int:
         return _bridge_main(argv[1:])
     parser = argparse.ArgumentParser(
         prog="chancellor-verify-log",
-        description="Verify a Chancellor hash-chained audit log offline.",
+        description="Verify a Chancellor hash-chained audit log offline. "
+        "A log is VERIFIED only when its checkpoints are signed by the "
+        "key pinned with --pubkey.",
     )
     parser.add_argument("log", help="path to the audit log JSONL")
     parser.add_argument(
@@ -961,6 +1418,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="accept a log with no checkpoint (tail truncation then undetectable)",
     )
+    _add_signer_args(parser)
     parser.add_argument(
         "--proof",
         default=None,
@@ -969,6 +1427,11 @@ def main(argv: list[str] | None = None) -> int:
         "the log is not consulted",
     )
     args = parser.parse_args(argv)
+    try:
+        signer = _signer_from_args(args.pubkey)
+    except ValueError as exc:
+        print(f"error: --pubkey: {exc}", file=sys.stderr)
+        return 2
 
     if args.proof is not None:
         cp_path = (
@@ -984,17 +1447,20 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as exc:
             print(f"error: proof file unreadable: {exc}", file=sys.stderr)
             return 2
-        result = verify_holder_proof(cp_path, proof)
+        result = verify_holder_proof(
+            cp_path, proof, signer=signer, accept_dev_signer=args.accept_dev_signer
+        )
+        _print_signer_status(result)
         print(
             f"checkpoints: {result.checkpoints}, "
             f"checkpoint log_size: {result.checkpoint_log_size}"
         )
-        if result.ok:
+        if result.authentic:
             print("VERIFIED: holder proof folds to the checkpoint root")
             return 0
         for failure in result.failures:
             print(f"FAIL: {failure}")
-        print("NOT VERIFIED")
+        print(verdict_of(result) if result.consistent else "NOT VERIFIED")
         return 1
 
     if not Path(args.log).exists():
@@ -1003,21 +1469,27 @@ def main(argv: list[str] | None = None) -> int:
     result = verify_log(
         args.log,
         checkpoint_path=args.checkpoints,
+        signer=signer,
         allow_legacy_prefix=args.allow_legacy_prefix,
         allow_uncheckpointed=args.allow_uncheckpointed,
+        accept_dev_signer=args.accept_dev_signer,
     )
+    _print_signer_status(result)
     print(
         f"entries: {result.entries} (chained: {result.chained_entries}), "
         f"checkpoints: {result.checkpoints}"
     )
     for warning in result.warnings:
-        print(f"WARNING: {warning}")
-    if result.ok:
+        if warning != DEV_SIGNER_LABEL:
+            print(f"WARNING: {warning}")
+    if result.authentic:
         print("VERIFIED: chain intact, newest checkpoint consistent")
         return 0
     for failure in result.failures:
         print(f"FAIL: {failure}")
-    print("NOT VERIFIED")
+    if result.consistent and signer is None and not result.dev_signer:
+        print("NOT AUTHENTIC: no signer pinned (pass --pubkey)")
+    print(verdict_of(result) if result.consistent else "NOT VERIFIED")
     return 1
 
 

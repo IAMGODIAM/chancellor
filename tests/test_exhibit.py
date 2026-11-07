@@ -32,7 +32,9 @@ def test_exhibit_fast_auto_tamper(tmp_path: Path) -> None:
     assert "the run has arrived at the gate" in out
     assert "payload_integrity" in out  # the fault beat's halt, named
     assert "drift: 0" in out
-    assert "VERIFIED" in out
+    assert "DEV-SIGNED, NOT AUTHENTIC" in out
+    assert "VERIFIED" not in out.replace("NOT VERIFIED", "")
+    assert "--accept-dev-signer" not in out
     assert re.search(r"tamper: entry seq \d+ altered after the fact", out)
 
 

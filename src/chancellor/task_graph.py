@@ -109,6 +109,10 @@ class TaskNode:
     max_attempts: int = DEFAULT_MAX_ATTEMPTS
     requires_grade: bool = True  # False = explicit ungraded-class node
     disposition: str | None = None  # last resume/lifecycle disposition
+    # True = the graph author declares this node performs no gated effect,
+    # so a worker artifact with no action is acceptable. Defaults to False:
+    # in a governed run a node that declares nothing is denied.
+    inert: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -125,6 +129,7 @@ class TaskNode:
             "max_attempts": self.max_attempts,
             "requires_grade": self.requires_grade,
             "disposition": self.disposition,
+            "inert": self.inert,
         }
 
     @classmethod
@@ -142,6 +147,7 @@ class TaskNode:
             attempts=int(d.get("attempts", 0)),
             max_attempts=int(d.get("max_attempts", DEFAULT_MAX_ATTEMPTS)),
             requires_grade=bool(d.get("requires_grade", True)),
+            inert=bool(d.get("inert", False)),
             disposition=d.get("disposition"),
         )
 
@@ -168,6 +174,7 @@ class TaskGraph:
         worker: str = "agent",
         max_attempts: int = DEFAULT_MAX_ATTEMPTS,
         requires_grade: bool = True,
+        inert: bool = False,
     ) -> TaskNode:
         return self.add(
             TaskNode(
@@ -177,6 +184,7 @@ class TaskGraph:
                 worker=worker,
                 max_attempts=max_attempts,
                 requires_grade=requires_grade,
+                inert=inert,
             )
         )
 
