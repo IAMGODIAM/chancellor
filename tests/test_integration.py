@@ -86,29 +86,32 @@ def test_demo_run_grades_come_from_the_judge(tmp_path, capsys):
     assert result.checkpoints == 1
 
 
-def test_demo_audit_log_verifies_via_module_cli(tmp_path):
-    """The shipped demo log passes `python -m chancellor.verify_log` with
-    exit 0, exactly as the submission's stranger would run it."""
+def test_demo_audit_log_is_labelled_dev_signed_via_module_cli(tmp_path):
+    """The shipped demo log is dev-signed: the module verifier labels it
+    DEV-SIGNED, NOT AUTHENTIC and exits non-zero, with or without the
+    acknowledgement flag. It is never reported as verified."""
     state_dir = tmp_path / ".chancellor"
     assert cli.run_demo(str(state_dir)) == 0
     env = dict(os.environ)
     src = str(Path(chancellor.__file__).resolve().parent.parent)
     env["PYTHONPATH"] = src + os.pathsep + env.get("PYTHONPATH", "")
-    proc = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "chancellor.verify_log",
-            str(state_dir / "audit-log.jsonl"),
-            "--accept-dev-signer",
-        ],
-        capture_output=True,
-        text=True,
-        env=env,
-        timeout=60,
-    )
-    assert proc.returncode == 0, proc.stdout + proc.stderr
-    assert "VERIFIED" in proc.stdout
+    for extra in ([], ["--accept-dev-signer"]):
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "chancellor.verify_log",
+                str(state_dir / "audit-log.jsonl"),
+                *extra,
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=60,
+        )
+        assert proc.returncode == 1, proc.stdout + proc.stderr
+        assert "DEV-SIGNED, NOT AUTHENTIC" in proc.stdout
+        assert "VERIFIED" not in proc.stdout.replace("NOT VERIFIED", "")
 
 
 # ------------------------------------------------- provenance, unit level

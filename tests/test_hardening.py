@@ -14,9 +14,9 @@ from chancellor import receipts
 from chancellor.cli import main as cli_main
 from chancellor.escalation import (
     DEFAULT_CHECKPOINT_EVERY,
+    REFUSAL_DECLARATION_MISMATCH,
     REFUSAL_NO_APPROVER,
     REFUSAL_NODE_FAILED,
-    REFUSAL_RECONCILE_MISMATCH,
     REFUSAL_UNCLASSIFIED,
     ActionClass,
     ActionPolicy,
@@ -73,28 +73,31 @@ def _artifact(action):
 
 
 # ------------------------------------------------- 1. signer labelling
-def test_verify_log_labels_dev_signer_and_requires_acceptance(tmp_path, capsys):
+def test_verify_log_labels_dev_signer_and_never_calls_it_verified(tmp_path, capsys):
     path = tmp_path / "audit.jsonl"
     _seed(path).checkpoint()
 
     assert verify_main([str(path)]) == 1
     out = capsys.readouterr().out
     assert DEV_SIGNER_LABEL in out
-    assert "dev_signer_not_accepted" in out
+    assert "dev_signed_not_authentic" in out
+    assert "VERIFIED" not in out.replace("NOT VERIFIED", "")
 
-    assert verify_main([str(path), "--accept-dev-signer"]) == 0
+    # Acknowledging the non-production signer changes the wording of the
+    # failure list, never the verdict or the exit status.
+    assert verify_main([str(path), "--accept-dev-signer"]) == 1
     out = capsys.readouterr().out
     assert DEV_SIGNER_LABEL in out
-    assert "VERIFIED" in out
+    assert "VERIFIED" not in out.replace("NOT VERIFIED", "")
 
 
 def test_verify_log_result_flags_dev_signer(tmp_path):
     path = tmp_path / "audit.jsonl"
     _seed(path).checkpoint()
     refused = verify_log(path)
-    assert not refused.ok and refused.dev_signer
+    assert not refused.ok and refused.dev_signer and not refused.authentic
     accepted = verify_log(path, accept_dev_signer=True)
-    assert accepted.ok and accepted.dev_signer
+    assert accepted.ok and accepted.dev_signer and not accepted.authentic
 
 
 class _OtherSigner:
@@ -107,11 +110,11 @@ class _OtherSigner:
         return self.sign(data) == sig
 
 
-def test_verify_log_non_dev_signer_needs_no_flag(tmp_path):
+def test_verify_log_pinned_non_dev_signer_is_authentic(tmp_path):
     path = tmp_path / "audit.jsonl"
     _seed(path, signer=_OtherSigner()).checkpoint()
     result = verify_log(path, signer=_OtherSigner())
-    assert result.ok and not result.dev_signer
+    assert result.ok and result.authentic and not result.dev_signer
 
 
 # ------------------------------------------- 2. supervise needs a key
@@ -255,20 +258,31 @@ def test_missing_action_key_is_denied_with_receipt(tmp_path):
 # ------------------------------------------------ 5. every node receipted
 def test_every_node_gets_a_receipt(tmp_path):
     log = AuditLog(tmp_path / "a.jsonl")
+    gatekeeper = Gatekeeper(audit_log=log)
+    broker = ToolBroker(gatekeeper=gatekeeper)
+    broker.register("read_file", lambda **_kw: "contents")
     g = TaskGraph("t")
     g.task("a", "A", worker="plain", inert=True)
     g.task("b", "B", depends_on=["a"], worker="acts")
     g.task("c", "C", depends_on=["b"], worker="plain", inert=True)
-    workers = {
-        "plain": lambda node: {"text": "ok", "cost_usd": 0.0},
-        "acts": _artifact({"action": "read", "tool": "read_file"}),
-    }
-    report = _runner(g, workers, Gatekeeper(audit_log=log)).run()
+
+    def acts(node):
+        broker.call(node.id, "read_file", {"path": "x"})
+        return {
+            "text": "ok",
+            "cost_usd": 0.0,
+            "action": {"action": "read", "tool": "read_file"},
+        }
+
+    workers = {"plain": lambda node: {"text": "ok", "cost_usd": 0.0}, "acts": acts}
+    report = _runner(g, workers, gatekeeper, broker).run()
     assert report.ok and report.completed == ["a", "b", "c"]
     entries = log.read_all()
-    assert [e["node_id"] for e in entries] == ["a", "b", "c"]
+    # b leaves its decision and, after it, the outcome of the call.
+    assert [e["node_id"] for e in entries] == ["a", "b", "b", "c"]
     assert "no action declared" in entries[0]["action"]
-    assert all(e["approved"] for e in entries)
+    assert entries[2]["entry_type"] == "tool_outcome"
+    assert all(e.get("approved", True) for e in entries)
 
 
 def test_failed_node_leaves_a_receipt(tmp_path):
@@ -332,7 +346,10 @@ def test_stamped_and_non_tool_payloads_pass_integrity_check():
     assert not check_payload_integrity(
         {"data": {"value": 6, "checksum": checksum_of(5)}}
     ).ok
-    assert check_payload_integrity({"data": {"key": "k", "value": 1}}).ok
+    assert not check_payload_integrity({"data": {"key": "k", "value": 1}}).ok
+    assert check_payload_integrity(
+        {"data": {"key": "k", "value": 1}}, trusted_write=True
+    ).ok
     assert check_payload_integrity({"data": {"skipped": True}}).ok
     assert check_payload_integrity({"text": "no data"}).ok
 
@@ -502,7 +519,10 @@ def test_runner_completes_when_ledger_and_declaration_agree(tmp_path):
     report = _runner(g, w, broker.gatekeeper, broker).run()
     assert report.ok and report.completed == ["n"]
     assert len(ran) == 1
-    assert len(log.read_all()) == 1  # checked once, before it ran
+    decision, outcome = log.read_all()  # checked once, before it ran, then recorded
+    assert decision["approved"] is True and decision["call_id"]
+    assert outcome["entry_type"] == "tool_outcome"
+    assert outcome["call_id"] == decision["call_id"]
 
 
 def test_runner_halts_when_declared_action_never_went_through_broker(tmp_path):
@@ -510,9 +530,9 @@ def test_runner_halts_when_declared_action_never_went_through_broker(tmp_path):
     action = {"action": "pay", "tool": "wire_transfer"}
     g, w = _one_node(_artifact(action))
     report = _runner(g, w, broker.gatekeeper, broker).run()
-    assert report.halted and report.failed == ["n"] and not report.completed
+    assert report.halted and report.blocked == ["n"] and not report.completed
     assert ran == []
-    assert log.read_all()[-1]["refusal_state"] == REFUSAL_RECONCILE_MISMATCH
+    assert log.read_all()[-1]["refusal_state"] == REFUSAL_DECLARATION_MISMATCH
 
 
 def test_runner_halts_when_brokered_call_was_denied_but_declared(tmp_path):
@@ -531,3 +551,16 @@ def test_runner_halts_when_brokered_call_was_denied_but_declared(tmp_path):
     report = _runner(g, w, broker.gatekeeper, broker).run()
     assert report.halted and not report.completed
     assert ran == []
+
+
+def test_payload_key_does_not_select_integrity_exemption():
+    assert not check_payload_integrity({"data": {"key": "result", "value": 1}}).ok
+
+
+def test_only_runner_registered_write_records_get_the_exemption():
+    from chancellor.evals.suite_b import _governed_panel
+
+    write_record = {"text": "stored", "data": {"key": "result", "value": 1}}
+    panel = _governed_panel([write_record])
+    assert panel.run_all(write_record).ok
+    assert not panel.run_all(dict(write_record)).ok

@@ -11,6 +11,7 @@ tampered chain.
 import json
 
 import pytest
+from pinning import operator_signer, pin_args
 
 from chancellor import receipts
 from chancellor.escalation import AuditLog
@@ -206,20 +207,16 @@ def test_resolve_tampered_chain_fails_closed(tmp_path):
     assert any(f.startswith("entry_hash_mismatch") for f in result.failures)
 
 
-def test_resolve_cli_exit_codes(tmp_path, capsys):
+def test_resolve_cli_exit_codes(tmp_path, capsys, monkeypatch):
     path = tmp_path / "audit.jsonl"
-    log = AuditLog(path)
+    log = AuditLog(path, signer=operator_signer())
+    pin = pin_args(monkeypatch)
     manifest = _manifest_entry(log)
     _test_run_entry(log, manifest["manifest_sha256"])
     log.checkpoint()
-    assert (
-        verify_main(
-            ["resolve", str(path), manifest["manifest_sha256"], "--accept-dev-signer"]
-        )
-        == 0
-    )
+    assert verify_main(["resolve", str(path), manifest["manifest_sha256"], *pin]) == 0
     out = capsys.readouterr().out
     assert "RESOLVED" in out and "test_run:" in out and "sealed_by:" in out
-    assert verify_main(["resolve", str(path), "cd" * 32, "--accept-dev-signer"]) == 1
+    assert verify_main(["resolve", str(path), "cd" * 32, *pin]) == 1
     assert "NOT RESOLVED" in capsys.readouterr().out
     assert verify_main(["resolve", str(tmp_path / "missing.jsonl"), "ab" * 32]) == 2

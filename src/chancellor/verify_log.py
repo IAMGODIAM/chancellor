@@ -1,10 +1,10 @@
 """Offline verifier for Chancellor's hash-chained audit log.
 
-    python -m chancellor.verify_log <audit-log.jsonl> [--checkpoints <file>]
+    python -m chancellor.verify_log <audit-log.jsonl> --pubkey <key|file>
+                                [--checkpoints <file>]
                                 [--allow-legacy-prefix] [--allow-uncheckpointed]
-                                [--accept-dev-signer]
     python -m chancellor.verify_log resolve <audit-log.jsonl> <manifest_sha256>
-                                [--checkpoints <file>] [--accept-dev-signer]
+                                --pubkey <key|file> [--checkpoints <file>]
 
 The ``resolve`` verb walks freeze provenance (receipts.freeze_manifest /
 test_run entries): given a manifest hash it prints the freeze_manifest
@@ -30,14 +30,17 @@ root, head hash). Tamper classes detected, each with a named failure:
                            governing frame this verifier holds, by id
                            and hash, inside its committed body)
 
-Signer label: a log sealed under the built-in dev key
-(``chancellor-dev-hmac-sha256``, a public key anyone can recompute) is
-tamper-evidence only. The verifier prints ``SIGNER: dev-hmac (public) —
-tamper-evidence only`` whenever it sees that key id, and fails such a log
-unless ``--accept-dev-signer`` is passed.
+Authenticity: a log is VERIFIED only when its checkpoints are signed by
+a key the user pinned with ``--pubkey`` (an Ed25519 public key, or the
+key id of an operator HMAC key whose secret the verifier holds) and that
+key is not the built-in dev key. A log sealed under the public dev key
+(``chancellor-dev-hmac-sha256``, which anyone can recompute) prints
+``DEV-SIGNED, NOT AUTHENTIC``: its chain can be checked for consistency,
+but nobody can show who sealed it. A log with no pinned signer is never
+reported as authentic.
 
-Exit codes: 0 = verified, 1 = verification failed (named failures on
-stdout), 2 = usage / IO error.
+Exit codes: 0 = verified AND authentic (pinned, non-dev signer), 1 = not
+verified or not authentic (named failures on stdout), 2 = usage / IO error.
 
 Without any checkpoint, tail truncation is undetectable *by
 construction* — the verifier refuses to call such a log verified
@@ -57,7 +60,9 @@ checkpoint's log_size is refused (``proof_count_mismatch``).
 from __future__ import annotations
 
 import argparse
+import base64
 import json
+import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -75,9 +80,43 @@ class VerificationResult:
     checkpoints: int = 0  # checkpoint envelopes seen
     checkpoint_log_size: int | None = None
     dev_signer: bool = False  # a checkpoint was sealed under the dev key
+    # The chain and checkpoints are internally consistent, whatever the
+    # signer. Consistency is not authenticity.
+    consistent: bool = False
+    # Consistent AND sealed under the pinned, non-dev signer. Only this
+    # may be reported as VERIFIED.
+    authentic: bool = False
+    signer_key_id: str | None = None
 
 
-DEV_SIGNER_LABEL = "SIGNER: dev-hmac (public) — tamper-evidence only"
+DEV_SIGNER_LABEL = receipts.DEV_SIGNED_LABEL
+DEV_SIGNER_NOTE = (
+    "sealed under the public dev key: the chain can be checked for "
+    "consistency, but anyone can re-seal it, so it shows nothing about who "
+    "wrote it"
+)
+NOT_AUTHENTIC_LABEL = "NOT AUTHENTIC"
+
+
+def verdict_of(result: VerificationResult | ResolveResult) -> str:
+    """The one-line verdict a CLI or demo may print. VERIFIED/RESOLVED
+    wording is reserved for authentic results."""
+    if result.authentic:
+        return "authentic"
+    if result.dev_signer:
+        return DEV_SIGNER_LABEL
+    if result.ok:
+        return NOT_AUTHENTIC_LABEL
+    return "not verified"
+
+
+def _sidecar_has_checkpoint(cp_path: Path) -> bool:
+    if not cp_path.exists():
+        return False
+    return any(
+        line.strip()
+        for line in cp_path.read_text(encoding="utf-8", errors="replace").splitlines()
+    )
 
 
 def _dev_signer_seen(cp_path: Path, signer: receipts.Signer) -> bool:
@@ -114,22 +153,55 @@ def _dev_signer_seen(cp_path: Path, signer: receipts.Signer) -> bool:
     return seen and signer.key_id == receipts.DEV_SIGNER_KEY_ID
 
 
-def _apply_dev_gate(result, cp_path: Path, signer: receipts.Signer, accept: bool):
-    """Label a dev-signed result, and fail it unless the caller accepted
-    the dev signer."""
-    if not _dev_signer_seen(cp_path, signer):
+def _apply_signer_gate(result, cp_path: Path, signer: receipts.Signer, accept: bool):
+    """Decide authenticity. The verifying ``signer`` is the pin: a result
+    is authentic only when it is consistent, a checkpoint exists, and
+    the pinned signer is not the public dev key. A dev-signed result is
+    labelled and fails unless the caller acknowledged the non-production
+    signer; even then it is never authentic."""
+    result.consistent = result.ok
+    result.signer_key_id = signer.key_id
+    dev = _dev_signer_seen(cp_path, signer)
+    result.dev_signer = dev
+    if dev:
+        if accept:
+            result.warnings.append(DEV_SIGNER_LABEL)
+        else:
+            result.failures.append(
+                f"dev_signed_not_authentic: {DEV_SIGNER_LABEL} — {DEV_SIGNER_NOTE}"
+            )
+            result.ok = False
         return result
-    result.dev_signer = True
-    if accept:
-        result.warnings.append(DEV_SIGNER_LABEL)
-    else:
-        result.failures.append(
-            "dev_signer_not_accepted: checkpoints are sealed under the public "
-            "dev key — tamper-evidence only; pass --accept-dev-signer to "
-            "acknowledge"
-        )
-        result.ok = False
+    result.authentic = result.ok and _sidecar_has_checkpoint(cp_path)
     return result
+
+
+def _checkpoint_envelope_keyids(envelope: dict) -> list[str]:
+    sigs = envelope.get("signatures") if isinstance(envelope, dict) else None
+    if not isinstance(sigs, list):
+        return []
+    return [str(sg.get("keyid")) for sg in sigs if isinstance(sg, dict)]
+
+
+def _signature_failures(
+    envelope: dict, signer: receipts.Signer, which: str
+) -> list[str]:
+    """Named failures for one envelope's signature under the pinned
+    signer: a key id that is not the pinned one, then the signature
+    itself."""
+    out: list[str] = []
+    ids = _checkpoint_envelope_keyids(envelope)
+    if ids != [signer.key_id]:
+        out.append(
+            f"signer_not_pinned: {which} checkpoint is signed by "
+            f"{ids or 'no key'}, not the pinned signer {signer.key_id!r}"
+        )
+    if not receipts.checkpoint_signature_valid(envelope, signer):
+        out.append(
+            f"checkpoint_signature_invalid: {which} checkpoint signature "
+            "does not verify"
+        )
+    return out
 
 
 def _load_jsonl(path: Path, failures: list[str]) -> list[dict] | None:
@@ -160,10 +232,15 @@ def verify_log(
     allow_uncheckpointed: bool = False,
     accept_dev_signer: bool = False,
 ) -> VerificationResult:
-    """Verify a receipt chain offline (see _verify_log_core). A log sealed
-    under the public dev key is labelled and FAILS unless
-    ``accept_dev_signer`` is set."""
-    signer = signer if signer is not None else receipts.default_signer()
+    """Verify a receipt chain offline (see _verify_log_core).
+
+    ``signer`` is the pin: the key the checkpoints must be signed by. A
+    result is ``authentic`` only when it is consistent and pinned to a
+    non-dev signer. With no ``signer`` the public dev signer is used, so
+    a dev-signed log is labelled and FAILS unless ``accept_dev_signer``
+    acknowledges the non-production signer — and even then it is never
+    authentic."""
+    signer = signer if signer is not None else receipts.public_dev_signer()
     result = _verify_log_core(
         log_path, checkpoint_path, signer, allow_legacy_prefix, allow_uncheckpointed
     )
@@ -172,7 +249,7 @@ def verify_log(
         if checkpoint_path is not None
         else receipts.default_checkpoint_path(log_path)
     )
-    return _apply_dev_gate(result, cp_path, signer, accept_dev_signer)
+    return _apply_signer_gate(result, cp_path, signer, accept_dev_signer)
 
 
 def _verify_log_core(
@@ -309,11 +386,7 @@ def _verify_log_core(
                     f"tree={payload.get('tree')!r}, expected "
                     f"{receipts.TREE_RFC9162!r}"
                 )
-            if not receipts.checkpoint_signature_valid(newest, signer):
-                failures.append(
-                    "checkpoint_signature_invalid: newest "
-                    "checkpoint signature does not verify"
-                )
+            failures.extend(_signature_failures(newest, signer, "newest"))
             checkpoint_log_size = payload.get("log_size")
             if checkpoint_log_size != len(chained_hashes):
                 if isinstance(checkpoint_log_size, int) and checkpoint_log_size > len(
@@ -351,6 +424,9 @@ def _verify_log_core(
                     "log's entry hashes != checkpoint root"
                 )
 
+    _check_checkpoint_history(cp_rows, chained_hashes, signer, failures)
+    _check_outcomes([r for r in rows if "entry_hash" in r], failures)
+
     return VerificationResult(
         ok=not failures,
         failures=failures,
@@ -362,6 +438,125 @@ def _verify_log_core(
     )
 
 
+def _check_checkpoint_history(
+    cp_rows: list[dict],
+    chained_hashes: list[str],
+    signer: receipts.Signer,
+    failures: list[str],
+) -> None:
+    """Every checkpoint in the sidecar, not only the newest, must agree
+    with the log: a signature from the pinned signer, a size that never
+    shrinks, a root and head that recompute over the prefix it claims,
+    and no v1 checkpoint after a v2 one."""
+    seen_v2 = False
+    previous_size = 0
+    last = len(cp_rows) - 1
+    for idx, envelope in enumerate(cp_rows):
+        try:
+            payload = receipts.checkpoint_payload(envelope)
+        except Exception:
+            if idx != last:
+                failures.append(
+                    f"checkpoint_malformed: checkpoint {idx} does not decode"
+                )
+            continue
+        schema = payload.get("schema")
+        if schema == receipts.CHECKPOINT_SCHEMA_V2:
+            seen_v2 = True
+        elif schema == receipts.CHECKPOINT_SCHEMA and seen_v2:
+            failures.append(
+                f"checkpoint_schema_downgrade: checkpoint {idx} is v1 after "
+                "a v2 checkpoint"
+            )
+        size = payload.get("log_size")
+        if isinstance(size, int) and size < previous_size:
+            failures.append(
+                f"checkpoint_size_regressed: checkpoint {idx} commits {size} "
+                f"entries after one that committed {previous_size}"
+            )
+        if isinstance(size, int):
+            previous_size = max(previous_size, size)
+        if idx == last:
+            continue  # the newest is checked in full by the caller
+        if schema not in (receipts.CHECKPOINT_SCHEMA, receipts.CHECKPOINT_SCHEMA_V2):
+            failures.append(f"checkpoint_schema: checkpoint {idx} is {schema!r}")
+            continue
+        failures.extend(_signature_failures(envelope, signer, f"checkpoint {idx}"))
+        if not isinstance(size, int) or size < 0 or size > len(chained_hashes):
+            failures.append(
+                f"checkpoint_history_inconsistent: checkpoint {idx} commits "
+                f"{size!r} entries, log holds {len(chained_hashes)}"
+            )
+            continue
+        root_fn = (
+            receipts.rfc9162_root
+            if schema == receipts.CHECKPOINT_SCHEMA_V2
+            else receipts.merkle_root
+        )
+        head = chained_hashes[size - 1] if size else None
+        if payload.get("merkle_root") != root_fn(chained_hashes[:size]) or (
+            payload.get("head_receipt_hash") != head
+        ):
+            failures.append(
+                f"checkpoint_history_inconsistent: checkpoint {idx} does not "
+                "match the log prefix it seals"
+            )
+
+
+def _check_outcomes(chained: list[dict], failures: list[str]) -> None:
+    """Brokered calls leave two records: the decision (carrying a
+    ``call_id``) and, after it, the outcome. An approved decision with no
+    matching outcome, an outcome with no approved decision, or an outcome
+    whose executed arguments differ from the approved ones, fails."""
+    decisions: dict[str, tuple[int, dict]] = {}
+    outcomes: dict[str, list[tuple[int, dict]]] = {}
+    for pos, entry in enumerate(chained):
+        call_id = entry.get("call_id")
+        if entry.get("entry_type") == receipts.ENTRY_TYPE_TOOL_OUTCOME:
+            outcomes.setdefault(str(call_id), []).append((pos, entry))
+        elif isinstance(call_id, str) and "approved" in entry:
+            decisions[call_id] = (pos, entry)
+    for call_id, (pos, decision) in decisions.items():
+        found = outcomes.get(call_id, [])
+        if not decision.get("approved"):
+            if found:
+                failures.append(
+                    f"outcome_for_denied_call: seq {pos} was denied but call "
+                    f"{call_id} has an outcome"
+                )
+            continue
+        if len(found) != 1 or found[0][0] < pos:
+            failures.append(
+                f"approval_without_outcome: seq {pos} approved call {call_id} "
+                f"({decision.get('tool')!r}) with "
+                f"{'no' if not found else len(found)} matching outcome"
+            )
+            continue
+        outcome = found[0][1]
+        if (
+            outcome.get("tool") != decision.get("tool")
+            or outcome.get("node_id") != decision.get("node_id")
+            or outcome.get("approved_args_sha256") != decision.get("args_sha256")
+        ):
+            failures.append(
+                f"outcome_mismatch: call {call_id} outcome does not match "
+                f"the approved decision at seq {pos}"
+            )
+        elif outcome.get("result_status") in ("ok", "error") and outcome.get(
+            "executed_args_sha256"
+        ) != outcome.get("approved_args_sha256"):
+            failures.append(
+                f"outcome_args_mismatch: call {call_id} ran with arguments "
+                f"other than the approved ones (seq {pos})"
+            )
+    for call_id, group in outcomes.items():
+        if call_id not in decisions:
+            failures.append(
+                f"outcome_without_approval: outcome at seq {group[0][0]} "
+                f"names call {call_id}, which no decision in this log carries"
+            )
+
+
 def verify_holder_proof(
     checkpoint_path: str | Path,
     proof: dict,
@@ -370,9 +565,9 @@ def verify_holder_proof(
 ) -> VerificationResult:
     """Verify a holder-presented proof (see _verify_holder_proof_core);
     dev-signed checkpoints are labelled and fail unless accepted."""
-    signer = signer if signer is not None else receipts.default_signer()
+    signer = signer if signer is not None else receipts.public_dev_signer()
     result = _verify_holder_proof_core(checkpoint_path, proof, signer)
-    return _apply_dev_gate(result, Path(checkpoint_path), signer, accept_dev_signer)
+    return _apply_signer_gate(result, Path(checkpoint_path), signer, accept_dev_signer)
 
 
 def _verify_holder_proof_core(
@@ -422,10 +617,7 @@ def _verify_holder_proof_core(
             f"checkpoint_tree: tree={payload.get('tree')!r} != "
             f"{receipts.TREE_RFC9162!r}"
         )
-    if not receipts.checkpoint_signature_valid(newest, signer):
-        failures.append(
-            "checkpoint_signature_invalid: newest checkpoint signature does not verify"
-        )
+    failures.extend(_signature_failures(newest, signer, "newest"))
     if failures:
         return VerificationResult(
             ok=False,
@@ -488,6 +680,9 @@ class ResolveResult:
     checkpoint: dict | None = None  # payload of the sealing checkpoint
     warnings: list[str] = field(default_factory=list)
     dev_signer: bool = False  # a checkpoint was sealed under the dev key
+    consistent: bool = False
+    authentic: bool = False
+    signer_key_id: str | None = None
 
 
 # CC 24 (radon) — one branch per gap resolve must fail closed on.
@@ -500,14 +695,14 @@ def resolve_manifest(
 ) -> ResolveResult:
     """Resolve a manifest hash (see _resolve_manifest_core); dev-signed
     checkpoints are labelled and fail unless accepted."""
-    signer = signer if signer is not None else receipts.default_signer()
+    signer = signer if signer is not None else receipts.public_dev_signer()
     result = _resolve_manifest_core(log_path, manifest_sha256, checkpoint_path, signer)
     cp_path = (
         Path(checkpoint_path)
         if checkpoint_path is not None
         else receipts.default_checkpoint_path(log_path)
     )
-    return _apply_dev_gate(result, cp_path, signer, accept_dev_signer)
+    return _apply_signer_gate(result, cp_path, signer, accept_dev_signer)
 
 
 def _resolve_manifest_core(
@@ -619,6 +814,7 @@ def _resolve_manifest_core(
         )
     else:
         leaves = [e["entry_hash"] for e in chained]
+        seen_v2_checkpoint = False
         for envelope in cp_rows:
             try:
                 payload = receipts.checkpoint_payload(envelope)
@@ -627,10 +823,22 @@ def _resolve_manifest_core(
                     "checkpoint_malformed: a checkpoint envelope does not decode"
                 )
                 continue
-            if payload.get("schema") != receipts.CHECKPOINT_SCHEMA:
+            schema = payload.get("schema")
+            if schema not in (
+                receipts.CHECKPOINT_SCHEMA,
+                receipts.CHECKPOINT_SCHEMA_V2,
+            ):
                 failures.append(
-                    f"checkpoint_schema: {payload.get('schema')!r} != "
-                    f"{receipts.CHECKPOINT_SCHEMA!r}"
+                    f"checkpoint_schema: {schema!r} is not "
+                    f"{receipts.CHECKPOINT_SCHEMA!r} or "
+                    f"{receipts.CHECKPOINT_SCHEMA_V2!r}"
+                )
+                continue
+            if schema == receipts.CHECKPOINT_SCHEMA_V2:
+                seen_v2_checkpoint = True
+            elif seen_v2_checkpoint:
+                failures.append(
+                    "checkpoint_schema_downgrade: a v1 checkpoint follows a v2 one"
                 )
                 continue
             if not receipts.checkpoint_signature_valid(envelope, signer):
@@ -639,10 +847,15 @@ def _resolve_manifest_core(
                     "does not verify"
                 )
                 continue
+            root_fn = (
+                receipts.rfc9162_root
+                if schema == receipts.CHECKPOINT_SCHEMA_V2
+                else receipts.merkle_root
+            )
             size = payload.get("log_size")
             if not isinstance(size, int) or size < needed or size > len(leaves):
                 continue  # valid, but does not seal these entries (yet)
-            if payload.get("merkle_root") != receipts.merkle_root(leaves[:size]):
+            if payload.get("merkle_root") != root_fn(leaves[:size]):
                 failures.append(
                     "checkpoint_root_mismatch: checkpoint root does not "
                     "recompute over the entries it claims to seal"
@@ -672,6 +885,448 @@ def _resolve_manifest_core(
     )
 
 
+PUBKEY_HELP = (
+    "pin the signer: an Ed25519 public key ('ed25519:<base64>' or 64 hex "
+    "characters, or a file holding one), or an operator HMAC key id "
+    "('hmac-sha256:<id>', verified with the secret in "
+    f"{receipts.VERIFY_KEY_ENV}). A log is reported authentic only when "
+    "its checkpoints are signed by the pinned, non-dev key"
+)
+ACCEPT_DEV_HELP = (
+    "acknowledge a non-production signer: the output stays "
+    "'DEV-SIGNED, NOT AUTHENTIC' and the exit status stays non-zero"
+)
+
+
+def load_pinned_signer(spec: str) -> receipts.Signer:
+    """Build the verifying signer for a ``--pubkey`` value (a literal or
+    the path of a file holding one). Raises ValueError when the value is
+    not a usable pin. Nothing here reads a private signing key: an
+    Ed25519 pin is public, and an HMAC pin is checked against the secret
+    the verifier's operator supplies in the environment."""
+    text = spec.strip()
+    candidate = Path(text)
+    try:
+        if candidate.is_file():
+            text = candidate.read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+    if text == receipts.DEV_SIGNER_KEY_ID:
+        signer = receipts.public_dev_signer()
+        if signer.key_id != text:
+            raise ValueError("resolved signer does not match the pinned key id")
+        return signer
+    if text.startswith(receipts.HMAC_KEY_ID_PREFIX):
+        secret = os.environ.get(receipts.VERIFY_KEY_ENV)
+        if not secret:
+            raise ValueError(
+                "an HMAC key id needs the verifying secret in "
+                f"{receipts.VERIFY_KEY_ENV}"
+            )
+        signer = receipts.DevHmacSigner(secret=secret.encode("utf-8"))
+        if signer.key_id != text:
+            raise ValueError(
+                f"the secret in {receipts.VERIFY_KEY_ENV} does not match the "
+                "pinned key id"
+            )
+        return signer
+    raw = (
+        text[len(receipts.ED25519_KEY_ID_PREFIX) :]
+        if text.startswith(receipts.ED25519_KEY_ID_PREFIX)
+        else text
+    )
+    key: bytes | None = None
+    if len(raw) == 64:
+        try:
+            key = bytes.fromhex(raw)
+        except ValueError:
+            key = None
+    if key is None:
+        try:
+            key = base64.b64decode(raw, validate=True)
+        except Exception:
+            key = None
+    if key is None or len(key) != 32:
+        raise ValueError(
+            "not a usable pin: give an Ed25519 public key (32 bytes, base64 or "
+            "hex) or an operator key id; a key id alone cannot check an "
+            "Ed25519 signature"
+        )
+    return receipts.PinnedEd25519Verifier(key)
+
+
+def _signer_from_args(pubkey: str | None) -> receipts.Signer | None:
+    return load_pinned_signer(pubkey) if pubkey is not None else None
+
+
+def _add_signer_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--pubkey", default=None, metavar="KEY_OR_FILE", help=PUBKEY_HELP
+    )
+    parser.add_argument(
+        "--accept-dev-signer", action="store_true", help=ACCEPT_DEV_HELP
+    )
+
+
+def _print_signer_status(result: VerificationResult | ResolveResult) -> None:
+    if result.dev_signer:
+        print(DEV_SIGNER_LABEL)
+        print(f"  {DEV_SIGNER_NOTE}")
+    elif result.consistent and not result.authentic:
+        print(f"{NOT_AUTHENTIC_LABEL}: no signed checkpoint to pin")
+    if result.authentic:
+        print(f"signer: {result.signer_key_id} (pinned)")
+
+
+# ------------------------------------------------- the install bridge audit
+# Frame v2's bridge (SPEC-FOUNDRY-CHANCELLOR §1.5): the Chancellor
+# chain and the Foundry's act journal are separate chains; neither
+# validates the other. This audit — the ONE check class the install
+# build adds to the verifier — checks CORRESPONDENCE only: every
+# governed act's citation resolves, every decision pre-dates the act
+# it authorized (a late decision is no decision), every Foundry
+# refusal record pairs with the Chancellor refusal Decision that
+# recorded it, and every probation opening's citations resolve.
+# Citations are hashes and ids, never paraphrase.
+
+
+@dataclass
+class BridgeAuditResult:
+    ok: bool
+    failures: list[str] = field(default_factory=list)
+    acts_checked: int = 0
+    citations_resolved: int = 0
+    refusals_paired: int = 0
+
+
+def _iso_to_epoch(text: object) -> float | None:
+    if not isinstance(text, str):
+        return None
+    try:
+        from datetime import datetime
+
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return None
+
+
+def _opening_seq(opening: dict) -> int | None:
+    """The issuer log index of a holder opening, decoded from its
+    envelope payload with the stdlib only (the payload is the
+    issuer's canonical JSON; reading it is not importing it)."""
+    import base64
+
+    try:
+        payload = json.loads(
+            base64.b64decode(opening["envelope"]["payload"]).decode("utf-8")
+        )
+        seq = payload.get("seq")
+        return int(seq) if isinstance(seq, int) else None
+    except Exception:
+        return None
+
+
+def audit_install_bridge(
+    entries: list[dict],
+    act_records: list[dict],
+    journals: dict[str, dict],
+    *,
+    scope_bundle_ids: set[str] | None = None,
+    issuer_openings: list[dict] | None = None,
+) -> BridgeAuditResult:
+    """Correspondence audit over a paired Chancellor chain + Foundry
+    act journal. ``journals`` maps act_id → {"preflight": dict|None,
+    "chancellor_decision": dict|None}. ``scope_bundle_ids`` restricts
+    the audit to the frozen scope enumeration (None = every act
+    present). Receipt-kind citations (a commission receipt — the
+    Foundry-side standing citation) resolve against
+    ``issuer_openings`` when supplied."""
+    failures: list[str] = []
+    acts_checked = 0
+    citations_resolved = 0
+    refusals_paired = 0
+
+    by_seq: dict[int, dict] = {}
+    for entry in entries:
+        if isinstance(entry.get("seq"), int):
+            by_seq[entry["seq"]] = entry
+    openings_by_id: dict[str, dict] = {}
+    for opening in issuer_openings or []:
+        rid = opening.get("receipt_id")
+        if isinstance(rid, str):
+            openings_by_id[rid] = opening
+
+    def in_scope(bundle_id: object) -> bool:
+        return scope_bundle_ids is None or bundle_id in scope_bundle_ids
+
+    for record in act_records:
+        bundle_id = record.get("bundle_id")
+        if not in_scope(bundle_id):
+            continue
+        if record.get("type") == "refusal":
+            # Pairing: a Chancellor refusal Decision whose detail
+            # cites this record's hash and whose rationale names the
+            # Foundry state verbatim.
+            record_hash = record.get("record_hash")
+            reason = record.get("reason")
+            paired = False
+            for entry in entries:
+                if entry.get("action_class") != "capability_install":
+                    continue
+                if entry.get("approved") is not False:
+                    continue
+                detail = entry.get("detail")
+                parsed: dict = {}
+                if isinstance(detail, str):
+                    try:
+                        parsed = json.loads(detail)
+                    except json.JSONDecodeError:
+                        parsed = {}
+                if (
+                    parsed.get("foundry_refusal_record_hash") == record_hash
+                    and isinstance(reason, str)
+                    and reason in str(entry.get("rationale", ""))
+                ):
+                    paired = True
+                    break
+            if paired:
+                refusals_paired += 1
+            else:
+                failures.append(
+                    f"bridge_refusal_unpaired: refusal record "
+                    f"{record_hash} ({reason}) for {bundle_id} has no "
+                    "Chancellor refusal Decision"
+                )
+            continue
+        if record.get("type") != "act":
+            continue
+        acts_checked += 1
+        act_id = str(record.get("act_id"))
+        journal = journals.get(act_id, {})
+        preflight = journal.get("preflight") or {}
+        preflight_epoch = _iso_to_epoch(preflight.get("at"))
+        citation = journal.get("chancellor_decision")
+        if isinstance(citation, dict) and citation.get("kind") == (
+            "chancellor-decision"
+        ):
+            seq = citation.get("seq")
+            target = by_seq.get(seq) if isinstance(seq, int) else None
+            if target is None or target.get("entry_hash") != citation.get("entry_hash"):
+                failures.append(
+                    f"bridge_citation_unresolved: act {act_id} cites "
+                    f"Chancellor seq {seq}, not found in the chain"
+                )
+                continue
+            if target.get("action_class") != "capability_install":
+                failures.append(
+                    f"bridge_citation_wrong_class: act {act_id} cites "
+                    f"seq {seq} (action_class "
+                    f"{target.get('action_class')!r})"
+                )
+                continue
+            detail = target.get("detail")
+            parsed = {}
+            if isinstance(detail, str):
+                try:
+                    parsed = json.loads(detail)
+                except json.JSONDecodeError:
+                    parsed = {}
+            if parsed.get("bundle_id") != bundle_id or parsed.get("verb") != record.get(
+                "verb"
+            ):
+                failures.append(
+                    f"bridge_citation_mismatch: act {act_id} vs the "
+                    f"decision at seq {seq} (bundle/verb disagree)"
+                )
+                continue
+            if target.get("approved") is not True:
+                failures.append(
+                    f"bridge_act_without_approval: act {act_id} cites "
+                    f"a decision at seq {seq} that did not approve it"
+                )
+                continue
+            decision_ts = target.get("ts")
+            if (
+                isinstance(decision_ts, (int, float))
+                and preflight_epoch is not None
+                and float(decision_ts) > preflight_epoch
+            ):
+                failures.append(
+                    f"bridge_precedence_late: act {act_id}'s decision "
+                    f"at seq {seq} post-dates the act's pre-flight — "
+                    "a late decision is no decision"
+                )
+                continue
+            citations_resolved += 1
+            continue
+        # Receipt-kind citation: the act statement's commission block.
+        statement: dict = record.get("statement") or {}
+        citation_block: dict = statement.get("citation") or {}
+        auth: dict = citation_block.get("authorizing_decision") or {}
+        receipt_id = auth.get("receipt_id")
+        cited_opening = openings_by_id.get(receipt_id) if receipt_id else None
+        if cited_opening is None:
+            failures.append(
+                f"bridge_citation_unresolved: act {act_id} cites "
+                f"receipt {receipt_id}, not among the issuer openings"
+            )
+            continue
+        cited_seq = _opening_seq(cited_opening)
+        act_seq = record.get("receipt_seq")
+        if cited_seq is not None and isinstance(act_seq, int) and cited_seq >= act_seq:
+            failures.append(
+                f"bridge_precedence_late: act {act_id}'s cited "
+                f"decision sits at issuer index {cited_seq}, not "
+                f"strictly before the act's own index {act_seq} — "
+                "a late decision is no decision"
+            )
+            continue
+        citations_resolved += 1
+
+    # Probation openings: both citations must resolve.
+    act_receipt_ids = {
+        r.get("receipt_id")
+        for r in act_records
+        if r.get("type") == "act" and in_scope(r.get("bundle_id"))
+    }
+    for entry in entries:
+        if entry.get("entry_type") != "capability_probation_opened":
+            continue
+        seq = entry.get("decision_seq")
+        target = by_seq.get(seq) if isinstance(seq, int) else None
+        if (
+            target is None
+            or target.get("entry_hash") != entry.get("decision_entry_hash")
+            or target.get("action_class") != "capability_install"
+            or target.get("approved") is not True
+        ):
+            failures.append(
+                f"bridge_probation_citation_unresolved: probation "
+                f"opened at seq {entry.get('seq')} cites decision seq "
+                f"{seq}, which does not resolve to its approval"
+            )
+        if entry.get("install_receipt_id") not in act_receipt_ids and (
+            entry.get("install_receipt_id") not in openings_by_id
+        ):
+            failures.append(
+                f"bridge_probation_citation_unresolved: probation "
+                f"opened at seq {entry.get('seq')} cites install "
+                f"receipt {entry.get('install_receipt_id')}, found in "
+                "neither the act journal nor the issuer openings"
+            )
+
+    return BridgeAuditResult(
+        ok=not failures,
+        failures=failures,
+        acts_checked=acts_checked,
+        citations_resolved=citations_resolved,
+        refusals_paired=refusals_paired,
+    )
+
+
+def _load_act_journals(acts_dir: Path) -> tuple[list[dict], dict[str, dict]]:
+    records: list[dict] = []
+    log_path = acts_dir / "acts.jsonl"
+    if log_path.exists():
+        for line in log_path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                records.append(json.loads(line))
+    journals: dict[str, dict] = {}
+    if acts_dir.is_dir():
+        for child in sorted(acts_dir.iterdir()):
+            if not child.is_dir():
+                continue
+            journal: dict[str, dict | None] = {
+                "preflight": None,
+                "chancellor_decision": None,
+            }
+            for name, key in (
+                ("preflight.json", "preflight"),
+                ("chancellor-decision.json", "chancellor_decision"),
+            ):
+                f = child / name
+                if f.exists():
+                    try:
+                        journal[key] = json.loads(f.read_text(encoding="utf-8"))
+                    except json.JSONDecodeError:
+                        journal[key] = None
+            journals[child.name] = journal
+    return records, journals
+
+
+def _bridge_main(argv: list[str]) -> int:
+    """Console entry for the bridge verb: audit correspondence
+    between a Chancellor chain and a paired Foundry act journal."""
+    parser = argparse.ArgumentParser(
+        prog="chancellor-verify-log bridge",
+        description="Audit citation correspondence between a "
+        "Chancellor audit log and a Foundry act journal (frame v2 "
+        "bridge — correspondence only; neither chain validates the "
+        "other).",
+    )
+    parser.add_argument("log", help="path to the Chancellor audit log JSONL")
+    parser.add_argument(
+        "--foundry-acts-dir",
+        required=True,
+        help="the Foundry acts directory (acts.jsonl + per-act journals)",
+    )
+    parser.add_argument(
+        "--issuer-openings",
+        default=None,
+        help="holder openings JSONL for receipt-kind citations",
+    )
+    parser.add_argument(
+        "--scope-bundles",
+        default=None,
+        help="comma-separated bundle ids forming the frozen scope "
+        "enumeration (default: every act present)",
+    )
+    args = parser.parse_args(argv)
+
+    failures: list[str] = []
+    entries = _load_jsonl(Path(args.log), failures)
+    if entries is None:
+        for failure in failures:
+            print(f"FAIL: {failure}")
+        return 1
+    records, journals = _load_act_journals(Path(args.foundry_acts_dir))
+    openings: list[dict] = []
+    if args.issuer_openings:
+        openings = [
+            json.loads(line)
+            for line in Path(args.issuer_openings)
+            .read_text(encoding="utf-8")
+            .splitlines()
+            if line.strip()
+        ]
+    scope = (
+        {b.strip() for b in args.scope_bundles.split(",") if b.strip()}
+        if args.scope_bundles
+        else None
+    )
+    result = audit_install_bridge(
+        entries,
+        records,
+        journals,
+        scope_bundle_ids=scope,
+        issuer_openings=openings,
+    )
+    print(
+        f"acts checked: {result.acts_checked}, citations resolved: "
+        f"{result.citations_resolved}, refusals paired: "
+        f"{result.refusals_paired}"
+    )
+    for failure in result.failures:
+        print(f"FAIL: {failure}")
+    if result.ok:
+        print(
+            "BRIDGE VERIFIED: every citation resolves, every decision pre-dates its act"
+        )
+        return 0
+    print("BRIDGE NOT VERIFIED")
+    return 1
+
+
 def _resolve_main(argv: list[str]) -> int:
     """Console entry for the resolve verb."""
     parser = argparse.ArgumentParser(
@@ -686,25 +1341,25 @@ def _resolve_main(argv: list[str]) -> int:
         default=None,
         help="checkpoint sidecar path (default: <log>.checkpoints.jsonl)",
     )
-    parser.add_argument(
-        "--accept-dev-signer",
-        action="store_true",
-        help="acknowledge checkpoints sealed under the public dev key "
-        "(tamper-evidence only); without it such a log fails",
-    )
+    _add_signer_args(parser)
     args = parser.parse_args(argv)
 
     if not Path(args.log).exists():
         print(f"error: log not found: {args.log}", file=sys.stderr)
         return 2
+    try:
+        signer = _signer_from_args(args.pubkey)
+    except ValueError as exc:
+        print(f"error: --pubkey: {exc}", file=sys.stderr)
+        return 2
     result = resolve_manifest(
         args.log,
         args.manifest,
         checkpoint_path=args.checkpoints,
+        signer=signer,
         accept_dev_signer=args.accept_dev_signer,
     )
-    if result.dev_signer:
-        print(DEV_SIGNER_LABEL)
+    _print_signer_status(result)
     if result.manifest_entry is not None:
         m = result.manifest_entry
         print(
@@ -727,10 +1382,10 @@ def _resolve_main(argv: list[str]) -> int:
         )
     for failure in result.failures:
         print(f"FAIL: {failure}")
-    if result.ok:
+    if result.authentic:
         print("RESOLVED: manifest, covering test runs, and sealing checkpoint")
         return 0
-    print("NOT RESOLVED")
+    print("NOT RESOLVED" if not result.consistent else f"{verdict_of(result)}")
     return 1
 
 
@@ -739,9 +1394,13 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "resolve":
         return _resolve_main(argv[1:])
+    if argv and argv[0] == "bridge":
+        return _bridge_main(argv[1:])
     parser = argparse.ArgumentParser(
         prog="chancellor-verify-log",
-        description="Verify a Chancellor hash-chained audit log offline.",
+        description="Verify a Chancellor hash-chained audit log offline. "
+        "A log is VERIFIED only when its checkpoints are signed by the "
+        "key pinned with --pubkey.",
     )
     parser.add_argument("log", help="path to the audit log JSONL")
     parser.add_argument(
@@ -759,12 +1418,7 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="accept a log with no checkpoint (tail truncation then undetectable)",
     )
-    parser.add_argument(
-        "--accept-dev-signer",
-        action="store_true",
-        help="acknowledge checkpoints sealed under the public dev key "
-        "(tamper-evidence only); without it such a log fails",
-    )
+    _add_signer_args(parser)
     parser.add_argument(
         "--proof",
         default=None,
@@ -773,6 +1427,11 @@ def main(argv: list[str] | None = None) -> int:
         "the log is not consulted",
     )
     args = parser.parse_args(argv)
+    try:
+        signer = _signer_from_args(args.pubkey)
+    except ValueError as exc:
+        print(f"error: --pubkey: {exc}", file=sys.stderr)
+        return 2
 
     if args.proof is not None:
         cp_path = (
@@ -789,20 +1448,19 @@ def main(argv: list[str] | None = None) -> int:
             print(f"error: proof file unreadable: {exc}", file=sys.stderr)
             return 2
         result = verify_holder_proof(
-            cp_path, proof, accept_dev_signer=args.accept_dev_signer
+            cp_path, proof, signer=signer, accept_dev_signer=args.accept_dev_signer
         )
-        if result.dev_signer:
-            print(DEV_SIGNER_LABEL)
+        _print_signer_status(result)
         print(
             f"checkpoints: {result.checkpoints}, "
             f"checkpoint log_size: {result.checkpoint_log_size}"
         )
-        if result.ok:
+        if result.authentic:
             print("VERIFIED: holder proof folds to the checkpoint root")
             return 0
         for failure in result.failures:
             print(f"FAIL: {failure}")
-        print("NOT VERIFIED")
+        print(verdict_of(result) if result.consistent else "NOT VERIFIED")
         return 1
 
     if not Path(args.log).exists():
@@ -811,12 +1469,12 @@ def main(argv: list[str] | None = None) -> int:
     result = verify_log(
         args.log,
         checkpoint_path=args.checkpoints,
+        signer=signer,
         allow_legacy_prefix=args.allow_legacy_prefix,
         allow_uncheckpointed=args.allow_uncheckpointed,
         accept_dev_signer=args.accept_dev_signer,
     )
-    if result.dev_signer:
-        print(DEV_SIGNER_LABEL)
+    _print_signer_status(result)
     print(
         f"entries: {result.entries} (chained: {result.chained_entries}), "
         f"checkpoints: {result.checkpoints}"
@@ -824,12 +1482,14 @@ def main(argv: list[str] | None = None) -> int:
     for warning in result.warnings:
         if warning != DEV_SIGNER_LABEL:
             print(f"WARNING: {warning}")
-    if result.ok:
+    if result.authentic:
         print("VERIFIED: chain intact, newest checkpoint consistent")
         return 0
     for failure in result.failures:
         print(f"FAIL: {failure}")
-    print("NOT VERIFIED")
+    if result.consistent and signer is None and not result.dev_signer:
+        print("NOT AUTHENTIC: no signer pinned (pass --pubkey)")
+    print(verdict_of(result) if result.consistent else "NOT VERIFIED")
     return 1
 
 

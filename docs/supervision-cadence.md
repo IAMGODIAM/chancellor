@@ -59,6 +59,7 @@ an agent that signs about every 505 seconds:
 
 ```bash
 # CHANCELLOR_SUPERVISE_KEY must hold your operator-supplied signing key
+# (at least 32 bytes; the supervisor keeps it, the agent never receives it)
 chancellor supervise --cadence 505 --missed 3 -- <agent command...>
 ```
 

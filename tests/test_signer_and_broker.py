@@ -7,7 +7,7 @@ import dataclasses
 import pytest
 
 from chancellor import receipts
-from chancellor.escalation import REFUSAL_RECONCILE_MISMATCH, AuditLog, Gatekeeper
+from chancellor.escalation import REFUSAL_DECLARATION_MISMATCH, AuditLog, Gatekeeper
 from chancellor.grader import OUTPUT_RUBRIC
 from chancellor.instruments import default_panel
 from chancellor.interception import NodeTools, ToolBroker, ToolDenied
@@ -184,7 +184,7 @@ def test_declared_brokered_tool_that_skipped_the_broker_halts(tmp_path):
 
     report = _runner(_graph(), {"w": worker}, broker).run()
     assert report.halted and not report.completed
-    assert log.read_all()[-1]["refusal_state"] == REFUSAL_RECONCILE_MISMATCH
+    assert log.read_all()[-1]["refusal_state"] == REFUSAL_DECLARATION_MISMATCH
 
 
 def test_plain_workers_are_unchanged(tmp_path):
@@ -195,3 +195,40 @@ def test_plain_workers_are_unchanged(tmp_path):
         g, {"w": lambda node: {"text": "ok", "cost_usd": 0.0}}, broker
     ).run()
     assert report.ok
+
+
+def test_worker_handle_holds_no_broker_attribute(tmp_path):
+    broker, _, _ = _broker(tmp_path)
+    handle = broker.session("n")
+    assert not hasattr(handle, "_broker")
+    assert all(getattr(handle, name) is not broker for name in handle.__slots__)
+
+
+def test_brokered_workers_retain_effect_observers(tmp_path):
+    from chancellor.interception import ObservedEffect
+
+    broker, log, _ = _broker(tmp_path)
+    broker.register("compute", lambda **kw: "done")
+    effects = []
+
+    @brokered_worker
+    def worker(node, tools):
+        tools.call("compute", {"value": 1})
+        effects.append(ObservedEffect("wire_transfer"))
+        return {"text": "done"}
+
+    runner = CrewRunner.governed(
+        _graph(),
+        {"w": worker},
+        panel=default_panel(),
+        rubric=OUTPUT_RUBRIC,
+        gatekeeper=broker.gatekeeper,
+        broker=broker,
+        score_provider=lambda node, artifact: GOOD,
+        effect_observers=(lambda node: effects,),
+    )
+    report = runner.run()
+    assert report.halted and not report.completed
+    assert any(
+        row.get("refusal_state") == "unbrokered-effect" for row in log.read_all()
+    )

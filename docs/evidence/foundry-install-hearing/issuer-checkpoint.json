@@ -1,0 +1,10 @@
+{
+  "payloadType": "application/vnd.e5.receipt-checkpoint.v1+json",
+  "payload": "eyJjcmVhdGVkX2F0IjoxNzkzNjQyMzYwLCJoZWFkX3JlY2VpcHRfaGFzaCI6Ijg4NTVjYWRlMWY1YzhiNTY1MDVlNmY1NTJlMmMyYjZiYzc1OGU0NzdkNjNkYzI0OGE4ZTY5MmRmMDYyOWIxYTgiLCJpc3N1ZXIiOiJlNS1pc3N1ZXItZDQ3MjU1ZThiM2JlIiwibG9nX3NpemUiOjIyLCJtZXJrbGVfcm9vdCI6IjVkOTM5YTFmNzliYzkzYTRhYWRjOWI3OGIwY2Q1YWI4NWRiZjY5ODhhZTFkYTg0ZjY2ZDBmMmY1MGRhNjJmOWMiLCJzY2hlbWEiOiJlNS5yZWNlaXB0X2NoZWNrcG9pbnQudjEifQ==",
+  "signatures": [
+    {
+      "keyid": "e5-issuer-d47255e8b3be",
+      "sig": "19tNEJWzznU7pxl76/Rf6/1oAJPW28cw95vmsL/9IBGWcQZxKf2NBUQY+idScmcUslQaHGPOWGChJI5q1Z00Aw=="
+    }
+  ]
+}

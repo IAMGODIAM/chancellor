@@ -28,10 +28,9 @@ and the RunReport of an ungoverned runner says so.
 
 Tool access (broker): with a ToolBroker attached, a worker that needs
 tools is registered with brokered_worker() and receives a per-node
-NodeTools handle — the only way it reaches a registered tool, and every
-call through it is checked before the tool runs. The handle is revoked
-when the worker returns. A worker that holds a raw tool handle of its own
-is outside what the runner can see; reconcile halts a node whose
+NodeTools handle. Calls through it are checked before the tool runs, and
+the handle is revoked when the worker returns. Other calls are audited
+afterward when effect observers cover them. Reconcile halts a node whose
 declared tool never went through the broker.
 
 A worker that raises halts the run. A gatekeeper that raises is a DENY.
@@ -49,22 +48,30 @@ test-only paths use them), and a scores-less artifact still halts.
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Callable, Mapping
+import logging
+from collections.abc import Callable, Collection, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import cast
 
 from .escalation import (
+    HUMAN_GATES,
+    REFUSAL_BROKERED_DENIAL,
+    REFUSAL_DECLARATION_MISMATCH,
+    REFUSAL_INERT_VIOLATION,
     REFUSAL_NODE_FAILED,
     REFUSAL_RECONCILE_MISMATCH,
+    REFUSAL_UNBROKERED_EFFECT,
     REFUSAL_UNCLASSIFIED,
     ActionClass,
     EscalationRequest,
     Gatekeeper,
+    coerce_class,
+    strictest,
 )
 from .grader import Rubric, grade
 from .instruments import InstrumentPanel
-from .interception import NodeTools, ToolBroker
+from .interception import InterceptRecord, NodeTools, ObservedEffect, ToolBroker
 from .task_graph import AttemptCapError, NodeStatus, TaskGraph, TaskNode
 
 # A worker maps a node -> artifact dict.
@@ -89,6 +96,12 @@ def brokered_worker(fn: BrokeredFn) -> BrokeredWorker:
     """Mark ``fn(node, tools)`` as a worker that takes broker-mediated
     tool access. Usable as a decorator."""
     return BrokeredWorker(fn)
+
+
+# An effect observer reports the side effects it can see for a node after
+# the node's worker has run (for example by diffing a sandbox, a ledger
+# or a mock service). The runner reconciles them against the broker.
+EffectObserver = Callable[[TaskNode], Iterable[ObservedEffect]]
 
 
 @dataclass
@@ -122,6 +135,8 @@ class CrewRunner:
         state_path: str | Path | None = None,
         score_provider: Callable | None = None,
         broker: ToolBroker | None = None,
+        effect_observers: Iterable[EffectObserver] = (),
+        raw_tool_handles: Mapping[str, Collection[str]] | None = None,
     ):
         """The low-level constructor. Every governance layer is optional
         here, which makes this the TEST-ONLY path — production code must
@@ -129,7 +144,14 @@ class CrewRunner:
 
         `score_provider`: optional callable (node, artifact) -> scores
         dict. When set, it — not the artifact — is where graded nodes'
-        scores come from (score provenance: the Judge, in production)."""
+        scores come from (score provenance: the Judge, in production).
+
+        `effect_observers`: callables (node) -> effects the runner can see
+        for that node; each must correspond to an approved brokered call
+        or the run halts. `raw_tool_handles`: worker name -> the tools that
+        worker holds directly (not through the broker). A worker may also
+        carry a `raw_tool_handles` attribute. A node whose worker holds any
+        such handle cannot be marked inert."""
         self.graph = graph
         self.workers = workers
         self.panel = panel
@@ -138,6 +160,10 @@ class CrewRunner:
         self.state_path = Path(state_path) if state_path else None
         self.score_provider = score_provider
         self.broker = broker
+        self.effect_observers = tuple(effect_observers)
+        self._raw_tool_handles = {
+            name: frozenset(tools) for name, tools in (raw_tool_handles or {}).items()
+        }
         self.is_governed = False
         self._attempt_receipted = False
         self._broker_mark = 0
@@ -154,6 +180,8 @@ class CrewRunner:
         state_path: str | Path | None = None,
         score_provider: Callable | None = None,
         broker: ToolBroker | None = None,
+        effect_observers: Iterable[EffectObserver] = (),
+        raw_tool_handles: Mapping[str, Collection[str]] | None = None,
     ) -> CrewRunner:
         """The production constructor. All three governance layers are
         required, and the panel must be non-empty — a governed runner
@@ -179,8 +207,15 @@ class CrewRunner:
             state_path=state_path,
             score_provider=score_provider,
             broker=broker,
+            effect_observers=effect_observers,
+            raw_tool_handles=raw_tool_handles,
         )
         runner.is_governed = True
+        if not runner.effect_observers and not runner._raw_tool_handles:
+            logging.getLogger(__name__).warning(
+                "governed runner has no effect observer or raw tool registration; "
+                "effects outside the broker may not be detected"
+            )
         return runner
 
     @classmethod
@@ -253,6 +288,8 @@ class CrewRunner:
         report.dispositions.update(self.graph.resume_report)
         self._reevaluate_blocked(report)
         self._persist()
+        if self._inert_handle_violations(report):
+            return report
         while not self.graph.is_complete():
             ready = self.graph.ready()
             if not ready:
@@ -300,16 +337,128 @@ class CrewRunner:
     def _receipted(self) -> None:
         self._attempt_receipted = True
 
+    def _deny_node(
+        self,
+        node: TaskNode,
+        report: RunReport,
+        *,
+        action: str,
+        rationale: str,
+        refusal_state: str,
+        tool: str | None = None,
+    ) -> tuple[bool, EscalationRequest | None, EscalationRequest | None]:
+        """Receipt a denial for the node, block it, and halt the run."""
+        assert self.gatekeeper is not None
+        self.gatekeeper.note(
+            node_id=node.id,
+            action=action,
+            approved=False,
+            rationale=rationale,
+            refusal_state=refusal_state,
+            tool=tool,
+        )
+        self._receipted()
+        self.graph.block(node.id, f"gate denied: {rationale}")
+        report.blocked.append(node.id)
+        report.halted = True
+        report.halt_reason = f"node {node.id}: gate denied ({rationale})"
+        self._persist()
+        return False, None, None
+
+    def _node_rows(self, node: TaskNode) -> list[InterceptRecord]:
+        broker = self.broker
+        if broker is None:
+            return []
+        return broker.rows_for(node.id, self._broker_mark)
+
+    def _brokered_class(self, rows: list[InterceptRecord]) -> ActionClass | None:
+        """The class of what the node actually ran: the strictest class
+        the policy table gives the brokered tools. Never taken from the
+        worker."""
+        assert self.gatekeeper is not None
+        classes = [self.gatekeeper.policy.tool_class(r.tool) for r in rows]
+        if not classes or any(c is None for c in classes):
+            return None
+        return strictest([c for c in classes if c is not None])
+
+    def _declaration_mismatch(
+        self, declared: EscalationRequest, rows: list[InterceptRecord]
+    ) -> str | None:
+        """Why the declared action does not match the brokered calls, or
+        None when it does."""
+        assert self.gatekeeper is not None
+        brokered = self._brokered_class(rows)
+        if brokered is None:
+            return "a brokered tool has no class in the policy table"
+        tools = {r.tool for r in rows}
+        if declared.tool is not None and (
+            not isinstance(declared.tool, str)
+            or declared.tool.strip().lower() not in tools
+        ):
+            return (
+                f"declared tool {declared.tool!r} is not among the brokered "
+                f"calls {sorted(tools)}"
+            )
+        if declared.action_class is not None:
+            declared_class = coerce_class(declared.action_class)
+            if declared_class is not brokered:
+                return (
+                    f"declared class {declared.action_class!r} does not match "
+                    f"the brokered class {brokered.value!r}"
+                )
+        effects = declared.effects
+        for effect in (effects,) if isinstance(effects, str) else effects:
+            effect_class = (
+                self.gatekeeper.policy.effects.get(effect.strip().lower())
+                if isinstance(effect, str)
+                else None
+            )
+            if effect_class is None or strictest([effect_class, brokered]) is not (
+                brokered
+            ):
+                return (
+                    f"declared effect {effect!r} goes beyond the brokered "
+                    f"class {brokered.value!r}"
+                )
+        return None
+
     def _gate(
         self, node: TaskNode, artifact: object, report: RunReport
     ) -> tuple[bool, EscalationRequest | None, EscalationRequest | None]:
         """The node's gate. Returns (proceed, decided request, declared
         request). Every path leaves a receipt: an action decision, "no
-        action declared", or a denial naming why."""
+        action declared", or a denial naming why.
+
+        The class of a brokered node comes from what it ran (the broker's
+        ledger and the policy table). A declaration is checked against
+        that and is denied on any mismatch. A node with no brokered call
+        has only its declaration, which can add a human gate but never
+        earns auto-approval."""
         gatekeeper = self.gatekeeper
         assert gatekeeper is not None
+        rows = self._node_rows(node)
+        if node.inert and rows:
+            return self._deny_node(
+                node,
+                report,
+                action=f"node {node.id}: brokered call on an inert node",
+                rationale="node is marked inert but made brokered call(s) "
+                f"({', '.join(sorted({r.tool for r in rows}))}) — denied",
+                refusal_state=REFUSAL_INERT_VIOLATION,
+            )
+        denied = [r for r in rows if not r.approved]
+        if denied:
+            return self._deny_node(
+                node,
+                report,
+                action=f"node {node.id}: brokered call was denied",
+                rationale="a brokered call by this node was denied "
+                f"({', '.join(sorted({r.tool for r in denied}))}); the node "
+                "cannot complete — denied",
+                refusal_state=REFUSAL_BROKERED_DENIAL,
+            )
         if not (isinstance(artifact, dict) and "action" in artifact):
-            if node.inert or self._brokered_calls(node):
+            if node.inert or rows:
                 gatekeeper.note(
                     node_id=node.id,
                     action=f"node {node.id}: no action declared",
@@ -319,48 +468,76 @@ class CrewRunner:
                 )
                 self._receipted()
                 return True, None, None
-            gatekeeper.note(
-                node_id=node.id,
+            return self._deny_node(
+                node,
+                report,
                 action=f"node {node.id}: no action declared",
-                approved=False,
                 rationale="no action declared and the node is not declared inert "
-                "— denied (fail-closed)",
+                "— denied",
                 refusal_state=REFUSAL_UNCLASSIFIED,
             )
-            self._receipted()
-            self.graph.block(node.id, "gate denied: no action declared")
-            report.blocked.append(node.id)
-            report.halted = True
-            report.halt_reason = (
-                f"node {node.id}: gate denied (no action declared, fail-closed)"
-            )
-            self._persist()
-            return False, None, None
         try:
             declared = self._coerce_request(node, artifact["action"])
         except ValueError as exc:
             self._fail_node(node, report, str(exc), refusal_state=REFUSAL_UNCLASSIFIED)
             return False, None, None
-        if self.broker is not None and self.broker.has_tool(declared.tool):
-            # A brokered tool was already checked, per call, before it
-            # ran; the reconcile step compares the claim to the ledger.
+        if rows:
+            mismatch = self._declaration_mismatch(declared, rows)
+            if mismatch is not None:
+                return self._deny_node(
+                    node,
+                    report,
+                    action=declared.action,
+                    rationale=f"declared action does not match the brokered "
+                    f"calls: {mismatch} — denied",
+                    refusal_state=REFUSAL_DECLARATION_MISMATCH,
+                    tool=declared.tool if isinstance(declared.tool, str) else None,
+                )
+            # The per-call receipts are the decisions; the node's class is
+            # what the brokered tools are in the policy table.
             self._receipted()
-            return True, declared, declared
+            return (
+                True,
+                replace(declared, action_class=self._brokered_class(rows)),
+                declared,
+            )
+        if self.broker is not None and self.broker.has_tool(declared.tool):
+            return self._deny_node(
+                node,
+                report,
+                action=declared.action,
+                rationale=f"declared brokered tool {declared.tool!r} but no "
+                "call went through the broker — denied",
+                refusal_state=REFUSAL_DECLARATION_MISMATCH,
+                tool=str(declared.tool),
+            )
+        classification = gatekeeper.policy.classify(declared)
+        if (
+            classification.denied_reason is None
+            and classification.action_class not in HUMAN_GATES
+        ):
+            return self._deny_node(
+                node,
+                report,
+                action=declared.action,
+                rationale="the node declared an auto-approved action but made "
+                "no brokered call; auto-approval needs a brokered call — denied",
+                refusal_state=REFUSAL_DECLARATION_MISMATCH,
+                tool=declared.tool if isinstance(declared.tool, str) else None,
+            )
         try:
             decision = gatekeeper.authorize(declared)
         except Exception as exc:
-            # FAIL-CLOSED: a gatekeeper that raises has not approved
-            # anything. The node blocks for a human; the run halts.
+            # A gatekeeper that raises has not approved anything. The
+            # node blocks for a human; the run halts.
             self._receipted()
             self.graph.block(
                 node.id,
-                f"gatekeeper error — denied (fail-closed): {type(exc).__name__}: {exc}",
+                f"gatekeeper error — denied: {type(exc).__name__}: {exc}",
             )
             report.blocked.append(node.id)
             report.halted = True
-            report.halt_reason = (
-                f"node {node.id}: gatekeeper error — denied (fail-closed): {exc}"
-            )
+            report.halt_reason = f"node {node.id}: gatekeeper error — denied: {exc}"
             self._persist()
             return False, None, declared
         self._receipted()
@@ -373,11 +550,64 @@ class CrewRunner:
             return False, decision.request, declared
         return True, decision.request, declared
 
-    def _brokered_calls(self, node: TaskNode) -> bool:
-        broker = self.broker
-        return broker is not None and any(
-            r.node_id == node.id for r in broker.ledger[self._broker_mark :]
-        )
+    def _raw_handles_of(self, node: TaskNode) -> frozenset[str]:
+        held = set(self._raw_tool_handles.get(node.worker, ()))
+        worker = self.workers.get(node.worker)
+        attr = getattr(worker, "raw_tool_handles", None)
+        if isinstance(attr, (set, frozenset, list, tuple)):
+            held.update(str(t) for t in attr)
+        return frozenset(held)
+
+    def _inert_handle_violations(self, report: RunReport) -> bool:
+        """Receipt and halt on any inert node whose worker holds raw tool
+        handles, before any worker runs. Returns True when it halted."""
+        gatekeeper = self.gatekeeper
+        if gatekeeper is None:
+            return False
+        for node in self.graph.nodes.values():
+            held = self._raw_handles_of(node) if node.inert else frozenset()
+            if not held:
+                continue
+            reason = (
+                f"node is marked inert but its worker holds tool handle(s) "
+                f"({', '.join(sorted(held))}) — refused"
+            )
+            gatekeeper.note(
+                node_id=node.id,
+                action=f"node {node.id}: inert with tool handles",
+                approved=False,
+                rationale=reason,
+                refusal_state=REFUSAL_INERT_VIOLATION,
+            )
+            self.graph.block(node.id, f"gate denied: {reason}")
+            report.blocked.append(node.id)
+            report.halted = True
+            report.halt_reason = f"node {node.id}: gate denied ({reason})"
+            self._persist()
+            return True
+        return False
+
+    def _unbrokered_effects(self, node: TaskNode) -> list[str]:
+        """Side effects the observers can see for this node that no
+        approved brokered call accounts for. An observer that fails is
+        reported as an unverifiable effect."""
+        problems: list[str] = []
+        for observer in self.effect_observers:
+            try:
+                observed = list(observer(node))
+            except Exception as exc:
+                problems.append(f"effect observer failed: {type(exc).__name__}: {exc}")
+                continue
+            if self.broker is None:
+                problems.extend(
+                    f"{e.description or e.tool}: effect seen with no broker"
+                    for e in observed
+                )
+            else:
+                problems.extend(
+                    self.broker.unbrokered(node.id, self._broker_mark, observed)
+                )
+        return problems
 
     # -- one node -------------------------------------------------------------
 
@@ -414,6 +644,19 @@ class CrewRunner:
         finally:
             if tools is not None:
                 tools.revoke()
+
+        # Effects the runner can see must each be accounted for by an
+        # approved brokered call.
+        if self.gatekeeper is not None and self.effect_observers:
+            unbrokered = self._unbrokered_effects(node)
+            if unbrokered:
+                return self._fail_node(
+                    node,
+                    report,
+                    "unbrokered effect — halted: " + "; ".join(unbrokered),
+                    refusal_state=REFUSAL_UNBROKERED_EFFECT,
+                    force_receipt=True,
+                )
 
         # Instruments — fail-closed.
         if self.panel is not None:

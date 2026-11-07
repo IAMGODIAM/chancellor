@@ -12,6 +12,8 @@ verifying under v1 rules (dual-verify; test_receipts.py covers v1).
 import hashlib
 import json
 
+from pinning import operator_signer, pin_args
+
 from chancellor import receipts
 from chancellor.escalation import ActionClass, AuditLog, EscalationRequest, Gatekeeper
 from chancellor.verify_log import main as verify_main
@@ -183,21 +185,21 @@ def test_holder_proof_rejects_v1_checkpoint(tmp_path):
     assert any(f.startswith("checkpoint_schema") for f in result.failures)
 
 
-def test_holder_proof_cli(tmp_path, capsys):
+def test_holder_proof_cli(tmp_path, capsys, monkeypatch):
     path = tmp_path / "audit.jsonl"
-    log = _seed_log(path, n=3)
+    log = AuditLog(path, signer=operator_signer())
+    gk = Gatekeeper(audit_log=log, approver=lambda req: (True, "ok"), human_id="tester")
+    for i in range(3):
+        gk.authorize(_spend(i))
     log.checkpoint_v2()
+    pin = pin_args(monkeypatch)
     leaves = [e["entry_hash"] for e in log.read_all()]
     proof_path = tmp_path / "proof.json"
     proof_path.write_text(json.dumps(receipts.rfc9162_proof(leaves, 1)))
-    assert (
-        verify_main([str(path), "--proof", str(proof_path), "--accept-dev-signer"]) == 0
-    )
+    assert verify_main([str(path), "--proof", str(proof_path), *pin]) == 0
     assert "VERIFIED" in capsys.readouterr().out
     bad = receipts.rfc9162_proof(leaves, 1)
     bad["tree_size"] = 9
     proof_path.write_text(json.dumps(bad))
-    assert (
-        verify_main([str(path), "--proof", str(proof_path), "--accept-dev-signer"]) == 1
-    )
+    assert verify_main([str(path), "--proof", str(proof_path), *pin]) == 1
     assert "proof_count_mismatch" in capsys.readouterr().out

@@ -51,12 +51,13 @@ from .evals.suite_b_tasks import TASKS_BY_ID
 from .evals.suite_b_world import FaultEntry
 from .grader import OUTPUT_RUBRIC, grade
 from .instruments import default_panel
+from .interception import ToolBroker
 from .judge import Exemplar, Judge
 from .live_transport import openai_http_transport
 from .orchestrator import CrewRunner
 from .receipts import checkpoint_payload
 from .task_graph import TaskGraph, TaskNode
-from .verify_log import DEV_SIGNER_LABEL, verify_log
+from .verify_log import DEV_SIGNER_LABEL, DEV_SIGNER_NOTE, verify_log
 
 DEFAULT_SEED = 7
 
@@ -209,6 +210,12 @@ def _live_client() -> MetaModelClient:
     return MetaModelClient(transport=openai_http_transport(base, api_key=key))
 
 
+def _flushing_print(line: str) -> None:
+    """Print one line and flush it, so paced output reaches pipes and
+    logs as it happens instead of in one block at exit."""
+    print(line, flush=True)
+
+
 def run_exhibit(
     *,
     fast: bool = False,
@@ -217,7 +224,7 @@ def run_exhibit(
     live: bool = False,
     seed: int = DEFAULT_SEED,
     state_dir: str | Path | None = None,
-    emit: Callable[[str], None] = print,
+    emit: Callable[[str], None] = _flushing_print,
     input_fn: Callable[[str], str] = input,
 ) -> int:
     """Run the hearing. Returns 0 only on the full, honest path."""
@@ -268,9 +275,17 @@ def run_exhibit(
         emit(f"  {node.id} (attempt {attempts[node.id]}): {text}")
         return {"text": text, "cost_usd": 0.0}
 
+    # The runner's broker for the pass in progress: the exhibit's read and
+    # compute steps run through it, so the gate's class for them comes
+    # from the brokered tool and the policy table.
+    current: dict[str, ToolBroker] = {}
+
     def gather(node: TaskNode) -> dict[str, Any]:
         artifact = work(
             node, _GATHER_TEXT, "Research the question and report the findings."
+        )
+        current["broker"].call(
+            node.id, "read_file", {"path": "case-file"}, action="Read the case file"
         )
         artifact["action"] = EscalationRequest(
             action="Read the case file",
@@ -291,6 +306,12 @@ def run_exhibit(
             "strength the findings support, and hold all sends for the gate."
         )
         artifact = work(node, scripted, prompt)
+        current["broker"].call(
+            node.id,
+            "compute",
+            {"analysis": "remedy"},
+            action="Run the remedy analysis",
+        )
         artifact["action"] = EscalationRequest(
             action="Run the remedy analysis",
             action_class=ActionClass.COMPUTE,
@@ -352,6 +373,10 @@ def run_exhibit(
         return graph
 
     def governed_runner(graph: TaskGraph, gatekeeper: Gatekeeper) -> CrewRunner:
+        broker = ToolBroker(gatekeeper=gatekeeper)
+        broker.register("read_file", lambda path: f"contents of {path}")
+        broker.register("compute", lambda analysis: f"{analysis}: analysed")
+        current["broker"] = broker
         return CrewRunner.governed(
             graph,
             workers,
@@ -360,6 +385,7 @@ def run_exhibit(
             gatekeeper=gatekeeper,
             score_provider=scores,
             state_path=state_path,
+            broker=broker,
         )
 
     emit("CHANCELLOR — THE EXHIBIT")
@@ -447,6 +473,11 @@ def run_exhibit(
         try:
             answer = input_fn("    press Enter to approve, anything else denies: ")
         except EOFError:
+            emit("")
+            emit(
+                "    no human at the gate (input is not a terminal) — denied,"
+                " fail-closed. For an unattended run, use --auto."
+            )
             return False, "no human at the gate — denied (fail-closed)"
         if answer.strip() == "":
             return True, "approved at the exhibit gate by the human present"
@@ -472,17 +503,30 @@ def run_exhibit(
     emit("EXHIBIT D — THE RECEIPT")
     emit("  the verifier walks the chain cold — no state, no session, just the book")
     pacer.pause(10)
-    envelope = audit.checkpoint()
+    envelope = audit.checkpoint_v2()
     sealed = checkpoint_payload(envelope)["log_size"]
     result = verify_log(audit.path, accept_dev_signer=True)
-    emit(f"  {DEV_SIGNER_LABEL} (the demo seals with the built-in dev key)")
+    emit(f"  {DEV_SIGNER_LABEL}: {DEV_SIGNER_NOTE}")
+    emit(
+        "  (the demo seals with the built-in dev key; to check a log you keep, "
+        "pin your own key: python -m chancellor.verify_log <log> --pubkey <key>)"
+    )
     entries = len(audit.read_all())
     emit(
         f"  entries verified: {result.chained_entries} · checkpoints:"
         f" {result.checkpoints} (signed over {sealed})"
     )
-    book_verdict = "VERIFIED" if result.ok else "FAILED — " + "; ".join(result.failures)
+    book_verdict = (
+        f"chain consistent — {DEV_SIGNER_LABEL}"
+        if result.ok and not result.authentic
+        else "FAILED — " + "; ".join(result.failures)
+    )
     emit(f"  verdict of the book: {book_verdict}")
+    emit(
+        f"  the seal lives in the sidecar: {audit.checkpoint_path} — "
+        f"the log verifies only with it beside {audit.path}; "
+        "lifted alone, the book reads NOT VERIFIED (no_checkpoint)"
+    )
     receipt_ok = result.ok and result.chained_entries == entries
 
     tamper_ok = True
@@ -537,8 +581,9 @@ def run_exhibit(
     )
     emit(f"  drift: {drift}")
     emit(
-        f"  receipts: {entries} entries · chain verified cold · "
-        f"{result.checkpoints} signed checkpoint over {sealed} entries"
+        f"  receipts: {entries} entries · chain checked cold "
+        f"({DEV_SIGNER_LABEL}) · "
+        f"{result.checkpoints} checkpoint over {sealed} entries"
     )
     if tamper_line:
         emit(tamper_line)

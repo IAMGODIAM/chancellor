@@ -40,6 +40,11 @@ class ActionClass(StrEnum):
     # the policy could not classify (always denied).
     NONE = "none"
     UNCLASSIFIED = "unclassified"
+    # The ninth class (frame v2, clause 6): an agent gaining a new
+    # capability is a gated act — proposed, checked, decided,
+    # receipted, verified live, reversible. Governed end to end by
+    # chancellor.installs.
+    CAPABILITY_INSTALL = "capability_install"
 
 
 HUMAN_GATES: frozenset[ActionClass] = frozenset(
@@ -49,6 +54,7 @@ HUMAN_GATES: frozenset[ActionClass] = frozenset(
         ActionClass.PUBLISH,
         ActionClass.IRREVERSIBLE,
         ActionClass.CREDENTIAL,
+        ActionClass.CAPABILITY_INSTALL,
     }
 )
 
@@ -78,6 +84,26 @@ REFUSAL_VERIFICATION_FAILED = "verification-failed"
 REFUSAL_UNCLASSIFIED = "unclassified-action"
 REFUSAL_NODE_FAILED = "node-failed"
 REFUSAL_RECONCILE_MISMATCH = "reconcile-mismatch"
+REFUSAL_DECLARATION_MISMATCH = "declaration-mismatch"
+REFUSAL_INERT_VIOLATION = "inert-violation"
+REFUSAL_BROKERED_DENIAL = "brokered-call-denied"
+REFUSAL_UNBROKERED_EFFECT = "unbrokered-effect"
+
+# The install register (frame v2, clause 6): the Foundry manager's
+# pre-flight states, the scope check, and the budget fold, mapped
+# once, here, to Chancellor-side names (the mapping table is the
+# contract — chancellor.installs records refusals under these states
+# and names the Foundry state verbatim in the rationale). Wired in
+# chancellor.installs, where the arc runs.
+REFUSAL_INSTALL_INCOMPATIBLE = "install-incompatible"
+REFUSAL_INSTALL_UNLICENSED = "install-unlicensed"
+REFUSAL_INSTALL_PIN_MISMATCH = "install-pin-mismatch"
+REFUSAL_INSTALL_PAYLOAD_ESCAPE = "install-payload-escape"
+REFUSAL_INSTALL_UNCONSENTED_BUILD = "install-unconsented-build"
+REFUSAL_INSTALL_SNAPSHOT_FAILED = "install-snapshot-failed"
+REFUSAL_INSTALL_OUT_OF_SCOPE = "install-out-of-scope"
+REFUSAL_INSTALL_COST_REFUSED = "install-cost-refused"
+REFUSAL_INSTALL_BUDGET_EXHAUSTED = "install-budget-exhausted"
 
 REFUSAL_STATES: frozenset[str] = frozenset(
     {
@@ -93,6 +119,19 @@ REFUSAL_STATES: frozenset[str] = frozenset(
         REFUSAL_UNCLASSIFIED,
         REFUSAL_NODE_FAILED,
         REFUSAL_RECONCILE_MISMATCH,
+        REFUSAL_DECLARATION_MISMATCH,
+        REFUSAL_INERT_VIOLATION,
+        REFUSAL_BROKERED_DENIAL,
+        REFUSAL_UNBROKERED_EFFECT,
+        REFUSAL_INSTALL_INCOMPATIBLE,
+        REFUSAL_INSTALL_UNLICENSED,
+        REFUSAL_INSTALL_PIN_MISMATCH,
+        REFUSAL_INSTALL_PAYLOAD_ESCAPE,
+        REFUSAL_INSTALL_UNCONSENTED_BUILD,
+        REFUSAL_INSTALL_SNAPSHOT_FAILED,
+        REFUSAL_INSTALL_OUT_OF_SCOPE,
+        REFUSAL_INSTALL_COST_REFUSED,
+        REFUSAL_INSTALL_BUDGET_EXHAUSTED,
     }
 )
 
@@ -114,6 +153,22 @@ class EscalationRequest:
     # The class as declared by the requester, kept for the receipt once
     # the gate has replaced action_class with the decided class.
     declared_class: str | None = None
+    # Set by the broker on a brokered call: binds this decision to the
+    # outcome record written after the call runs.
+    call_id: str | None = None
+    # The capability this request belongs to, when it does (frame v2:
+    # a probationary capability's gated uses, and the install arc's
+    # own requests). Trailing + defaulted; AuditLog.record() stamps it
+    # into the entry ONLY when set — requests of the existing classes
+    # never set it, so their receipts stay byte-identical.
+    capability_id: str | None = None
+    # AM-2 request-side seam: axes the REQUEST carries beyond the
+    # action class's static floor (e.g. computed by the install
+    # governor from a bundle's declared permissions). AuditLog.record
+    # unions it over the floor when present. Request-side only —
+    # never part of the entry body beyond the recorded union. The
+    # existing classes never set it; their receipts are unchanged.
+    effect_axes: tuple[str, ...] | None = None
 
 
 @dataclass
@@ -138,17 +193,20 @@ Approver = Callable[[EscalationRequest], tuple[bool, str]]
 # is keyed by tool name and by effect axis; a requester's self-declared
 # class can only tighten the result. Anything the table cannot classify is
 # denied (fail-closed).
-_STRICTNESS: dict[ActionClass, int] = {
-    ActionClass.NONE: 0,
-    ActionClass.READ: 1,
-    ActionClass.DRAFT: 2,
-    ActionClass.COMPUTE: 3,
-    ActionClass.EXTERNAL_SEND: 10,
-    ActionClass.PUBLISH: 11,
-    ActionClass.SPEND: 12,
-    ActionClass.CREDENTIAL: 13,
-    ActionClass.IRREVERSIBLE: 14,
-}
+_STRICTNESS: Mapping[ActionClass, int] = MappingProxyType(
+    {
+        ActionClass.NONE: 0,
+        ActionClass.READ: 1,
+        ActionClass.DRAFT: 2,
+        ActionClass.COMPUTE: 3,
+        ActionClass.EXTERNAL_SEND: 10,
+        ActionClass.PUBLISH: 11,
+        ActionClass.SPEND: 12,
+        ActionClass.CREDENTIAL: 13,
+        ActionClass.IRREVERSIBLE: 14,
+        ActionClass.CAPABILITY_INSTALL: 15,
+    }
+)
 
 
 def strictest(classes: list[ActionClass]) -> ActionClass:
@@ -218,12 +276,27 @@ class Classification:
 
 @dataclass(frozen=True)
 class ActionPolicy:
+    """The policy table. Tables passed in are copied into read-only
+    mappings at construction, so nothing that holds the original (or this
+    policy) can change a class afterwards."""
+
     tools: Mapping[str, ActionClass] = field(
         default_factory=lambda: DEFAULT_TOOL_POLICY
     )
     effects: Mapping[str, ActionClass] = field(
         default_factory=lambda: DEFAULT_EFFECT_POLICY
     )
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "tools", MappingProxyType(dict(self.tools)))
+        object.__setattr__(self, "effects", MappingProxyType(dict(self.effects)))
+
+    def tool_class(self, tool: object) -> ActionClass | None:
+        """The table's class for a tool name, or None when the table does
+        not know it."""
+        if not isinstance(tool, str):
+            return None
+        return self.tools.get(tool.strip().lower())
 
     @staticmethod
     def _deny(reason: str) -> Classification:
@@ -350,6 +423,15 @@ class AuditLog:
 
     def record(self, decision: Decision) -> None:
         state = self._state
+        # AM-2 seam: axes are the class's static floor, unioned with
+        # any request-side axes the caller computed (install governor:
+        # from the bundle's declared permissions). Requests that do
+        # not set the field get the floor alone — unchanged bytes.
+        effect_axes = _receipts.effect_axes_for(
+            _class_value(decision.request.action_class)
+        )
+        if decision.request.effect_axes is not None:
+            effect_axes = sorted(set(effect_axes) | set(decision.request.effect_axes))
         entry: dict[str, Any] = {
             "schema": _receipts.SCHEMA,
             **_receipts.current_frame_fields(),
@@ -357,13 +439,7 @@ class AuditLog:
             "ts": decision.ts,
             "action": decision.request.action,
             "action_class": _class_value(decision.request.action_class),
-            "effect_axes": _receipts.effect_axes_for(
-                _class_value(decision.request.action_class)
-            ),
-            "tool": decision.request.tool,
-            "effects": list(decision.request.effects),
-            "declared_class": decision.request.declared_class,
-            "args_sha256": decision.request.args_sha256,
+            "effect_axes": effect_axes,
             "detail": decision.request.detail,
             "cost_usd": decision.request.cost_usd,
             "node_id": decision.request.node_id,
@@ -373,6 +449,25 @@ class AuditLog:
             "rationale": decision.rationale,
             "prev_hash": state.prev_hash,
         }
+        request = decision.request
+        if (
+            request.tool is not None
+            or request.effects
+            or request.declared_class is not None
+            or request.args_sha256 is not None
+            or request.call_id is not None
+        ):
+            entry.update(
+                {
+                    "tool": request.tool,
+                    "effects": list(request.effects),
+                    "declared_class": request.declared_class,
+                    "args_sha256": request.args_sha256,
+                    "call_id": request.call_id,
+                }
+            )
+        if decision.request.capability_id is not None:
+            entry["capability_id"] = decision.request.capability_id
         entry["entry_hash"] = _receipts.entry_hash(entry)
         with self.path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(entry) + "\n")
@@ -389,7 +484,7 @@ class AuditLog:
         interval since the last seal."""
         every = self.checkpoint_every
         if every is not None and self._state.chained % every == 0:
-            self.checkpoint()
+            self.checkpoint_v2()
 
     # Chain-owned fields a caller-supplied body may never set itself.
     # The frame citation is chain-owned for the same reason the schema
@@ -430,9 +525,28 @@ class AuditLog:
         self._maybe_seal()
         return entry
 
+    def _sidecar_has_v2(self) -> bool:
+        if not self.checkpoint_path.exists():
+            return False
+        for line in self.checkpoint_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                schema = _receipts.checkpoint_payload(json.loads(line)).get("schema")
+            except Exception:
+                continue
+            if schema == _receipts.CHECKPOINT_SCHEMA_V2:
+                return True
+        return False
+
     def checkpoint(self) -> dict:
         """Sign a Merkle checkpoint over every chained entry so far and
-        append it to the checkpoint sidecar. Returns the envelope."""
+        append it to the checkpoint sidecar. Returns the envelope. A
+        sidecar that already holds a v2 checkpoint never takes a v1 one
+        (the verifier rejects that order), so the checkpoint is written as
+        v2 in that case."""
+        if self._sidecar_has_v2():
+            return self.checkpoint_v2()
         envelope = _receipts.build_checkpoint(
             signer=self.signer,
             log_size=self._state.chained,
@@ -492,7 +606,13 @@ class Gatekeeper:
         self.audit_log = audit_log
         self.approver = approver
         self.human_id = human_id
-        self.policy = policy if policy is not None else DEFAULT_POLICY
+        self._policy = policy if policy is not None else DEFAULT_POLICY
+
+    @property
+    def policy(self) -> ActionPolicy:
+        """The policy table in force (read-only: the policy's tables are
+        immutable mappings, and this attribute has no setter)."""
+        return self._policy
 
     def authorize(self, request: EscalationRequest) -> Decision:
         """Decide a gate request and receipt the decision.
@@ -552,6 +672,20 @@ class Gatekeeper:
         )
         self._record(decision)
         return decision
+
+    def record_outcome(self, fields: dict[str, Any]) -> None:
+        """Write a tool_outcome entry (see receipts.tool_outcome_fields)
+        onto the hash chain. Record-or-halt like every decision."""
+        if self.audit_log is None:
+            return
+        try:
+            self.audit_log.record_entry(fields)
+        except Exception as exc:
+            raise AuditWriteError(
+                f"audit write failed for the outcome of call "
+                f"{fields.get('call_id')!r} on {fields.get('tool')!r} "
+                f"(record-or-halt): {type(exc).__name__}: {exc}"
+            ) from exc
 
     def _record(self, decision: Decision) -> None:
         if self.audit_log is None:

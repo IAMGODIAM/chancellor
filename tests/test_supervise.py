@@ -600,7 +600,7 @@ while done < total:
         detail=f"segment {done}",
     )
     log.record(Decision(request, True, "agent", "segment committed", time.time()))
-    log.checkpoint()
+    log.checkpoint_v2()
     done += 1
     if done < total:
         time.sleep(interval)

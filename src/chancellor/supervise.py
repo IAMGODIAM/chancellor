@@ -41,10 +41,12 @@ named legs, R11 anchoring disclosure.
 
 from __future__ import annotations
 
+import ctypes
 import json
 import os
 import shutil
 import subprocess
+import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -60,6 +62,7 @@ from .escalation import (
     EscalationRequest,
     Gatekeeper,
 )
+from .installs import fold_all_probation, format_status_lines
 from .receipts import ChainIntegrityError
 
 # ------------------------------------------------------------------ causes
@@ -149,17 +152,18 @@ def _parse_jsonl_lenient(path: Path) -> tuple[list[dict], bool]:
     return rows, torn
 
 
-def verify_at_checkpoint_boundary(
+def _verify_at_checkpoint_boundary_once(
     log_path: str | Path,
     checkpoint_path: str | Path | None = None,
     signer: receipts.Signer | None = None,
 ) -> BoundaryVerification:
-    """Verify the chain at the newest signed checkpoint boundary:
-    checkpoint signature, the committed prefix's hash chain, its Merkle
-    root and head hash, and truncation (fewer chained entries present
-    than the checkpoint commits). Fail-closed: no signed checkpoint
-    means no verified boundary exists, and nothing may resume."""
-    signer = signer if signer is not None else receipts.default_signer()
+    """One read of the log/sidecar pair, judged as read. The pair is
+    read log-first, sidecar-second, so a live writer that appends and
+    checkpoints between the two reads presents exactly as
+    tail_truncation — the O1 tear. Callers that can meet a live
+    writer go through verify_at_checkpoint_boundary, which recounts
+    once on that signature."""
+    signer = signer if signer is not None else receipts.public_dev_signer()
     log_path = Path(log_path)
     cp_path = (
         Path(checkpoint_path)
@@ -168,6 +172,10 @@ def verify_at_checkpoint_boundary(
     )
     failures: list[str] = []
     warnings: list[str] = []
+    if receipts.is_dev_signer(signer):
+        warnings.append(
+            f"{receipts.DEV_SIGNED_LABEL}: verified under the public dev key"
+        )
 
     if not log_path.exists():
         return BoundaryVerification(
@@ -225,11 +233,17 @@ def verify_at_checkpoint_boundary(
             warnings=warnings,
             entries_present=entries_present,
         )
-    if payload.get("schema") != receipts.CHECKPOINT_SCHEMA:
+    schema = payload.get("schema")
+    if schema not in (receipts.CHECKPOINT_SCHEMA, receipts.CHECKPOINT_SCHEMA_V2):
         failures.append(
-            f"checkpoint_schema: {payload.get('schema')!r} != "
-            f"{receipts.CHECKPOINT_SCHEMA!r}"
+            f"checkpoint_schema: {schema!r} is not "
+            f"{receipts.CHECKPOINT_SCHEMA!r} or {receipts.CHECKPOINT_SCHEMA_V2!r}"
         )
+    root_fn = (
+        receipts.rfc9162_root
+        if schema == receipts.CHECKPOINT_SCHEMA_V2
+        else receipts.merkle_root
+    )
     log_size = payload.get("log_size")
     if not isinstance(log_size, int) or log_size < 0:
         failures.append(f"checkpoint_log_size_invalid: {log_size!r}")
@@ -273,7 +287,7 @@ def verify_at_checkpoint_boundary(
             log_size=log_size,
             entries_present=entries_present,
         )
-    if receipts.merkle_root(state.leaves) != payload.get("merkle_root"):
+    if root_fn(state.leaves) != payload.get("merkle_root"):
         failures.append(
             "checkpoint_root_mismatch: Merkle root over the committed "
             "prefix != checkpoint root"
@@ -288,6 +302,38 @@ def verify_at_checkpoint_boundary(
         head_hash=payload.get("head_receipt_hash"),
         entries_present=entries_present,
     )
+
+
+def verify_at_checkpoint_boundary(
+    log_path: str | Path,
+    checkpoint_path: str | Path | None = None,
+    signer: receipts.Signer | None = None,
+) -> BoundaryVerification:
+    """Verify the chain at the newest signed checkpoint boundary:
+    checkpoint signature, the committed prefix's hash chain, its Merkle
+    root and head hash, and truncation (fewer chained entries present
+    than the checkpoint commits). Fail-closed: no signed checkpoint
+    means no verified boundary exists, and nothing may resume.
+
+    O1 recount-on-tear: the pair is read log-first, sidecar-second,
+    so a writer that appends + checkpoints between the two reads
+    leaves the sidecar's log_size ahead of the counted entries and
+    the tear reads as tail_truncation on a healthy chain. On that
+    signature alone, recount once: re-read the pair fresh and judge
+    on the consistent second read alone (never a mix of snapshots).
+    A truncation that persists across the recount is real and still
+    fails; one that vanishes was the tear."""
+    result = _verify_at_checkpoint_boundary_once(log_path, checkpoint_path, signer)
+    if not any(f.startswith("tail_truncation") for f in result.failures):
+        return result
+    recount = _verify_at_checkpoint_boundary_once(log_path, checkpoint_path, signer)
+    recount.warnings.append(
+        "tail_truncation_recounted: the first read pair was torn "
+        "(writer appended + checkpointed between the log and "
+        "sidecar reads); verdict taken from a fresh consistent "
+        "re-read (O1)"
+    )
+    return recount
 
 
 # ------------------------------------------------- supervisor state
@@ -373,14 +419,21 @@ class _PopenHandle:
 Launcher = Callable[[list[str]], ProcessHandle]
 
 
+def prepare_process_launch() -> None:
+    if sys.platform.startswith("linux"):
+        library = ctypes.CDLL(None, use_errno=True)
+        if library.prctl(4, 0, 0, 0, 0) != 0:
+            raise OSError(ctypes.get_errno(), "process launch preparation failed")
+
+
 def _default_launcher(command: list[str]) -> ProcessHandle:
     return _PopenHandle(subprocess.Popen(command))
 
 
 def launcher_with_env(extra_env: dict[str, str]) -> Launcher:
     """A launcher that starts the agent with ``extra_env`` added to its
-    environment — how the operator's signing key reaches the agent's
-    own log so both sides seal and verify under the same key."""
+    environment. Never a way to hand an agent a signing key: keys reach
+    a supervised agent only as a sign-only channel (chancellor.sealing)."""
 
     def launch(command: list[str]) -> ProcessHandle:
         return _PopenHandle(subprocess.Popen(command, env={**os.environ, **extra_env}))
@@ -537,6 +590,27 @@ class Supervisor:
             f"entries, age {age_s:.1f}s (stale threshold "
             f"{self.config.stale_threshold_s:.0f}s)"
         )
+        self._emit_probation_status()
+
+    def _emit_probation_status(self) -> None:
+        """Probation surfaces (frame v2, spec §2 P6): when this
+        watch's own chain carries capability-install records, the
+        status line folds each capability's probation state from the
+        chain and prints it age-stamped (fold head + its timestamp).
+        Ordinary watches carry no such records and print nothing
+        extra — the surface exists only where the state does."""
+        if self._log is None:
+            return
+        entries = self._log.read_all()
+        if not entries:
+            return
+        states = fold_all_probation(entries)
+        if not states:
+            return
+        head = entries[-1].get("entry_hash")
+        head_ts = entries[-1].get("ts")
+        for line in format_status_lines(states, head=head):
+            self._emit(f"[supervise] probation: {line} (head ts {head_ts})")
 
     # -------------------------------------------------- cadence advice
     def _snapshot_written_at(self, snap: CheckpointSnapshot, now: float) -> float:
@@ -611,7 +685,7 @@ class Supervisor:
             },
         )
         assert self._log is not None
-        self._log.checkpoint()
+        self._log.checkpoint_v2()
         self._emit(line)
 
     def _observe_cadence(self, snap: CheckpointSnapshot | None, now: float) -> None:
@@ -698,7 +772,7 @@ class Supervisor:
             detail=json.dumps({"event": "escalation", **detail}, sort_keys=True),
         )
         decision = gatekeeper.authorize(request)
-        self._log.checkpoint()
+        self._log.checkpoint_v2()
         return decision
 
     # -------------------------------------------------------- snapshot
@@ -782,7 +856,7 @@ class Supervisor:
                     "prior_consecutive_failures": self._state.consecutive_failures,
                 },
             )
-            self._log.checkpoint()
+            self._log.checkpoint_v2()
         except (ChainIntegrityError, OSError) as exc:
             return (
                 "persist leg failed: the supervision log cannot be "
@@ -800,6 +874,7 @@ class Supervisor:
             # this classification.
             self._cadence_fresh_start = not self.agent_checkpoints.exists()
             self._cadence_initial_launch = False
+        prepare_process_launch()
         self._child = self._launcher(self.config.agent_command)
         self._agent_started_at = self._clock()
         self._stall_open = False
@@ -846,12 +921,25 @@ class Supervisor:
             self._state.interruptions += 1
 
         # A first launch onto existing state is a resume: no resume
-        # proceeds on an unverified chain (R3).
+        # proceeds on an unverified chain (R3). F-WABI-001: the
+        # verification's failure is honored whenever a pre-existing
+        # agent log exists and is non-empty ON DISK — file presence +
+        # size, not parseability. A malformed log with zero parseable
+        # entries is still existing state; adopting it as a fresh
+        # start would launch onto an unverified chain. A zero-byte
+        # log carries no entries and no committed state, so it is
+        # treated exactly as no log: a fresh start (a checkpoint
+        # sidecar committing entries against it still triggers the
+        # honored path via log_size, and fails as truncation).
         if self.agent_log.exists():
             initial = verify_at_checkpoint_boundary(
                 self.agent_log, self.agent_checkpoints, self._signer
             )
-            if initial.entries_present > 0 or initial.log_size:
+            try:
+                pre_existing_nonempty = self.agent_log.stat().st_size > 0
+            except OSError:
+                pre_existing_nonempty = False
+            if pre_existing_nonempty or initial.log_size:
                 if not initial.ok:
                     self._receipt(
                         "chain verification failed before first launch",
@@ -920,7 +1008,7 @@ class Supervisor:
                     },
                 )
                 assert self._log is not None
-                self._log.checkpoint()
+                self._log.checkpoint_v2()
                 self._status("agent completed", age)
                 return 0
             return self._on_death(exit_status=status, witnessed=True, snap=snap)
@@ -1020,7 +1108,7 @@ class Supervisor:
                 },
             )
             assert self._log is not None
-            self._log.checkpoint()
+            self._log.checkpoint_v2()
         return None
 
     # ------------------------------------------------------------- death

@@ -21,3 +21,8 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+      - id: release-sync
+        name: release-sync (offline consistency)
+        entry: python tools/release_sync.py check --offline
+        language: system
+        pass_filenames: false
