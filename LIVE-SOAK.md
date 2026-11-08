@@ -25,15 +25,15 @@ same publisher; this file remains the canonical text record.
 ## Status
 
 <!-- STATUS:BEGIN -->
-- **Segments done:** 7442 / 11,520
-- **Steps executed:** 89304
-- **Faults injected so far:** 744 (one every ten segments)
-- **Segments complete / halted (fail-closed):** 6839 / 603
+- **Segments done:** 7494 / 11,520
+- **Steps executed:** 89928
+- **Faults injected so far:** 749 (one every ten segments)
+- **Segments complete / halted (fail-closed):** 6888 / 606
 - **Drift events:** 0
-- **Audit chain:** 7179 entries under signed checkpoint in the published snapshot · 893 signed checkpoint(s) so far · the live log holds 7179 entries (the tail past the newest checkpoint is not yet checkpointed — the verifier says so rather than guessing, by design)
-- **Last chain verification:** VERIFIED — the published snapshot pair was verified cold with the product's own verifier at this refresh; the soak's own in-run verifications: 893/893 ok
+- **Audit chain:** 7227 entries under signed checkpoint in the published snapshot · 899 signed checkpoint(s) so far · the live log holds 7230 entries (the tail past the newest checkpoint is not yet checkpointed — the verifier says so rather than guessing, by design)
+- **Last chain verification:** VERIFIED — the published snapshot pair was verified cold with the product's own verifier at this refresh; the soak's own in-run verifications: 899/899 ok
 - **Interruptions resumed from checkpoint so far:** 13 (a deliberate proof kill at segment 3, and a supervision loss at segment 49 when the platform session was torn down during an outage — in both cases the soak resumed from its checkpoint and the chain verified across the interruption)
-- **Status as of:** 2026-11-08 08:47 EST (refreshed hourly from the soak's own state)
+- **Status as of:** 2026-11-08 09:47 EST (refreshed hourly from the soak's own state)
 <!-- STATUS:END -->
 
 ## How to read a halt — the language of this page, filed before the first segment
