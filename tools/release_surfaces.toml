@@ -58,6 +58,10 @@ path = "BUILD-LOG.md"
 reason = "append-only build record; entries name the tree they were written on"
 
 [[exempt_files]]
+path = "REPLICATION.md"
+reason = "public record of the replication package and the defect it caught; names the releases it documents"
+
+[[exempt_files]]
 glob = "docs/evidence/**"
 reason = "measured records; figures keep their trees' names by the attribution rule"
 
