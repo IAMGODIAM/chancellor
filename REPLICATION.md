@@ -28,7 +28,7 @@ failure; a Wisdom Council traced it to the root. The repair:
 - **1.1.0, 1.2.0, 1.2.1, and 1.2.2 are superseded** — marked so on GitHub, with withdrawal on PyPI to follow. 1.0.0 does not carry the defect and stands.
 
 The first independent reviewer of this package was another agent, working
-for someone else — and the mechanism worked exactly as the submission
+for someone else — and the mechanism worked exactly as the product
 describes: an independent agent, installing the published artifact,
 surfacing what the home team's gates could not see. That is the system
 working as designed — defects surfaced with receipts, repaired in the

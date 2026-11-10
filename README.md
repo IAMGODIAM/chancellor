@@ -20,9 +20,9 @@
 
 **The governance-and-eval harness for long-running agents.**
 
-Built for the Meta Global AI Developer Hackathon (Cerebral Valley), Indie Dev track, on the Meta Model API: `muse-spark-1.3` does the work, `muse-wonder-1.0` grades it — a worker never scores its own output.
+Built on the Meta Model API: `muse-spark-1.3` does the work, `muse-wonder-1.0` grades it — a worker never scores its own output.
 
-## For judges — the 60-second path
+## The 60-second path
 
 ```bash
 pip install chancellor
@@ -37,7 +37,7 @@ python -m chancellor.verify_log .chancellor-exhibit/audit-log.jsonl
 
 - **The evidence:** [docs/evidence/run-7/](docs/evidence/run-7/) — the 10x record (RUN-7) with its bounds printed, verified by an independent recount; the first measurement (RUN-5) stands at [docs/evidence/run-5/](docs/evidence/run-5/); a two-file sample you can verify in isolation lives in [docs/evidence/sample/](docs/evidence/sample/).
 - **Replicate it yourself:** [REPLICATION.md](REPLICATION.md) — the source distribution is the peer-review package, and the record of the defect its own machinery caught and repaired.
-- **Live — the judging-week soak:** [The Long Watch](https://iamgodiam.github.io/chancellor/live.html) — the frozen submission tree's soak, composed live: 11,520 governed segments across judging week, running through finals on Nov 9, rendered from the same state on the same hourly cycle. The canonical text record is [LIVE-SOAK.md](https://github.com/IAMGODIAM/chancellor/blob/judging-soak/LIVE-SOAK.md) on the `judging-soak` branch.
+- **Live — the long soak:** [The Long Watch](https://iamgodiam.github.io/chancellor/live.html) — the long-running soak, composed live: 11,520 governed segments, rendered from the same state on the same hourly cycle. The canonical text record is [LIVE-SOAK.md](https://github.com/IAMGODIAM/chancellor/blob/judging-soak/LIVE-SOAK.md) on the `judging-soak` branch.
 - **The supervisor's own evidence run (RUN-9 — complete, independently recounted):** [the RUN-9 board](https://github.com/IAMGODIAM/chancellor/blob/run9-live/LIVE-KEEP.md) — the KEEP office on trial in the open, now closed. Of the kills the run's driver actually fired, the supervisor detected and receipted 22 of 22; every resume was immediately preceded by a chain verification that passed (27 of 27), and drift re-derived from the persisted per-segment state files was 0 across 1,825 files, with zero corrupted committed state files. The supervisor's measured trial (RUN-9) found K1 at 22/40 and K6 at 215/240 on watch 9104 against their pre-registered thresholds; the continuity claims are stated with that exception. The supervisor anchors on one machine; machine death is outside its watch, and RUN-9's termination cell demonstrated that boundary rather than claiming past it.
 - **Live — the system's dialogue with itself (IN FLIGHT, UNVERIFIED):** [The Live Lab](https://iamgodiam.github.io/chancellor/keep-lab.html) — the supervisor's own receipts rendered as the conversation the system has with itself: noticed · diagnosed · checked · corrected, refreshed on the board's five-minute cycle beside the RUN-9 board above.
 - **The film:** the [Demo](#demo) section below — three minutes, a capture of this exact run.
@@ -89,7 +89,7 @@ Governance is not free, and the price is printed, not hidden: the governed arm c
 **Tests:** 297 passing, 0 failing — which also passes its own presentation gates: Ruff format and lint at zero findings, mypy clean, identical commands in pre-commit and CI (see the badge above).
 <!-- /release-sync:TESTS-LINE -->
 
-**Suite A:** the calibration gate has been run twice under pre-registration and has not passed — and no Suite A score is claimed anywhere in this submission. The calibration of record measured band κ 0.667 and Spearman ρ 0.881, with precedent-consistency (κ 0.294) and reversibility (κ 0.575) below the 0.6 criterion floor. The pre-registered remedy run then failed its own completeness gate — 35 of 36 references scored, one lost to two transport failures — and an incomplete run earns no gate statistics; its diagnostics (not gate statistics) put every criterion above threshold, and the judge's blind self-agreement, measured for the first time, satisfied its gate on all four criteria. What ships is the labeled fallback: live judge verdicts carry the label *uncalibrated* until a pre-registered run passes in full. The gate catching our own judge — twice — is the method working as designed.
+**Suite A:** the calibration gate has been run twice under pre-registration and has not passed — and no Suite A score is claimed anywhere in this README. The calibration of record measured band κ 0.667 and Spearman ρ 0.881, with precedent-consistency (κ 0.294) and reversibility (κ 0.575) below the 0.6 criterion floor. The pre-registered remedy run then failed its own completeness gate — 35 of 36 references scored, one lost to two transport failures — and an incomplete run earns no gate statistics; its diagnostics (not gate statistics) put every criterion above threshold, and the judge's blind self-agreement, measured for the first time, satisfied its gate on all four criteria. What ships is the labeled fallback: live judge verdicts carry the label *uncalibrated* until a pre-registered run passes in full. The gate catching our own judge — twice — is the method working as designed.
 
 Don't take the tables' word for any of this — the audit log of a governed run verifies offline, with no credentials and no network (see [Verify the audit log](#verify-the-audit-log)).
 
@@ -109,7 +109,7 @@ Chancellor was not built in one motion. It began with three questions — who gr
 
 The harness, drawn as the machine it is: four subassemblies — the Worker, the Grader, the Human Gate, and the Watch — mounted on the receipt chain as the central shaft. The model is not an illustration of the system; it is counted from one: **1,435 parts** in all — 114 authored parts, 1,175 checkpointed entries from a real audit chain, and 146 seals. Press TAMPER and one character in one entry's rationale is flipped; the verification then names the damage exactly — **587 entries downstream of the break, 74 seals invalidated, 588 re-derived** — and the refusal is receipted, not asserted. Through every press, the governed bin stays at zero.
 
-See it move: [the film](https://www.youtube.com/watch?v=z-2BGfKpuKA) — and live, all judging week, [The Long Watch](https://iamgodiam.github.io/chancellor/live.html).
+See it move: [the film](https://www.youtube.com/watch?v=z-2BGfKpuKA) — and live, [The Long Watch](https://iamgodiam.github.io/chancellor/live.html).
 
 The interactive machine itself is live on the project page — [explode it, cut it away, press TAMPER](https://muse.ai/s/chancellor-landing-page-ixc6runtx0wxw4/ExzrqSkjrxd3Z-Z4k2JdGi-gBRtvWbcZsqkloYmFXpE).
 
@@ -122,7 +122,7 @@ The rectification release — the product itself does not change: no behavior ch
 - **The previous source artifact could not run its own tests.** It shipped the test suite without the tooling tree the suite loads by path, without the frame document and evidence tree that shipped tests read, and without one test fixture — the suite died at collection, before a single test could run. The defect was found by running the shipped suite from the published artifact itself, on a clean machine.
 - **The artifact is now self-testing.** A packaging manifest ships exactly the measured set the shipped tests read — the tooling tree, the evidence tree, the frame document, the fixture — and nothing more; the rest of the docs, which no shipped test reads, stays out. The suite now runs end to end from the unpacked source distribution.
 - **The exhibit names its seal.** The demo's audit log verifies only with its checkpoint sidecar beside it; the exhibit now prints where the seal lives and that the log alone reads NOT VERIFIED. The version test, in turn, skips with its reason named when the uninstalled environment it requires cannot hold, and runs in full where it can.
-- **The submission is untouched.** The hackathon entry stands on the previous release exactly as submitted; this release corrects the download, not the entry.
+- **The measured record is untouched.** This release corrects the download only; no measured result and no shipped behavior changes.
 
 The suite stands at 297 passing — the same count as the previous release, now reachable from the source artifact itself — with Ruff and mypy clean. Judge verdicts remain labeled *uncalibrated*, exactly as in 1.2.2.
 
@@ -155,10 +155,10 @@ Nothing else changes: no new surface, no behavior change on any path either fix 
 Everything below is labeled with the verification it actually carries. Features are not measurements; where a number appears, it names its own evidence.
 
 - **The supervisor — `chancellor supervise` (the KEEP office).** Continuity is now a product capability, not external scaffolding: the supervisor watches the governed agent's signed checkpoint boundary, discriminates dead from stalled, verifies the chain at the newest signed checkpoint **before** any resume (verify-or-halt — resume is never forced), resumes with a provisional window, and writes signed interruption receipts with the cause graded proven / plausible / unknown — never fabricated. Its escalation budget survives its own restarts, rebuilt by replaying its own signed log. *Verification:* fault-injection verified — a supervised agent SIGKILLed mid-work is detected, verified, and resumed to completion with a proven-cause receipt, and a corrupted chain is refused with the agent never relaunched: **15 / 15 consecutive fault-injection pairs** on the final tree, plus the same pair run against the installed package binary. (The earlier measured runs predate the supervisor and do not claim it; its own evidence run is a separate instrument.)
-- **Checkpoint v2 — the anchor commits to the count.** Receipts now build checkpoints on an RFC 9162 Merkle tree, and one anchor digest commits to root + log size + head together — closing an anchor-layer gap where a bare root could not distinguish a log from itself-plus-a-duplicate. v1 records still verify under v1 rules. *Verification:* the test suite's checkpoint-v2 cases, and regression — the v1 sample evidence and the judging soak's published snapshot both verify under the new verifier.
+- **Checkpoint v2 — the anchor commits to the count.** Receipts now build checkpoints on an RFC 9162 Merkle tree, and one anchor digest commits to root + log size + head together — closing an anchor-layer gap where a bare root could not distinguish a log from itself-plus-a-duplicate. v1 records still verify under v1 rules. *Verification:* the test suite's checkpoint-v2 cases, and regression — the v1 sample evidence and the long soak's published snapshot both verify under the new verifier.
 - **Test runs are records.** Freeze manifests and test-run results are first-class entries in the same hash-chained log, resolvable by a fail-closed `resolve` verb — a release's test proof is part of the receipt book, not a claim beside it.
 - **Receipts name their frame; refusals leave receipts.** Every new receipt and gate verdict is stamped, inside the signed payload, with the governing frame it was decided under (`e5.chancellor_frame.v1`, schema `e5.decision_receipt.v2`; v1 entries are pre-frame legacy and verify as such). Every gate refusal is receipted with a named refusal state — a refusal is never a silent absence.
-- **Design only — labeled as such, not built:** the Suite C adversarial admission exam ([docs/suite-c-design.md](docs/suite-c-design.md)), the cap object for the human gate ([docs/cap-object-spec.md](docs/cap-object-spec.md)), and production signer separation ([docs/signer-separation-design.md](docs/signer-separation-design.md)) ship as design documents. A further specification in the repository specifies capability install — an agent gaining a new capability as a gated, receipted, reversible act under the same frame — written against governed install machinery already running in the entrant's wider multi-agent programme, where its doc-only perimeter is admitted on measured evidence. They change no behavior and claim none.
+- **Design only — labeled as such, not built:** the Suite C adversarial admission exam ([docs/suite-c-design.md](docs/suite-c-design.md)), the cap object for the human gate ([docs/cap-object-spec.md](docs/cap-object-spec.md)), and production signer separation ([docs/signer-separation-design.md](docs/signer-separation-design.md)) ship as design documents. A further specification in the repository specifies capability install — an agent gaining a new capability as a gated, receipted, reversible act under the same frame — written against governed install machinery already running in the operator's wider multi-agent programme, where its doc-only perimeter is admitted on measured evidence. They change no behavior and claim none.
 
 ## Quickstart
 
@@ -172,7 +172,7 @@ chancellor eval-a          # Suite A with stub agents
 chancellor eval-b          # Suite B reliability metrics
 ```
 
-Zero runtime dependencies — stdlib only, Python ≥ 3.11. Allow about two minutes for the demo at stage pace (the gate is meant to be waited at); `--fast` compresses the same run for a quick pass. Judging from a distance: `pip install git+https://github.com/IAMGODIAM/chancellor` installs the package straight from this repo, and `chancellor demo` runs offline.
+Zero runtime dependencies — stdlib only, Python ≥ 3.11. Allow about two minutes for the demo at stage pace (the gate is meant to be waited at); `--fast` compresses the same run for a quick pass. Trying it from a distance: `pip install git+https://github.com/IAMGODIAM/chancellor` installs the package straight from this repo, and `chancellor demo` runs offline.
 
 The exhibit writes its state to `./.chancellor-exhibit` in the current directory (task-graph state, the audit log, and its checkpoints). Its verdict block is byte-identical across clean runs. `chancellor demo --classic` runs the original scripted governed run, which keeps its state in `./.chancellor`.
 
@@ -259,12 +259,12 @@ docs/              GLOSSARY.md (the amendment key) + media/ (banner, badges) + e
 
 The code cites its governing amendments inline (AM-2, EA-5, …) — the key is [docs/GLOSSARY.md](docs/GLOSSARY.md).
 
-## How it maps to the judging criteria
+## The case, in brief
 
-- **Impact (30%)** — for anyone who runs long-running agents with real authority: every consequential act is gated before it happens, graded after it lands, and receipted either way — and the run itself is kept by the fourth element, a supervisor that verifies the chain before it resumes anything — so an operator can hand an agent real work (spend, sends, publishing, irreversible acts) and prove afterward exactly what it did, what it cost, and who approved it.
-- **Tooling — creative use of Meta's tools (25%)** — the Meta Model API supplies both halves of the separation of powers: `muse-spark-1.3` does the work and `muse-wonder-1.0` grades it, so no run is scored by the model that produced it. Exact, versioned IDs only — see [ERRATA.md](ERRATA.md) E-1.
-- **Demo (25%)** — `chancellor demo` runs end-to-end offline today; the identical run executes on the live Meta models through the same client (connection validated Oct 30), so the demo cannot drift from the product. (Video: see the Demo section above.)
-- **Technical Depth (20%)** — durable, crash-atomic task graphs proven under kill-resume gates (300 / 300 at 1x; 3,000 / 3,000 as a labeled 10-box reproduction at 10x), an in-product supervisor that verifies before it resumes, rubric-graded outputs from an independent judge, failure-injected reliability measurement with the cost printed beside the frontier, and a hash-chained audit log verifiable offline.
+- **Impact** — for anyone who runs long-running agents with real authority: every consequential act is gated before it happens, graded after it lands, and receipted either way — and the run itself is kept by the fourth element, a supervisor that verifies the chain before it resumes anything — so an operator can hand an agent real work (spend, sends, publishing, irreversible acts) and prove afterward exactly what it did, what it cost, and who approved it.
+- **Tooling** — the Meta Model API supplies both halves of the separation of powers: `muse-spark-1.3` does the work and `muse-wonder-1.0` grades it, so no run is scored by the model that produced it. Exact, versioned IDs only — see [ERRATA.md](ERRATA.md) E-1.
+- **Demo** — `chancellor demo` runs end-to-end offline today; the identical run executes on the live Meta models through the same client (connection validated Oct 30), so the demo cannot drift from the product. (Video: see the Demo section above.)
+- **Technical depth** — durable, crash-atomic task graphs proven under kill-resume gates (300 / 300 at 1x; 3,000 / 3,000 as a labeled 10-box reproduction at 10x), an in-product supervisor that verifies before it resumes, rubric-graded outputs from an independent judge, failure-injected reliability measurement with the cost printed beside the frontier, and a hash-chained audit log verifiable offline.
 
 ## Agent collaboration
 
