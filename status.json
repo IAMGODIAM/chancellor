@@ -1,0 +1,65 @@
+{
+ "polled_at_est": "2026-11-20 00:32 EST",
+ "label": "IN FLIGHT / UNVERIFIED",
+ "boxes": [
+  {
+   "name": "b0",
+   "cell": "A \u2014 kill cycle",
+   "region": "us-east-1",
+   "lambda": null,
+   "reachable": false,
+   "progress": null,
+   "soaks": [],
+   "error": "not present in lambda list"
+  },
+  {
+   "name": "b1",
+   "cell": "A \u2014 kill cycle (replication)",
+   "region": "us-west-1",
+   "lambda": null,
+   "reachable": false,
+   "progress": null,
+   "soaks": [],
+   "error": "not present in lambda list"
+  },
+  {
+   "name": "b2",
+   "cell": "B \u2014 supervisor death + refusal",
+   "region": "us-east-1",
+   "lambda": null,
+   "reachable": false,
+   "progress": null,
+   "soaks": [],
+   "error": "not present in lambda list"
+  },
+  {
+   "name": "b3",
+   "cell": "C \u2014 stall vs death, then D \u2014 machine loss (staged)",
+   "region": "us-west-1",
+   "lambda": null,
+   "reachable": false,
+   "progress": null,
+   "soaks": [],
+   "error": "not present in lambda list"
+  }
+ ],
+ "totals": {
+  "segments_done": 0,
+  "segments_target": 0,
+  "segments_complete": 0,
+  "segments_halted": 0,
+  "faults_injected": 0,
+  "drift_events": 0,
+  "refusals": 0,
+  "escalations": 0,
+  "events": {}
+ },
+ "anomalies": [],
+ "notables": [
+  "box b0 not yet reporting (lambda: absent)",
+  "box b1 not yet reporting (lambda: absent)",
+  "box b2 not yet reporting (lambda: absent)",
+  "box b3 not yet reporting (lambda: absent)"
+ ],
+ "run_complete": false
+}
